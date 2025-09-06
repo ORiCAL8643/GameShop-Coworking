@@ -22,6 +22,7 @@ type User struct {
 	Attachments   []Attachment  `gorm:"foreignKey:UserID" json:"attachments,omitempty"`
 	Notifications []Notification `gorm:"foreignKey:UserID" json:"notifications,omitempty"`
 	UserGames     []UserGame    `gorm:"foreignKey:UserID" json:"user_games,omitempty"`
+	
 
 	Reviews     []Review      `gorm:"foreignKey:UserID" json:"reviews,omitempty"`
     ReviewLikes []Review_Like `gorm:"foreignKey:UserID" json:"review_likes,omitempty"`
