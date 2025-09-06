@@ -1,8 +1,6 @@
-// src/pages/ReviewForm.tsx
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Typography, Card, Form, Rate, Input, Button, Space, message, Popconfirm } from "antd";
-import { create, getById, update, remove } from "../services/reviewsApi";
 
 const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
@@ -10,84 +8,50 @@ const { TextArea } = Input;
 export default function ReviewForm() {
   const { gameId, reviewId } = useParams();
   const navigate = useNavigate();
-  const isEdit = Boolean(reviewId);
+  const isEdit = useMemo(() => Boolean(reviewId), [reviewId]);
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
 
-  const gameTitle = useMemo(() => `Game #${gameId}`, [gameId]);
-
-  useEffect(() => {
-    if (isEdit && reviewId) {
-      const data = getById(reviewId);
-      if (!data) {
-        message.error("ไม่พบรีวิวนี้");
-        navigate(`/game/${gameId}`);
-        return;
-      }
-      form.setFieldsValue({
-        title: data.title,
-        rating: data.rating,
-        text: data.text,
-      });
-    }
-  }, [isEdit, reviewId, form, navigate, gameId]);
+  // UI-only: จำลอง set ค่าเริ่มต้นเมื่อแก้ไข
+  // (ของจริงค่อยดึงค่าจาก service/Backend แล้ว setFieldsValue)
+  // form.setFieldsValue({ title: "...", rating: 4, text: "..." });
 
   const handleSubmit = async () => {
     try {
-      setLoading(true);
-      const { title, rating, text } = await form.validateFields();
-      const user = "You"; // mock user
-      if (!gameId) { message.error("ไม่พบ gameId"); return; }
-
-      if (isEdit && reviewId) {
-        const updated = update(reviewId, { title, rating, text });
-        if (!updated) throw new Error("อัปเดตไม่สำเร็จ");
-        message.success("แก้ไขรีวิวสำเร็จ");
-      } else {
-        create({ gameId, user, title, rating, text });
-        message.success("สร้างรีวิวสำเร็จ");
-      }
-      navigate(`/game/${gameId}`);
-    } catch (err: any) {
-      if (err?.errorFields) return; // validation error
-      message.error(err?.message || "เกิดข้อผิดพลาด");
-    } finally { setLoading(false); }
+      await form.validateFields();
+      // UI-only: ยังไม่บันทึกจริง แค่แจ้งเตือน
+      message.success(isEdit ? "จำลอง: อัปเดตรีวิวแล้ว" : "จำลอง: สร้างรีวิวแล้ว");
+      navigate(-1);
+    } catch {
+      /* validation error */
+    }
   };
 
   const handleDelete = () => {
-    if (!reviewId) return;
-    const ok = remove(reviewId);
-    if (ok) { message.success("ลบรีวิวสำเร็จ"); navigate(`/game/${gameId}`); }
-    else { message.error("ลบไม่สำเร็จ"); }
+    // UI-only: ยังไม่ลบจริง
+    message.success("จำลอง: ลบรีวิวแล้ว");
+    navigate(-1);
   };
 
   return (
-    <div>
-      <div style={{
-        background: "linear-gradient(90deg, #9254de 0%, #f759ab 100%)",
-        height: 120, borderRadius: 10, marginBottom: 24
-      }} />
+    <div style={{ padding: 24 }}>
       <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}>
-        <Space direction="vertical" style={{ width: "100%" }} size="middle">
-          <Title level={3} style={{ color: "white", margin: 0 }}>
-            {isEdit ? "Edit Review" : "Create Review"}
-          </Title>
-          <Paragraph style={{ color: "#ddd" }}>
-            {isEdit ? "แก้ไขรีวิวของคุณสำหรับ" : "เขียนรีวิวสำหรับ"}{" "}
-            <span style={{ color: "#fff", fontWeight: 600 }}>{gameTitle}</span>
-          </Paragraph>
+        <Space direction="vertical" size="large" style={{ width: "100%" }}>
+          <div>
+            <Title level={3} style={{ color: "white", margin: 0 }}>
+              {isEdit ? "แก้ไขรีวิว" : "เขียนรีวิว"}
+            </Title>
+            <Paragraph style={{ color: "#aaa", margin: 0 }}>
+              {isEdit ? "UI เท่านั้น (ยังไม่บันทึกจริง)" : `UI เท่านั้น (gameId: ${gameId || "-"})`}
+            </Paragraph>
+          </div>
 
-          <Form form={form} layout="vertical" requiredMark={false}>
-            {/* ✅ Title */}
+          <Form form={form} layout="vertical" requiredMark="optional">
             <Form.Item
               name="title"
-              label={<span style={{ color: "#ccc" }}>Title</span>}
-              rules={[
-                { required: true, message: "กรอกหัวข้อรีวิวด้วยครับ" },
-                { min: 4, message: "อย่างน้อย 4 ตัวอักษร" },
-              ]}
+              label={<span style={{ color: "#ccc" }}>หัวข้อรีวิว</span>}
+              rules={[{ required: true, message: "ใส่หัวข้อด้วยครับ" }]}
             >
-              <Input placeholder="เช่น สนุกมาก ระบบต่อสู้ดุดัน แต่ performance สะดุด" />
+              <Input placeholder="เช่น สนุกมาก ระบบต่อสู้ดี" />
             </Form.Item>
 
             <Form.Item
@@ -106,22 +70,22 @@ export default function ReviewForm() {
                 { min: 10, message: "อย่างน้อย 10 ตัวอักษร" },
               ]}
             >
-              <TextArea rows={5} placeholder="บอกเล่าประสบการณ์ ความเห็น จุดเด่น/ด้อย ฯลฯ" />
+              <TextArea rows={5} placeholder="เล่าประสบการณ์เล่นของคุณ…" />
             </Form.Item>
 
             <Space>
-              <Button type="primary" loading={loading} onClick={handleSubmit}>
-                {isEdit ? "Update Review" : "Submit Review"}
+              <Button type="primary" onClick={handleSubmit}>
+                {isEdit ? "บันทึกการแก้ไข (จำลอง)" : "โพสต์รีวิว (จำลอง)"}
               </Button>
-              <Button onClick={() => navigate(`/game/${gameId}`)}>Cancel</Button>
+              <Button onClick={() => navigate(-1)}>ยกเลิก</Button>
               {isEdit && (
                 <Popconfirm
-                  title="ลบรีวิว?"
+                  title="ต้องการลบรีวิวนี้?"
                   okText="ลบ" cancelText="ยกเลิก"
                   okButtonProps={{ danger: true }}
                   onConfirm={handleDelete}
                 >
-                  <Button danger>Delete</Button>
+                  <Button danger>Delete (จำลอง)</Button>
                 </Popconfirm>
               )}
             </Space>
