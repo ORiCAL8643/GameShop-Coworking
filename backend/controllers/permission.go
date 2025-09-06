@@ -3,8 +3,8 @@ package controllers
 import (
 	"net/http"
 
-	"gameshop-backend/configs"
-	"gameshop-backend/entity/role"
+	"example.com/sa-gameshop/configs"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 

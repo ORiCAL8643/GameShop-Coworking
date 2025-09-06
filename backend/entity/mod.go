@@ -15,11 +15,11 @@ type Mod struct {
 	FilePath    string    `json:"file_path"`
 	Status      string    `json:"status"`
 
-	GameUserID uint     `json:"game_user_id"`
-	GameUser   *GameUser `gorm:"foreignKey:GameUserID" json:"game_user"`
+	UserGameID uint      `json:"user_game_id"`
+	UserGame   *UserGame `gorm:"foreignKey:UserGameID" json:"user_game"`
 
-	GameID uint   `json:"game_id"`
-	Game   *Game  `gorm:"foreignKey:GameID" json:"game"`
+	GameID uint  `json:"game_id"`
+	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
 
 	ModTags []ModTag `gorm:"foreignKey:ModID" json:"mod_tags"`
 }

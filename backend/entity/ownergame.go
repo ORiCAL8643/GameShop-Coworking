@@ -12,8 +12,8 @@ type OwnerGame struct {
 	PurchaseDate time.Time `json:"purchase_date"`
 	Status       string    `json:"status"`
 
-	GameUserID uint       `json:"game_user_id"`
-	GameUser   *GameUser  `gorm:"foreignKey:GameUserID" json:"game_user"`
+	UserGameID uint      `json:"user_game_id"`
+	UserGame   *UserGame `gorm:"foreignKey:UserGameID" json:"user_game"`
 
 	GameID uint  `json:"game_id"`
 	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
