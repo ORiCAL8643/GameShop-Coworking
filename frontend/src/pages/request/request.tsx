@@ -1,5 +1,5 @@
 import { Layout, Space, Button } from 'antd';
-import Navbar from "../components/Navbar";
+import Navbar from "../../components/Navbar";
 import { Typography, Input, DatePicker } from "antd";
 import { Col, Row } from 'antd';
 
