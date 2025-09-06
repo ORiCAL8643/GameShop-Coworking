@@ -21,5 +21,5 @@ type Mod struct {
 	GameID uint  `json:"game_id"`
 	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
 
-	ModTags []ModTag `gorm:"foreignKey:ModID" json:"mod_tags"`
+	ModTags []ModTags `gorm:"foreignKey:ModID" json:"mod_tags"`
 }
