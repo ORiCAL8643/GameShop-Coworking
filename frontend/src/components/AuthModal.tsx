@@ -1,0 +1,109 @@
+import { useState } from 'react';
+import { Modal, Form, Input, Button, DatePicker } from 'antd';
+
+interface AuthModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
+  const [isLogin, setIsLogin] = useState(true);
+
+  const toggleMode = () => setIsLogin(!isLogin);
+
+  return (
+    <Modal open={open} onCancel={onClose} footer={null} centered>
+      {isLogin ? (
+        <>
+          <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Login</h2>
+          <Form layout="vertical">
+            <Form.Item
+              label="Username"
+              name="username"
+              rules={[{ required: true, message: 'Please enter your username' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="Password"
+              name="password"
+              rules={[{ required: true, message: 'Please enter your password' }]}
+            >
+              <Input.Password />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block>
+                Login
+              </Button>
+            </Form.Item>
+            <Form.Item>
+              <Button type="link" onClick={toggleMode} block>
+                Don't have an account? Sign Up
+              </Button>
+            </Form.Item>
+          </Form>
+        </>
+      ) : (
+        <>
+          <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Sign Up</h2>
+          <Form layout="vertical">
+            <Form.Item
+              label="Username"
+              name="username"
+              rules={[{ required: true, message: 'Please enter your username' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="Password"
+              name="password"
+              rules={[{ required: true, message: 'Please enter your password' }]}
+            >
+              <Input.Password />
+            </Form.Item>
+            <Form.Item
+              label="Email"
+              name="email"
+              rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="First Name"
+              name="first_name"
+              rules={[{ required: true, message: 'Please enter your first name' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="Last Name"
+              name="last_name"
+              rules={[{ required: true, message: 'Please enter your last name' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
+              label="Birthday"
+              name="birthday"
+              rules={[{ required: true, message: 'Please select your birthday' }]}
+            >
+              <DatePicker style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block>
+                Sign Up
+              </Button>
+            </Form.Item>
+            <Form.Item>
+              <Button type="link" onClick={toggleMode} block>
+                Already have an account? Login
+              </Button>
+            </Form.Item>
+          </Form>
+        </>
+      )}
+    </Modal>
+  );
+};
+
+export default AuthModal;
