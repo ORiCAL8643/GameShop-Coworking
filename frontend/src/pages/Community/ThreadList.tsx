@@ -46,7 +46,7 @@ export default function ThreadList({ threads, sortBy, onOpen, onCreate }: Props)
     return arr.sort((a, b) => {
       if (sortBy === "likes") return b.likes - a.likes;
       if (sortBy === "comments")
-        return b.comments.length - a.comments.length;
+        return b.commentCount - a.commentCount;
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [threads, sortBy]);
@@ -153,7 +153,7 @@ export default function ThreadList({ threads, sortBy, onOpen, onCreate }: Props)
               </div>
               <Space>
                 <Button icon={<LikeOutlined />} shape="circle" />
-                <Badge count={t.comments.length} size="small">
+                <Badge count={t.commentCount} size="small">
                   <Button icon={<MessageOutlined />} shape="circle" />
                 </Badge>
               </Space>
