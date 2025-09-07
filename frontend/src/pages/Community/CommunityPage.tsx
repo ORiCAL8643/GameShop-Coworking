@@ -1,8 +1,11 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { message, Space, Select } from "antd";
+import axios from "axios";
 import ThreadList from "./ThreadList";
 import ThreadDetail from "./ThreadDetail";
 import type { Thread, ThreadComment } from "./types";
+
+const base_url = "http://localhost:8088";
 
 export default function CommunityPage() {
   // --- mock data เริ่มต้น ---
@@ -14,6 +17,7 @@ export default function CommunityPage() {
       author: "neurougue",
       createdAt: "3 ชม.ที่แล้ว",
       likes: 2,
+      commentCount: 2,
       comments: [
         { id: 11, author: "Yanis_zaky", content: "1", datetime: "3 ชม. @ 8:17am" },
         { id: 12, author: "MaT", content: "2", datetime: "3 ชม. @ 5:06pm" },
@@ -26,6 +30,7 @@ export default function CommunityPage() {
       author: "Sil Halcorrn",
       createdAt: "8 ชม.ที่แล้ว",
       likes: 1,
+      commentCount: 0,
       comments: [],
     },
   ]);
@@ -51,6 +56,7 @@ export default function CommunityPage() {
       author: "คุณ",
       createdAt: "เพิ่งโพสต์",
       likes: 0,
+      commentCount: 0,
       comments: [],
       images, // ✅ เก็บรูปไปกับเธรด
     };
@@ -68,10 +74,33 @@ export default function CommunityPage() {
       datetime: "เพิ่งตอบกลับ",
     };
     setThreads((prev) =>
-      prev.map((t) => (t.id === activeThread.id ? { ...t, comments: [...t.comments, newC] } : t))
+      prev.map((t) =>
+        t.id === activeThread.id
+          ? { ...t, comments: [...t.comments, newC], commentCount: t.commentCount + 1 }
+          : t
+      )
     );
     message.success("ตอบกลับแล้ว");
   };
+
+  useEffect(() => {
+    axios
+      .get(`${base_url}/threads`, { params: { sort: sortBy } })
+      .then((res) => {
+        const data = res.data.map((t: any) => ({
+          id: t.ID,
+          title: t.title,
+          body: t.content,
+          author: t.user?.username || "",
+          createdAt: t.CreatedAt || "",
+          likes: t.likes,
+          commentCount: t.comments,
+          comments: [],
+        })) as Thread[];
+        setThreads(data);
+      })
+      .catch(() => {});
+  }, [sortBy]);
 
   return (
     <div style={{minHeight:'100vh', padding: 24 , flex: 1 , background: "#1e1e2f"}}>
