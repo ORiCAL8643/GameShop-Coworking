@@ -61,11 +61,38 @@ const PaymentPage = () => {
     }
     try {
       setSubmitting(true);
-      await new Promise((r) => setTimeout(r, 900));
+
+      // 1) สร้างข้อมูลการชำระเงิน
+      const res = await fetch("http://localhost:8088/payments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          order_id: orderId,
+          amount: total,
+          status: "PENDING",
+        }),
+      });
+      if (!res.ok) throw new Error("create payment failed");
+      const payment = await res.json();
+      const paymentId = payment.id || payment.ID;
+
+      // 2) อัปโหลดสลิปการชำระเงิน
+      const form = new FormData();
+      form.append("file", files[0].originFileObj as File);
+      form.append("payment_id", String(paymentId));
+      const slipRes = await fetch("http://localhost:8088/payment_slips", {
+        method: "POST",
+        body: form,
+      });
+      if (!slipRes.ok) throw new Error("upload slip failed");
+
+      // 3) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
       message.success("ส่งยืนยันการชำระเงินเรียบร้อย");
       setPayOpen(false);
       setFiles([]);
-    } catch {
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
       message.error("ส่งสลิปไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setSubmitting(false);
