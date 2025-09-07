@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -31,7 +31,12 @@ func CreateOrderItem(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "game_key_id not found"})
 			return
 		}
-		if gk.OrderItemID != nil {
+		// ตรวจว่าคีย์เกมถูกใช้ไปแล้วหรือยัง (อาศัยคอลัมน์ order_item_id)
+		var cnt int64
+		db.Model(&entity.KeyGame{}).
+			Where("id = ? AND order_item_id IS NOT NULL", *body.GameKeyID).
+			Count(&cnt)
+		if cnt > 0 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "game key already assigned"})
 			return
 		}
@@ -62,7 +67,7 @@ func CreateOrderItem(c *gin.Context) {
 
 func FindOrderItems(c *gin.Context) {
 	var rows []entity.OrderItem
-	db := configs.DB().Preload("Order").Preload("GameKey")
+	db := configs.DB().Preload("Order").Preload("KeyGame")
 	orderID := c.Query("order_id")
 	if orderID != "" {
 		db = db.Where("order_id = ?", orderID)
