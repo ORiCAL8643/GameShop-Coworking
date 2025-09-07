@@ -1,10 +1,24 @@
-import { Input, Avatar, Space } from 'antd';
+
 import { SearchOutlined, ShoppingCartOutlined, BellOutlined, DollarCircleOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import { Input, Avatar, Space, Button } from 'antd';
+
 import { Link } from 'react-router-dom';
+import AuthModal from '../components/AuthModal';
 
 const Navbar = () => {
+  const [openAuth, setOpenAuth] = useState(false);
+
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: '#1f1f1f' }}>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        padding: '16px',
+        background: '#1f1f1f',
+      }}
+    >
       {/* Search */}
       <Input
         prefix={<SearchOutlined />}
@@ -22,9 +36,14 @@ const Navbar = () => {
         </Link>
 
         <ShoppingCartOutlined style={{ color: 'white', fontSize: '18px' }} />
+        <Button type="primary" onClick={() => setOpenAuth(true)}>
+          Login
+        </Button>
         <Avatar src="https://i.pravatar.cc/300" />
       </Space>
+      <AuthModal open={openAuth} onClose={() => setOpenAuth(false)} />
     </div>
+  </div>
   );
 };
 
