@@ -3,7 +3,7 @@ package main
 
 import (
 	"example.com/sa-gameshop/configs"
-    //"example.com/sa-gameshop/entity"
+	//"example.com/sa-gameshop/entity"
 	"example.com/sa-gameshop/controllers"
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +23,7 @@ func main() {
 
 	router := r.Group("/")
 	{
+		router.POST("/login", controllers.Login)
 		// ===== Users =====
 		router.POST("/users", controllers.CreateUser)
 		router.GET("/users", controllers.FindUsers)
@@ -60,14 +61,14 @@ func main() {
 
 		// ===== Reactions =====
 		router.POST("/reactions", controllers.CreateReaction)
-		router.GET("/reactions", controllers.FindReactions)      // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/reactions", controllers.FindReactions) // ใช้ ?target_type=&target_id=&user_id=
 		router.GET("/reactions/:id", controllers.FindReactionByID)
 		router.PUT("/reactions/:id", controllers.UpdateReaction)
 		router.DELETE("/reactions/:id", controllers.DeleteReactionByID)
 
 		// ===== Attachments =====
 		router.POST("/attachments", controllers.CreateAttachment)
-		router.GET("/attachments", controllers.FindAttachments)  // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/attachments", controllers.FindAttachments) // ใช้ ?target_type=&target_id=&user_id=
 		router.GET("/attachments/:id", controllers.FindAttachmentByID)
 		router.PUT("/attachments/:id", controllers.UpdateAttachment)
 		router.DELETE("/attachments/:id", controllers.DeleteAttachmentByID)
