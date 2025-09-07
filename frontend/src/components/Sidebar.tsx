@@ -45,6 +45,10 @@ const items: groupItem[] = [
     key: '/workshop',
     label:'Workshop',
   },
+  {
+    key: '/refund',
+    label:'การคืนเงินผู้ใช้',
+  }
 ];
 
 const Sidebar = () => {
