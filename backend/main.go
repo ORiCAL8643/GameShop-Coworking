@@ -32,7 +32,7 @@ func main() {
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 
 		// ===== Games =====
-		router.POST("/games", controllers.CreateGame)
+		router.POST("/new-games", controllers.CreateGame)
 		router.GET("/games", controllers.FindGames)
 		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
