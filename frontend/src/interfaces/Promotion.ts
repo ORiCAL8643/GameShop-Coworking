@@ -6,6 +6,8 @@ export type DiscountType = "PERCENT" | "AMOUNT";
 
 export interface Promotion {
   ID: number;
+  title: string;
+  description?: string;
   discount_type: DiscountType;
   discount_value: number;        // >= 0
   start_date: string;            // ISO string
@@ -18,6 +20,8 @@ export interface Promotion {
 }
 
 export interface CreatePromotionRequest {
+  title: string;
+  description?: string;
   discount_type: DiscountType;
   discount_value: number;
   start_date: string;   // e.g., new Date().toISOString()
@@ -28,4 +32,4 @@ export interface CreatePromotionRequest {
   game_ids?: number[];
 }
 
-export interface UpdatePromotionRequest extends Partial<CreatePromotionRequest> {}
+export type UpdatePromotionRequest = Partial<CreatePromotionRequest>;
