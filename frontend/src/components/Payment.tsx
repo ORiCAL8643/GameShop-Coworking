@@ -28,7 +28,7 @@ const TEXT_SUB = "#a9afc3";
 import qrPromptPay from "../assets/ktb-qr.png";
 
 interface CartItem {
-  id: string;
+  id: number;
   title: string;
   price: number; // THB
   note?: string;
@@ -61,9 +61,9 @@ const PaymentPage = () => {
         setOrder(data);
         const mapped: CartItem[] =
           data.order_items?.map((it: any) => ({
-            id: String(it.id),
-            title: it.key_game?.game?.game_name || `Game ${it.id}`,
-            price: it.line_total ?? it.unit_price ?? 0,
+            id: it.id,
+            title: it.key_game.game.game_name,
+            price: it.line_total,
           })) || [];
         setItems(mapped);
       } catch (err) {
