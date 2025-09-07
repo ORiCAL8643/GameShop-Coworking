@@ -56,6 +56,7 @@ export default function RefundPage() {
         minHeight: "100%",
         color: "#fbfbfbff",
         padding: "40px 20px",
+        flex: 1
       }}
     >
       <style>

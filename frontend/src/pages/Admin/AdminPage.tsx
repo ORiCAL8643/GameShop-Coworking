@@ -116,10 +116,11 @@ export default function AdminPage({
     <div
       style={{
         background: "#0f0c29",
-        minHeight: "100%",
+        minHeight: "100vh",
         padding: "50px",
         color: "#fff",
         fontFamily: "'Poppins', sans-serif",
+        flex:1
       }}
     >
       <Title
