@@ -17,7 +17,7 @@ import Workshop from "../pages/Workshop/UploadPage.tsx";
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
-
+import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 // 🟣 Mock Refund Data
 const refunds = [
   {
@@ -82,14 +82,15 @@ const router = createBrowserRouter([
       // 🟣 Admin
       {
         path: "/Admin",
-        element: (
-          <AdminPage
+        children: [
+          { path: "/Admin/Page", element:<AdminPage
             refunds={refunds}
             setRefunds={() => {}}
             addNotification={addNotification}
             addRefundUpdate={addRefundUpdate}
-          />
-        ),
+          /> },
+          { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+        ],
       },
     ],
   },
