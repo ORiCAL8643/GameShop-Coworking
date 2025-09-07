@@ -52,7 +52,7 @@ export default function RefundPage() {
   return (
     <div
       style={{
-        background: "dark",
+        background: "#1e1e2f",
         minHeight: "100%",
         color: "#fbfbfbff",
         padding: "40px 20px",
