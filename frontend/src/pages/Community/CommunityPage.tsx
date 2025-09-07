@@ -71,6 +71,7 @@ export default function CommunityPage() {
   };
 
   return (
+    <div style={{minHeight:'100vh', padding: 24 , flex: 1 , background: "#1e1e2f"}}>
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
       {activeThread ? (
         <ThreadDetail
@@ -86,5 +87,6 @@ export default function CommunityPage() {
         />
       )}
     </Space>
+    </div>
   );
 }

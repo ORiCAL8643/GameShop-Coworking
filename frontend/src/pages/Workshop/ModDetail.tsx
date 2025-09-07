@@ -20,7 +20,7 @@ import {
 } from "@ant-design/icons";
 
 // import รูปจาก src/assets
-import defaultModImage from "../assets/mod1.jpg";
+import defaultModImage from "../../assets/header.jpg";
 
 const { Content, Header } = Layout;
 const { Title, Text, Paragraph } = Typography;
