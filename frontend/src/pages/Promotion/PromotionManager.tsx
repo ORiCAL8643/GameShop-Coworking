@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import {
   Layout, Card, Form, Input, InputNumber, DatePicker, Switch,
-  Button, Space, Table, Tag, Popconfirm, message, Typography, Select,
+  Button, Space, Table, Tag, Popconfirm, message, Typography, Select, Upload
 } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import Sidebar from "../../components/Sidebar";
 import type { Promotion, GameLite } from "../Promotion/App.ts";
@@ -38,7 +39,7 @@ type FormValues = {
   active: boolean;
   dateRange: [Dayjs, Dayjs];
   gameIds: string[];
-  imageUrl?: string;
+  imageFile?: any;
 };
 
 export default function PromotionManager() {
@@ -54,7 +55,8 @@ export default function PromotionManager() {
 
   const onSubmit = async () => {
     try {
-      await form.validateFields();
+      const values = await form.validateFields();
+      console.log("Form values:", values);
       message.success(isEdit ? "จำลอง: อัปเดตแล้ว" : "จำลอง: สร้างแล้ว");
       form.resetFields();
       setEditingId(null);
@@ -106,7 +108,6 @@ export default function PromotionManager() {
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
-     
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <Title level={2} style={{ color: "white" }}>Promotion Manager</Title>
@@ -148,8 +149,15 @@ export default function PromotionManager() {
                 <Select mode="multiple" placeholder="เลือกเกม" options={gameOptions} style={{ maxWidth: 600 }} />
               </Form.Item>
 
-              <Form.Item name="imageUrl" label={<span style={{ color: "#ccc" }}>รูปภาพ (URL)</span>}>
-                <Input placeholder="เช่น https://…" />
+              {/* ช่องอัปโหลดรูปภาพ */}
+              <Form.Item name="imageFile" label={<span style={{ color: "#ccc" }}>อัปโหลดรูปภาพ</span>}>
+                <Upload
+                  listType="picture"
+                  maxCount={1}
+                  beforeUpload={() => false} // ปิดการอัปโหลดจริง เก็บไฟล์ใน form
+                >
+                  <Button icon={<UploadOutlined />}>เลือกไฟล์</Button>
+                </Upload>
               </Form.Item>
 
               <Space>
