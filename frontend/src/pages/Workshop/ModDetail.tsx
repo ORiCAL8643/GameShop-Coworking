@@ -14,8 +14,6 @@ import {
 import {
     UserOutlined,
     CalendarOutlined,
-    DownloadOutlined,
-    ShareAltOutlined,
     ArrowLeftOutlined,
 } from "@ant-design/icons";
 
