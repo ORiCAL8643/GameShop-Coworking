@@ -45,7 +45,11 @@ const PaymentPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
-  const orderIdParam = id || searchParams.get("id") || searchParams.get("order_id");
+  const orderIdParam =
+    id ||
+    searchParams.get("id") ||
+    searchParams.get("order_id") ||
+    localStorage.getItem("orderId");
 
   useEffect(() => {
     if (!orderIdParam) return;

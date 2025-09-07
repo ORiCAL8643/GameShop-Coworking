@@ -70,8 +70,10 @@ const ProductGrid = () => {
       const orderId = res.data.ID || res.data.id;
       if (orderId) {
         localStorage.setItem('orderId', String(orderId));
+        navigate(`/category/Payment?id=${orderId}`);
+      } else {
+        navigate('/category/Payment');
       }
-      navigate('/category/Payment');
     } catch (err) {
       console.error('add to cart error', err);
     }
