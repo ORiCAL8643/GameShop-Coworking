@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Modal, Form, Input, Button, DatePicker } from 'antd';
 import { useAuth } from '../context/AuthContext';
+import type { Notification } from '../interfaces/Notification';
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  onLoginSuccess?: () => void;
+  onLoginSuccess?: (notif: Notification) => void;
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) => {
@@ -25,16 +26,25 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         }),
       });
 
+      const result = await res.json();
       if (!res.ok) {
-        throw new Error('Login failed');
+        Modal.error({ title: 'เข้าสู่ระบบไม่สำเร็จ', content: result.error });
+        return;
       }
 
-      const data = await res.json();
-      login(data.token, values.username);
+      login(result.token, values.username);
+      const notification = {
+        ID: Date.now(),
+        title: 'ระบบ',
+        type: 'system',
+        message: 'เข้าสู่ระบบสำเร็จ',
+        created_at: new Date().toLocaleString(),
+        is_read: false,
+      } as Notification;
+      onLoginSuccess?.(notification);
       onClose();
-      onLoginSuccess?.();
     } catch (error) {
-      console.error(error);
+      Modal.error({ title: 'เกิดข้อผิดพลาด', content: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์' });
     }
   };
 
@@ -58,7 +68,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
       const data = await res.json();
       login(data.token, values.username);
       onClose();
-      onLoginSuccess?.();
     } catch (error) {
       console.error(error);
     }
