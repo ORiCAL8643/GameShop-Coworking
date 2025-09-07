@@ -38,7 +38,7 @@ const ProductGrid = () => {
   const[game, Setgame] = useState<Game[]>([])
   async function GetGame() {
         try {
-        const response = await axios.get(`${base_url}/game`)
+        const response = await axios.get(`${base_url}/games`)
         Setgame(response.data)
         console.log(response.data)
         } catch(err) {

@@ -3,7 +3,6 @@ package main
 
 import (
 	"example.com/sa-gameshop/configs"
-	//"example.com/sa-gameshop/entity"
 	"example.com/sa-gameshop/controllers"
 	"github.com/gin-gonic/gin"
 )
