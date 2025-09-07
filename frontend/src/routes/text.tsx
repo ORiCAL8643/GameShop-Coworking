@@ -18,6 +18,7 @@ import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
+import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -74,6 +75,8 @@ const router = createBrowserRouter([
       { path: "/workshop/:title", element: <WorkshopDetail /> },
       { path: "/mod/:title", element: <ModDetail /> },
       { path: "/upload", element: <Workshop /> },
+
+      { path: "/promotion", element: <PromotionManager /> },
 
       // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
