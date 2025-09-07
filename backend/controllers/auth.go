@@ -24,13 +24,13 @@ func Login(c *gin.Context) {
 	}
 
 	var user entity.User
-	if err := configs.DB().Where("username = ?", body.Username).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+	if tx := configs.DB().Where("username = ?", body.Username).First(&user); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(body.Password)); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "incorrect password"})
 		return
 	}
 
@@ -50,5 +50,5 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"token": tokenString})
+	c.JSON(http.StatusOK, gin.H{"message": "login successful", "token": tokenString})
 }
