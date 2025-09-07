@@ -103,7 +103,7 @@ export default function AdminPaymentReviewPage() {
   };
 
   return (
-    <div style={{ padding: 24, background: BG_DARK, minHeight: "100%" }}>
+    <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1 }}>
       <Typography.Title level={2} style={{ color: THEME_PRIMARY, marginBottom: 16 }}>
         ตรวจสอบการชำระเงิน
       </Typography.Title>
