@@ -29,14 +29,6 @@ const Navbar = () => {
 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: '#1f1f1f' }}>
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        padding: '16px',
-        background: '#1f1f1f',
-      }}
-    >
       {/* Search */}
       <Input
         prefix={<SearchOutlined />}
