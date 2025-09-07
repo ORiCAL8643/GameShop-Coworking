@@ -75,7 +75,7 @@ const Add = () => {
 
     async function AddGame() {
         try {
-            const response = await axios.post(`${base_url}/new-game`, {
+            const response = await axios.post(`${base_url}/new-games`, {
             game_name: gameName,
             base_price: price,
             age_rating: age,
