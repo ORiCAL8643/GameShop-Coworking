@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image, App, Tooltip, Select
 } from "antd";
 import {
   CheckCircleOutlined, CloseCircleOutlined, EyeOutlined, ExclamationCircleOutlined, SearchOutlined
 } from "@ant-design/icons";
+import axios from "axios";
 
 const THEME_PRIMARY = "#9b59b6";
 const BG_DARK = "#1e1e2f";
@@ -28,36 +29,29 @@ type ReviewablePayment = {
 const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const mockRows: ReviewablePayment[] = [
-  {
-    id: "p_101",
-    order_no: "ORD-2025-0906-0001",
-    user_name: "demo_user",
-    amount: 1614,
-    slip_url: "/assets/slips/sample1.jpg", // เปลี่ยนเป็นของจริงภายหลัง
-    uploaded_at: "2025-09-06 09:12",
-    status: "PENDING",
-  },
-  {
-    id: "p_102",
-    order_no: "ORD-2025-0906-0002",
-    user_name: "bright",
-    amount: 315,
-    slip_url: "/assets/slips/sample2.jpg",
-    uploaded_at: "2025-09-06 09:20",
-    status: "PENDING",
-  },
-];
+const BASE_URL = "http://localhost:8088";
 
 export default function AdminPaymentReviewPage() {
   const { modal, message } = App.useApp();
-  const [rows, setRows] = useState<ReviewablePayment[]>(mockRows);
+  const [rows, setRows] = useState<ReviewablePayment[]>([]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: string }>({ open: false });
   const [rejectText, setRejectText] = useState("");
 
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("PENDING");
   const [keyword, setKeyword] = useState("");
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const res = await axios.get<ReviewablePayment[]>(`${BASE_URL}/payments?status=PENDING`);
+        setRows(res.data);
+      } catch {
+        message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
+      }
+    };
+    fetchPayments();
+  }, [message]);
 
   const data = useMemo(() => {
     return rows.filter(r => {
@@ -79,9 +73,13 @@ export default function AdminPaymentReviewPage() {
       cancelText: "ยกเลิก",
       okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
       onOk: async () => {
-        // TODO: เรียก API PATCH /payments/:id/approve
-        setRows(prev => prev.map(p => (p.id === id ? { ...p, status: "APPROVED" } : p)));
-        message.success("อนุมัติการชำระเงินแล้ว");
+        try {
+          await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" });
+          setRows(prev => prev.map(p => (p.id === id ? { ...p, status: "APPROVED" } : p)));
+          message.success("อนุมัติการชำระเงินแล้ว");
+        } catch {
+          message.error("ไม่สามารถอนุมัติได้");
+        }
       },
     });
   };
@@ -94,12 +92,21 @@ export default function AdminPaymentReviewPage() {
   const submitReject = async () => {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
-    // TODO: เรียก API PATCH /payments/:id/reject {reason}
-    setRows(prev =>
-      prev.map(p => (p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim() } : p)),
-    );
-    setRejectOpen({ open: false });
-    message.success("ปฏิเสธการชำระเงินแล้ว");
+    try {
+      await axios.patch(`${BASE_URL}/payments/${id}`, {
+        status: "REJECTED",
+        reject_reason: rejectText.trim(),
+      });
+      setRows(prev =>
+        prev.map(p =>
+          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim() } : p,
+        ),
+      );
+      message.success("ปฏิเสธการชำระเงินแล้ว");
+      setRejectOpen({ open: false });
+    } catch {
+      message.error("ไม่สามารถปฏิเสธได้");
+    }
   };
 
   return (
@@ -199,7 +206,7 @@ export default function AdminPaymentReviewPage() {
             {
               title: "จัดการ",
               key: "action",
-              render: (_: any, r: ReviewablePayment) => (
+              render: (_: unknown, r: ReviewablePayment) => (
                 <Space>
                   <Button
                     type="primary"

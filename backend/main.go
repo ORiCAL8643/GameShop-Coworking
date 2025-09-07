@@ -108,6 +108,14 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
+		// ===== Payments =====
+		router.POST("/payments", controllers.CreatePayment)
+		router.GET("/payments", controllers.FindPayments)
+		router.PATCH("/payments/:id", controllers.UpdatePayment)
+		router.DELETE("/payments/:id", controllers.DeletePayment)
+		router.POST("/payments/:id/approve", controllers.ApprovePayment)
+		router.POST("/payments/:id/reject", controllers.RejectPayment)
+
 	}
 
 	// Run the server

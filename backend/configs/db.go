@@ -55,6 +55,10 @@ func SetupDatabase() {
 		&entity.Categories{},
 		&entity.MinimumSpec{},
 		&entity.KeyGame{},
+		&entity.Order{},
+		&entity.Payment{},
+		&entity.PaymentSlip{},
+
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}
