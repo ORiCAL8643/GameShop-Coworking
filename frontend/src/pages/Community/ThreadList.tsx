@@ -1,5 +1,5 @@
 // src/pages/Community/ThreadList.tsx
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Avatar, Badge, Button, Card, Input, Space, Typography, Upload
 } from "antd";
@@ -13,11 +13,12 @@ const { Title, Text } = Typography;
 
 type Props = {
   threads: Thread[];
+  sortBy: "latest" | "likes" | "comments";
   onOpen: (threadId: number) => void;
   onCreate: (payload: CreateThreadPayload & { images?: string[] }) => void; // ✅
 };
 
-export default function ThreadList({ threads, onOpen, onCreate }: Props) {
+export default function ThreadList({ threads, sortBy, onOpen, onCreate }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<UploadFile[]>([]); // ✅ เก็บไฟล์ภาพที่เลือก
@@ -39,6 +40,19 @@ export default function ThreadList({ threads, onOpen, onCreate }: Props) {
     setBody("");
     setFiles([]);
   };
+
+  const sortedThreads = useMemo(() => {
+    const arr = [...threads];
+    return arr.sort((a, b) => {
+      if (sortBy === "likes") return b.likes - a.likes;
+      if (sortBy === "comments")
+        return b.comments.length - a.comments.length;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [threads, sortBy]);
+
+  const sortLabel =
+    sortBy === "likes" ? "Likes" : sortBy === "comments" ? "Comments" : "Latest";
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
@@ -101,8 +115,10 @@ export default function ThreadList({ threads, onOpen, onCreate }: Props) {
         </Space>
       </Card>
 
+      <Text style={{ color: "#ccc" }}>Sorted by: {sortLabel}</Text>
+
       {/* รายการเธรดทั้งหมด */}
-      {threads.map((t) => (
+      {sortedThreads.map((t) => (
         <Card
           key={t.id}
           className="community-card"
