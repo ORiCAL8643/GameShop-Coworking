@@ -79,6 +79,25 @@ func main() {
 		router.GET("/notifications/:id", controllers.FindNotificationByID)
 		router.PUT("/notifications/:id", controllers.UpdateNotification)
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
+
+		// ===== Promotions
+		router.POST("/promotions", controllers.CreatePromotion)
+		router.GET("/promotions", controllers.FindPromotions)
+		router.GET("/promotions/:id", controllers.GetPromotionByID)
+		router.PUT("/promotions/:id", controllers.UpdatePromotion)
+		router.DELETE("/promotions/:id", controllers.DeletePromotion)
+		router.POST("/promotions/:id/games", controllers.SetPromotionGames)
+		router.GET("/promotions-active", controllers.FindActivePromotions)
+
+		// ===== Reviews
+		router.POST("/reviews", controllers.CreateReview)
+		router.GET("/reviews", controllers.FindReviews)                 // ?game_id=&user_id=
+		router.GET("/reviews/:id", controllers.GetReviewByID)
+		router.PUT("/reviews/:id", controllers.UpdateReview)
+		router.DELETE("/reviews/:id", controllers.DeleteReview)
+		router.POST("/reviews/:id/toggle_like", controllers.ToggleReviewLike)
+		router.GET("/games/:id/reviews", controllers.FindReviewsByGame)
+
 	}
 
 	// Run the server
