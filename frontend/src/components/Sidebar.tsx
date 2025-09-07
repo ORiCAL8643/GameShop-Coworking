@@ -1,39 +1,67 @@
 import { Layout, Menu } from 'antd';
+import type { MenuProps } from 'antd';
+import { Outlet, useNavigate } from 'react-router-dom';
 import {
-  UserOutlined,
-  SearchOutlined,
   //HeartOutlined,
-  WalletOutlined,
-  DesktopOutlined,
-  CustomerServiceOutlined,
-  VideoCameraOutlined,
-  AppstoreOutlined,
-  EditOutlined
+
+  PlusOutlined,
+
 } from '@ant-design/icons';
 
+
 const { Sider } = Layout;
+type groupItem = Required<MenuProps>['items'][number];
+
+const items: groupItem[] = [
+  {
+    key: '/home' ,
+    label: 'หน้าแรก',
+  },
+  {
+    key: '/request',
+    label:'รีเควสเกม',
+  },
+  {
+    key: '/requestinfo',
+    label:'ข้อมูลรีเควส',
+  },
+  {
+    key: '/information',
+    label: 'จัดการข้อมูลเกม',
+    children: [
+        { key: '/information/Add', label: 'เพิ่มเกม', icon:<PlusOutlined />},
+        { key: '/information/Edit', label: 'แก้ไขข้อมูลเกม', icon:<PlusOutlined />},
+    ],
+  },
+  {
+    key: '/category',
+    label: 'หมวดหมู่',
+    children: [
+        { key: '/category/Community', label: 'ชุมชน', icon:<PlusOutlined />},
+        { key: '/category/Payment', label: 'การชำระเงิน', icon:<PlusOutlined />},
+    ],
+  },
+  {
+    key: '/workshop',
+    label:'Workshop',
+  },
+];
 
 const Sidebar = () => {
+  const navigate = useNavigate()
+
   return (
+    <Layout>
     <Sider theme="dark" width={220}>
       <div style={{ color: '#9254de', fontSize: 20, textAlign: 'center', padding: '16px 0' }}>
         GAME STORE
       </div>
-      <Menu theme="dark" mode="inline" defaultSelectedKeys={['1']}>
-        <Menu.Item key="1" icon={<UserOutlined />}>Profile</Menu.Item>
-        <Menu.Item key="2" icon={<SearchOutlined />}>Search</Menu.Item>
-        <Menu.Item key="3" icon={<CustomerServiceOutlined />}>Favorite</Menu.Item>
-        <Menu.Item key="4" icon={<WalletOutlined />}>Balance</Menu.Item>
-        <Menu.Divider />
-        <Menu.ItemGroup title="Category">
-          <Menu.Item key="5" icon={<DesktopOutlined />}>Computer</Menu.Item>
-          <Menu.Item key="6" icon={<CustomerServiceOutlined />}>Game Headphones</Menu.Item>
-          <Menu.Item key="7" icon={<VideoCameraOutlined />}>VR Glasses</Menu.Item>
-          <Menu.Item key="8" icon={<AppstoreOutlined />}>Keyboard</Menu.Item>
-          <Menu.Item key="9" icon={<EditOutlined />}>Mouse Gaming</Menu.Item>
-        </Menu.ItemGroup>
-      </Menu>
+      <Menu theme="dark"  mode="inline" items={items} onClick={({key})=>{
+        navigate(key)
+      }}/>
     </Sider>
+    <Outlet/>
+    </Layout>
   );
 };
 

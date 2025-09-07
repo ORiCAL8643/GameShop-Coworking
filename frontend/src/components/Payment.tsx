@@ -73,7 +73,7 @@ const PaymentPage = () => {
   };
 
   return (
-    <div style={{ padding: 24, background: BG_DARK, minHeight: "100%" }}>
+    <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1, justifyContent: "space-between", }}>
       <Typography.Title level={2} style={{ color: THEME_PRIMARY, textAlign: "center", marginBottom: 24 }}>
         YOUR GAME CART
       </Typography.Title>
