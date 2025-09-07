@@ -1,5 +1,5 @@
 // src/pages/PaymentPage.tsx
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Row,
   Col,
@@ -14,6 +14,7 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
+import { useParams, useSearchParams } from "react-router-dom";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -33,30 +34,56 @@ interface CartItem {
   note?: string;
 }
 
-const initialItems: CartItem[] = [
-  { id: "ark", title: "ARK: Survival Evolved", price: 315, note: "ราคาของผลิตภัณฑ์นี้มีการเปลี่ยนแปลง" },
-  { id: "wt-two-fronts", title: "War Thunder - Two Fronts Pack", price: 1299, note: "ผลิตภัณฑ์นี้ไม่มีสิทธิ์ขอคืน" },
-];
-
 const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const PaymentPage = () => {
-  const [items] = useState<CartItem[]>(initialItems);
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [order, setOrder] = useState<any | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const orderIdParam = id || searchParams.get("id") || searchParams.get("order_id");
+
+  useEffect(() => {
+    if (!orderIdParam) return;
+    const load = async () => {
+      try {
+        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`);
+        if (!res.ok) throw new Error("fetch order failed");
+        const data = await res.json();
+        setOrder(data);
+        const mapped: CartItem[] =
+          data.order_items?.map((it: any) => ({
+            id: String(it.id),
+            title: it.key_game?.game?.game_name || `Game ${it.id}`,
+            price: it.line_total ?? it.unit_price ?? 0,
+          })) || [];
+        setItems(mapped);
+      } catch (err) {
+        console.error(err);
+        message.error("ไม่สามารถโหลดคำสั่งซื้อ");
+      }
+    };
+    load();
+  }, [orderIdParam]);
 
   const subtotal = useMemo(() => items.reduce((s, it) => s + it.price, 0), [items]);
   const fee = 0;
   // ✅ ตัดส่วนลดออก
   const total = useMemo(() => subtotal + fee, [subtotal]);
 
-  const orderId = useMemo(() => `ORD-${Date.now()}`, [payOpen]);
+  const orderId = order?.id;
 
   const handleSubmitSlip = async () => {
     if (!files.length) {
       message.warning("กรุณาแนบสลิปการชำระเงิน");
+      return;
+    }
+    if (!orderId) {
+      message.error("ไม่พบหมายเลขคำสั่งซื้อ");
       return;
     }
     try {
@@ -80,17 +107,25 @@ const PaymentPage = () => {
       const form = new FormData();
       form.append("file", files[0].originFileObj as File);
       form.append("payment_id", String(paymentId));
+      form.append("order_id", String(orderId));
       const slipRes = await fetch("http://localhost:8088/payment_slips", {
         method: "POST",
         body: form,
       });
       if (!slipRes.ok) throw new Error("upload slip failed");
 
-      // 3) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
-      message.success("ส่งยืนยันการชำระเงินเรียบร้อย");
+      // 3) อัปเดตสถานะคำสั่งซื้อหลังส่งสลิปสำเร็จ
+      await fetch(`http://localhost:8088/orders/${orderId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_status: "PAID" }),
+      });
+
+      // 4) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
+      message.success(`ส่งยืนยันการชำระเงินเรียบร้อย (ชำระเงินเลขที่ ${paymentId})`);
+      setOrder({ ...order, order_status: "PAID" });
       setPayOpen(false);
       setFiles([]);
-      window.location.reload();
     } catch (err) {
       console.error(err);
       message.error("ส่งสลิปไม่สำเร็จ กรุณาลองใหม่");
