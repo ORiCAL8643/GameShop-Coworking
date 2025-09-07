@@ -51,7 +51,11 @@ const items: groupItem[] = [
   },
   {
     key: '/Admin',
-    label:'หน้าแอดมิน',
+    label:'Admin',
+    children: [
+        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
+        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
+    ],
   },
 ];
 
