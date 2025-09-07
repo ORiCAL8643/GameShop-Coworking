@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal, Form, Input, Button, DatePicker } from 'antd';
+import { useAuth } from '../context/AuthContext';
 
 interface AuthModalProps {
   open: boolean;
@@ -8,6 +9,7 @@ interface AuthModalProps {
 
 const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
   const [isLogin, setIsLogin] = useState(true);
+  const { login } = useAuth();
 
   const toggleMode = () => setIsLogin(!isLogin);
 
@@ -27,7 +29,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       }
 
       const data = await res.json();
-      localStorage.setItem('token', data.token);
+      login(data.token, values.username);
       onClose();
     } catch (error) {
       console.error(error);
@@ -52,7 +54,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       }
 
       const data = await res.json();
-      localStorage.setItem('token', data.token);
+      login(data.token, values.username);
       onClose();
     } catch (error) {
       console.error(error);

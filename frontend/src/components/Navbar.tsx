@@ -2,12 +2,14 @@
 import { SearchOutlined, ShoppingCartOutlined, BellOutlined, DollarCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Input, Avatar, Space, Button } from 'antd';
+import { useAuth } from '../context/AuthContext';
 
 import { Link } from 'react-router-dom';
 import AuthModal from '../components/AuthModal';
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
+  const { token, username, logout } = useAuth();
 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: '#1f1f1f' }}>
@@ -36,10 +38,17 @@ const Navbar = () => {
         </Link>
 
         <ShoppingCartOutlined style={{ color: 'white', fontSize: '18px' }} />
-        <Button type="primary" onClick={() => setOpenAuth(true)}>
-          Login
-        </Button>
-        <Avatar src="https://i.pravatar.cc/300" />
+        {token ? (
+          <>
+            <span style={{ color: 'white' }}>{username}</span>
+            <Button onClick={logout}>Logout</Button>
+            <Avatar src="https://i.pravatar.cc/300" />
+          </>
+        ) : (
+          <Button type="primary" onClick={() => setOpenAuth(true)}>
+            Login
+          </Button>
+        )}
       </Space>
       <AuthModal open={openAuth} onClose={() => setOpenAuth(false)} />
     </div>
