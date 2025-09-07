@@ -5,9 +5,10 @@ import { useAuth } from '../context/AuthContext';
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
+  onLoginSuccess?: () => void;
 }
 
-const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const { login } = useAuth();
 
@@ -31,6 +32,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       const data = await res.json();
       login(data.token, values.username);
       onClose();
+      onLoginSuccess?.();
     } catch (error) {
       console.error(error);
     }
@@ -56,6 +58,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       const data = await res.json();
       login(data.token, values.username);
       onClose();
+      onLoginSuccess?.();
     } catch (error) {
       console.error(error);
     }
