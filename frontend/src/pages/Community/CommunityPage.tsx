@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from "react";
-import { message, Space } from "antd";
+import { message, Space, Select } from "antd";
 import ThreadList from "./ThreadList";
 import ThreadDetail from "./ThreadDetail";
 import type { Thread, ThreadComment } from "./types";
@@ -33,27 +33,42 @@ export default function CommunityPage() {
 
   const idRef = useRef(1000);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<'latest' | 'likes' | 'comments'>(
+    'latest'
+  );
 
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeId) || null,
     [threads, activeId]
   );
 
+  const sortedThreads = useMemo(() => {
+    const arr = [...threads];
+    return arr.sort((a, b) => {
+      if (sortBy === 'likes') return b.likes - a.likes;
+      if (sortBy === 'comments')
+        return b.comments.length - a.comments.length;
+      return (
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    });
+  }, [threads, sortBy]);
+
   // สร้างเธรดใหม่ (หน้า List เท่านั้น)
-  const createThread = ({ title, body, images }: { title: string; body: string; images?: string[] }) => {
-  const n: Thread = {
-    id: idRef.current++,
-    title,
-    body,
-    author: "คุณ",
-    createdAt: "เพิ่งโพสต์",
-    likes: 0,
-    comments: [],
-    images, // ✅ เก็บรูปไปกับเธรด
-  };
-  setThreads((prev) => [n, ...prev]);
-  message.success("สร้างเธรดใหม่แล้ว");
-};
+    const createThread = ({ title, body, images }: { title: string; body: string; images?: string[] }) => {
+      const n: Thread = {
+        id: idRef.current++,
+        title,
+        body,
+        author: "คุณ",
+        createdAt: "เพิ่งโพสต์",
+        likes: 0,
+        comments: [],
+        images, // ✅ เก็บรูปไปกับเธรด
+      };
+      setThreads((prev) => [n, ...prev]);
+      message.success("สร้างเธรดใหม่แล้ว");
+    };
 
   // เพิ่มคอมเมนต์ที่ระดับ root ของเธรดที่เปิดอยู่ (หน้า Detail เท่านั้น)
   const replyRoot = ({ content }: { content: string }) => {
@@ -80,11 +95,23 @@ export default function CommunityPage() {
           onReplyRoot={replyRoot}
         />
       ) : (
-        <ThreadList
-          threads={threads}
-          onOpen={(id) => setActiveId(id)}
-          onCreate={createThread}
-        />
+        <>
+          <Select
+            value={sortBy}
+            onChange={(v) => setSortBy(v)}
+            style={{ width: 200 }}
+            options={[
+              { value: 'latest', label: 'Latest' },
+              { value: 'likes', label: 'Likes' },
+              { value: 'comments', label: 'Comments' }
+            ]}
+          />
+          <ThreadList
+            threads={sortedThreads}
+            onOpen={(id) => setActiveId(id)}
+            onCreate={createThread}
+          />
+        </>
       )}
     </Space>
     </div>
