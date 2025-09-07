@@ -15,11 +15,11 @@ import Workshop from "../pages/Workshop/UploadPage.tsx";
 
 // 🟣 Import เพิ่ม
 import RefundPage from "../pages/Refund/RefundPage.tsx";
-import RefundStatusPage from "../pages/Refund/RefundStatus.tsx";
+import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 
 // 🟣 Mock Refund Data
-const refunds = [
+const refunds: Refund[] = [
   {
     id: 1,
     orderId: "A001",
@@ -34,7 +34,7 @@ const refunds = [
     user: "Bob",
     game: "Elden Ring",
     reason: "Accidental purchase",
-    status: "Pending",
+    status: "Approved",
   },
 ];
 
@@ -75,7 +75,7 @@ const router = createBrowserRouter([
       { path: "/mod/:title", element: <ModDetail /> },
       { path: "/upload", element: <Workshop /> },
 
-      // 🟣 เพิ่มเส้นทาง Refund
+      // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
       { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
 

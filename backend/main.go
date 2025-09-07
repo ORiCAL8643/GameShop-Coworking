@@ -34,9 +34,9 @@ func main() {
 		// ===== Games =====
 		router.POST("/games", controllers.CreateGame)
 		router.GET("/games", controllers.FindGames)
-		router.GET("/games/:id", controllers.FindGameByID)
+		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
-		router.DELETE("/games/:id", controllers.DeleteGameByID)
+		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -91,12 +91,23 @@ func main() {
 
 		// ===== Reviews
 		router.POST("/reviews", controllers.CreateReview)
-		router.GET("/reviews", controllers.FindReviews)                 // ?game_id=&user_id=
+		router.GET("/reviews", controllers.FindReviews) // ?game_id=&user_id=
 		router.GET("/reviews/:id", controllers.GetReviewByID)
 		router.PUT("/reviews/:id", controllers.UpdateReview)
 		router.DELETE("/reviews/:id", controllers.DeleteReview)
 		router.POST("/reviews/:id/toggle_like", controllers.ToggleReviewLike)
 		router.GET("/games/:id/reviews", controllers.FindReviewsByGame)
+
+		// categories routes
+		router.GET("/categories", controllers.FindCategories)
+
+		// keygame routes
+		router.GET("/keygame", controllers.FindKeyGame)
+		router.POST("/new-keygame", controllers.CreateKeyGame)
+
+		//minimumspec routes
+		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
+		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
 	}
 

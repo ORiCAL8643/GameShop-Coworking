@@ -13,11 +13,10 @@ type Game struct {
 	CategoriesID   int        `json:"categories_id"`
 	Categories     Categories `json:"categories" gorm:"foreignkey:CategoriesID"`
 	Date           time.Time  `json:"release_date" gorm:"autoCreateTime"`
-	GamePrice      float64    `json:"game_price"` // ใช้ float64 ง่าย ๆ ถ้าอยากแม่นยำค่อยเปลี่ยนเป็น decimal lib
+	BasePrice      int        `json:"base_price"`
 	Status         string     `json:"status" gorm:"type:varchar(20);default:'pending';not null;index"`
 	Minimum_specID uint       `json:"minimum_spec_id"`
 	AgeRating      int        `json:"age_rating"`
-	Description    string     `json:"description"`
 
 	Requests []Request `gorm:"foreignKey:GameRefer"`
 	Market   Market    `json:"market"`
