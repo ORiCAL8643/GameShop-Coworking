@@ -64,7 +64,6 @@ const Navbar = () => {
         onLoginSuccess={handleLoginSuccess}
       />
     </div>
-  </div>
   );
 };
 
