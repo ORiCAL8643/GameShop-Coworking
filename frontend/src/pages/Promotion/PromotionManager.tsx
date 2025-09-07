@@ -1,35 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Layout, Card, Form, Input, InputNumber, DatePicker, Switch,
   Button, Space, Table, Tag, Popconfirm, message, Typography, Select,
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
-import Sidebar from "../../components/Sidebar";
 import type { Promotion, GameLite } from "../Promotion/App.ts";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
-
-// mock data เฉพาะ UI
-const MOCK_GAMES: GameLite[] = [
-  { id: "g1", title: "Elden Ring" },
-  { id: "g2", title: "Baldur’s Gate 3" },
-];
-
-const MOCK_PROMOS: Promotion[] = [
-  {
-    id: "p1",
-    title: "Mid-Year Sale",
-    description: "ลดจัดหนักหลายเกมดัง",
-    discountPercent: 30,
-    startDate: dayjs().subtract(7, "day").toISOString(),
-    endDate: dayjs().add(7, "day").toISOString(),
-    active: true,
-    imageUrl: "https://picsum.photos/1200/400?grayscale",
-    gameIds: ["g1", "g2"],
-  },
-];
 
 type FormValues = {
   title: string;
@@ -43,27 +22,92 @@ type FormValues = {
 
 export default function PromotionManager() {
   const [form] = Form.useForm<FormValues>();
-  const [data, setData] = useState<Promotion[]>(MOCK_PROMOS);
+  const [data, setData] = useState<Promotion[]>([]);
+  const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const isEdit = useMemo(() => Boolean(editingId), [editingId]);
 
+  const normalizePromo = (p: any): Promotion => ({
+    id: String(p.id ?? p.ID),
+    title: p.title,
+    description: p.description,
+    discountPercent: p.discountPercent ?? p.discount_value ?? 0,
+    startDate: p.startDate ?? p.start_date,
+    endDate: p.endDate ?? p.end_date,
+    active: p.active ?? p.status,
+    imageUrl: p.imageUrl ?? p.promo_image,
+    gameIds: (p.gameIds ?? p.games?.map((g: any) => String(g.id ?? g.ID))) || [],
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [gRes, pRes] = await Promise.all([
+          fetch("http://localhost:8088/games"),
+          fetch("http://localhost:8088/promotions?with=games"),
+        ]);
+        const gameJson = await gRes.json();
+        const promoJson = await pRes.json();
+        setGames(gameJson.map((g: any) => ({ id: String(g.id ?? g.ID), title: g.title })));
+        setData(promoJson.map((p: any) => normalizePromo(p)));
+      } catch {
+        message.error("โหลดข้อมูลล้มเหลว");
+      }
+    };
+    load();
+  }, []);
+
   const gameOptions = useMemo(
-    () => MOCK_GAMES.map(g => ({ label: g.title, value: g.id })),
-    []
+    () => games.map(g => ({ label: g.title, value: g.id })),
+    [games]
   );
 
   const onSubmit = async () => {
     try {
-      await form.validateFields();
-      message.success(isEdit ? "จำลอง: อัปเดตแล้ว" : "จำลอง: สร้างแล้ว");
+      const values = await form.validateFields();
+      const body = {
+        title: values.title,
+        description: values.description,
+        discount_type: "PERCENT",
+        discount_value: values.discountPercent,
+        start_date: values.dateRange[0].toISOString(),
+        end_date: values.dateRange[1].toISOString(),
+        status: values.active,
+        promo_image: values.imageUrl,
+        game_ids: values.gameIds.map(id => Number(id)),
+      };
+      const res = await fetch(
+        `http://localhost:8088/promotions${isEdit ? `/${editingId}` : ""}`,
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) throw new Error("api error");
+      const saved = normalizePromo(await res.json());
+      setData(prev => (
+        isEdit ? prev.map(p => (p.id === saved.id ? saved : p)) : [...prev, saved]
+      ));
+      message.success(isEdit ? "อัปเดตแล้ว" : "สร้างแล้ว");
       form.resetFields();
       setEditingId(null);
-    } catch {/* validation */}
+    } catch {
+      message.error("บันทึกไม่สำเร็จ");
+    }
   };
 
-  const onDelete = (id: string) => {
-    message.success("จำลอง: ลบแล้ว");
-    setData(prev => prev.filter(p => p.id !== id));
+  const onDelete = async (id: string) => {
+    try {
+      const res = await fetch(`http://localhost:8088/promotions/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("api error");
+      setData(prev => prev.filter(p => p.id !== id));
+      message.success("ลบแล้ว");
+    } catch {
+      message.error("ลบไม่สำเร็จ");
+    }
   };
 
   const columns = [
@@ -83,7 +127,7 @@ export default function PromotionManager() {
       render: (_: any, r: Promotion) => (
         <div>
           {r.gameIds.map(id => {
-            const title = MOCK_GAMES.find(g => g.id === id)?.title || id;
+            const title = games.find(g => g.id === id)?.title || id;
             return <Tag key={id}>{title}</Tag>;
           })}
         </div>
@@ -91,14 +135,25 @@ export default function PromotionManager() {
     { title: "จัดการ", key: "actions",
       render: (_: any, r: Promotion) => (
         <Space>
-          <Button onClick={() => setEditingId(r.id)}>แก้ไข (UI)</Button>
+          <Button onClick={() => {
+            setEditingId(r.id);
+            form.setFieldsValue({
+              title: r.title,
+              description: r.description,
+              discountPercent: r.discountPercent,
+              dateRange: [dayjs(r.startDate), dayjs(r.endDate)],
+              active: r.active,
+              gameIds: r.gameIds,
+              imageUrl: r.imageUrl,
+            });
+          }}>แก้ไข</Button>
           <Popconfirm
             title="ลบโปรโมชันนี้?"
             okText="ลบ" cancelText="ยกเลิก"
             okButtonProps={{ danger: true }}
             onConfirm={() => onDelete(r.id)}
           >
-            <Button danger>ลบ (UI)</Button>
+            <Button danger>ลบ</Button>
           </Popconfirm>
         </Space>
       ) },
@@ -154,7 +209,7 @@ export default function PromotionManager() {
 
               <Space>
                 <Button type="primary" onClick={onSubmit}>
-                  {isEdit ? "บันทึกการแก้ไข (จำลอง)" : "สร้างโปรโมชัน (จำลอง)"}
+                  {isEdit ? "บันทึกการแก้ไข" : "สร้างโปรโมชัน"}
                 </Button>
                 <Button onClick={() => { form.resetFields(); setEditingId(null); }}>
                   ล้างฟอร์ม
