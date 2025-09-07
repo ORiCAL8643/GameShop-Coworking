@@ -81,7 +81,7 @@ const router = createBrowserRouter([
 
       // 🟣 Admin
       {
-        path: "/admin",
+        path: "/Admin",
         element: (
           <AdminPage
             refunds={refunds}

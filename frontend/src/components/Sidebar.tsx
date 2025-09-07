@@ -48,7 +48,11 @@ const items: groupItem[] = [
   {
     key: '/refund',
     label:'การคืนเงินผู้ใช้',
-  }
+  },
+  {
+    key: '/Admin',
+    label:'หน้าแอดมิน',
+  },
 ];
 
 const Sidebar = () => {
