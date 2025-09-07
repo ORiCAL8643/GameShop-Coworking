@@ -42,33 +42,21 @@ export default function CommunityPage() {
     [threads, activeId]
   );
 
-  const sortedThreads = useMemo(() => {
-    const arr = [...threads];
-    return arr.sort((a, b) => {
-      if (sortBy === 'likes') return b.likes - a.likes;
-      if (sortBy === 'comments')
-        return b.comments.length - a.comments.length;
-      return (
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-    });
-  }, [threads, sortBy]);
-
   // สร้างเธรดใหม่ (หน้า List เท่านั้น)
-    const createThread = ({ title, body, images }: { title: string; body: string; images?: string[] }) => {
-      const n: Thread = {
-        id: idRef.current++,
-        title,
-        body,
-        author: "คุณ",
-        createdAt: "เพิ่งโพสต์",
-        likes: 0,
-        comments: [],
-        images, // ✅ เก็บรูปไปกับเธรด
-      };
-      setThreads((prev) => [n, ...prev]);
-      message.success("สร้างเธรดใหม่แล้ว");
+  const createThread = ({ title, body, images }: { title: string; body: string; images?: string[] }) => {
+    const n: Thread = {
+      id: idRef.current++,
+      title,
+      body,
+      author: "คุณ",
+      createdAt: "เพิ่งโพสต์",
+      likes: 0,
+      comments: [],
+      images, // ✅ เก็บรูปไปกับเธรด
     };
+    setThreads((prev) => [n, ...prev]);
+    message.success("สร้างเธรดใหม่แล้ว");
+  };
 
   // เพิ่มคอมเมนต์ที่ระดับ root ของเธรดที่เปิดอยู่ (หน้า Detail เท่านั้น)
   const replyRoot = ({ content }: { content: string }) => {
@@ -107,7 +95,8 @@ export default function CommunityPage() {
             ]}
           />
           <ThreadList
-            threads={sortedThreads}
+            threads={threads}
+            sortBy={sortBy}
             onOpen={(id) => setActiveId(id)}
             onCreate={createThread}
           />
