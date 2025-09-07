@@ -4,8 +4,9 @@ import (
 	"net/http"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // POST /users
@@ -15,10 +16,20 @@ func CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
 		return
 	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+	body.Password = string(hashedPassword)
+
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	body.Password = ""
 	c.JSON(http.StatusCreated, body)
 }
 
