@@ -11,12 +11,60 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
 
   const toggleMode = () => setIsLogin(!isLogin);
 
+  const handleLogin = async (values: { username: string; password: string }) => {
+    try {
+      const res = await fetch('http://localhost:8088/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: values.username,
+          password: values.password,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Login failed');
+      }
+
+      const data = await res.json();
+      localStorage.setItem('token', data.token);
+      onClose();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleSignup = async (values: any) => {
+    try {
+      const payload = {
+        ...values,
+        birthday: values.birthday?.format('YYYY-MM-DD'),
+      };
+
+      const res = await fetch('http://localhost:8088/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error('Signup failed');
+      }
+
+      const data = await res.json();
+      localStorage.setItem('token', data.token);
+      onClose();
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   return (
     <Modal open={open} onCancel={onClose} footer={null} centered>
       {isLogin ? (
         <>
           <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Login</h2>
-          <Form layout="vertical">
+          <Form layout="vertical" onFinish={handleLogin}>
             <Form.Item
               label="Username"
               name="username"
@@ -46,7 +94,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
       ) : (
         <>
           <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Sign Up</h2>
-          <Form layout="vertical">
+          <Form layout="vertical" onFinish={handleSignup}>
             <Form.Item
               label="Username"
               name="username"
