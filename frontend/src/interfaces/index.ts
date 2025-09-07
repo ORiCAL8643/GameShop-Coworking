@@ -7,3 +7,5 @@ export * from "./Reaction";
 export * from "./Attachment";
 export * from "./Notification";
 export * from "./UserGame";
+export * from "./OrderItem";
+export * from "./KeyGame";
