@@ -5,7 +5,7 @@ import type {
 } from "../interfaces/Promotion";
 import type { Game } from "../interfaces/Game";
 
-const API_URL = import.meta.env.VITE_API_URL as string;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8088";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
