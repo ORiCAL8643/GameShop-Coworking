@@ -109,6 +109,19 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
+		// ===== Orders =====
+		router.POST("/orders", controllers.CreateOrder)
+		router.GET("/orders", controllers.FindOrders)
+		router.GET("/orders/:id", controllers.FindOrderByID)
+		router.PUT("/orders/:id", controllers.UpdateOrder)
+		router.DELETE("/orders/:id", controllers.DeleteOrder)
+                // ===== Order Items =====
+                router.POST("/order-items", controllers.CreateOrderItem)
+                router.GET("/order-items", controllers.FindOrderItems)
+                router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+                router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+
+
 		// ===== Payments =====
 		router.POST("/payments", controllers.CreatePayment)
 		router.GET("/payments", controllers.FindPayments)
