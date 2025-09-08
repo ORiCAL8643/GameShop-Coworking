@@ -60,7 +60,25 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
       // 1) ตรวจสอบว่ามี orderId ใน localStorage หรือไม่
       let orderId = localStorage.getItem('orderId');
 
-      // 2) ถ้ายังไม่มี ให้สร้างออเดอร์ใหม่แล้วเก็บ orderId
+      // 2) ถ้ามี orderId ให้ตรวจสอบว่าออเดอร์ยังมีอยู่หรือไม่
+      if (orderId) {
+        try {
+          await axios.get(`${base_url}/orders/${orderId}`);
+        } catch (error) {
+          if (
+            axios.isAxiosError(error) &&
+            (error.response?.status === 404 || error.response?.status === 400)
+          ) {
+            // ถ้าออเดอร์ไม่พบหรือไม่ถูกต้อง ให้ลบ orderId และสร้างใหม่
+            localStorage.removeItem('orderId');
+            orderId = null;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      // 3) ถ้ายังไม่มี ให้สร้างออเดอร์ใหม่แล้วเก็บ orderId
       if (!orderId) {
         const orderRes = await axios.post(`${base_url}/orders`, {
           user_id: userId,
@@ -71,7 +89,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
         localStorage.setItem('orderId', orderId);
       }
 
-      // 3) เพิ่มสินค้าเข้า order_items ของออเดอร์
+      // 4) เพิ่มสินค้าเข้า order_items ของออเดอร์
       await axios.post(`${base_url}/order-items`, {
         order_id: Number(orderId),
         unit_price: g.base_price,
@@ -81,7 +99,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
         game_key_id: g.key_id,
       });
 
-      // 4) อัปเดตราคารวมของออเดอร์หลังเพิ่มสินค้า
+      // 5) อัปเดตราคารวมของออเดอร์หลังเพิ่มสินค้า
       const current = await axios.get(`${base_url}/orders/${orderId}`);
       const currentTotal = current.data.total_amount || 0;
       await axios.put(`${base_url}/orders/${orderId}`, {
