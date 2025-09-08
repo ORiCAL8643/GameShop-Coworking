@@ -1,46 +1,45 @@
-import { useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Layout, Typography, Card, Tag, List, Button, Empty } from "antd";
 import Sidebar from "../../components/Sidebar";
-import type { Promotion, GameLite } from "../Promotion/App.ts";
+import type { Promotion } from "../../interfaces/Promotion";
+import type { Game } from "../../interfaces/Game";
+import { getPromotion, listGames } from "../../services/promotions";
 import dayjs from "dayjs";
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
-// mock เฉพาะ UI
-const MOCK_GAMES: GameLite[] = [
-  { id: "g1", title: "Elden Ring" },
-  { id: "g2", title: "Baldur’s Gate 3" },
-];
-const MOCK_PROMOS: Promotion[] = [
-  {
-    id: "p1",
-    title: "Mid-Year Sale",
-    description: "ลดจัดหนักหลายเกมดัง",
-    discountPercent: 30,
-    startDate: dayjs().subtract(7, "day").toISOString(),
-    endDate: dayjs().add(7, "day").toISOString(),
-    active: true,
-    imageUrl: "https://picsum.photos/1200/400?blur=2",
-    gameIds: ["g1", "g2"],
-  },
-];
-
 export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
-  const promotion = useMemo(() => MOCK_PROMOS.find(p => p.id === id), [id]);
+  const [promotion, setPromotion] = useState<Promotion | null>(null);
+  const [games, setGames] = useState<Game[]>([]);
 
-  const games = useMemo(() => {
-    return promotion ? MOCK_GAMES.filter(g => promotion.gameIds.includes(g.id)) : [];
-  }, [promotion]);
+  useEffect(() => {
+    const load = async () => {
+      if (!id) return;
+      try {
+        const data = await getPromotion(Number(id));
+        setPromotion(data);
+        if (data.games) {
+          setGames(data.games);
+        } else {
+          const all = await listGames();
+          setGames(all);
+        }
+      } catch {
+        setPromotion(null);
+      }
+    };
+    load();
+  }, [id]);
 
   if (!promotion) {
     return (
       <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
         <Sidebar />
         <Content style={{ padding: 24, background: "#141414" }}>
-          <Empty description="ไม่พบโปรโมชัน (UI)" />
+          <Empty description="ไม่พบโปรโมชัน" />
         </Content>
       </Layout>
     );
@@ -51,11 +50,11 @@ export default function PromotionDetail() {
       <Sidebar />
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          {promotion.imageUrl && (
+          {promotion.promo_image && (
             <div
               style={{
                 width: "100%", height: 220, borderRadius: 10,
-                backgroundImage: `url(${promotion.imageUrl})`,
+                backgroundImage: `url(${promotion.promo_image})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 marginBottom: 16,
@@ -69,12 +68,14 @@ export default function PromotionDetail() {
             </Title>
             <div style={{ marginTop: 8 }}>
               <Tag color="magenta" style={{ marginRight: 8 }}>
-                -{promotion.discountPercent}%
+                {promotion.discount_type === "PERCENT"
+                  ? `-${promotion.discount_value}%`
+                  : `-${promotion.discount_value}`}
               </Tag>
               <Tag>
-                {dayjs(promotion.startDate).format("YYYY-MM-DD")} → {dayjs(promotion.endDate).format("YYYY-MM-DD")}
+                {dayjs(promotion.start_date).format("YYYY-MM-DD")} → {dayjs(promotion.end_date).format("YYYY-MM-DD")}
               </Tag>
-              {promotion.active ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag>}
+              {promotion.status ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag>}
             </div>
             {promotion.description && (
               <div style={{ color: "#ccc", marginTop: 8 }}>{promotion.description}</div>
@@ -90,10 +91,10 @@ export default function PromotionDetail() {
               dataSource={games}
               locale={{ emptyText: <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text> }}
               renderItem={(g) => (
-                <List.Item actions={[<Button key="buy">ไปหน้าซื้อ</Button>]}>
+                <List.Item actions={[<Button key="buy">ไปหน้าซื้อ</Button>]}> 
                   <List.Item.Meta
-                    title={<Text style={{ color: "white" }}>{g.title}</Text>}
-                    description={<Text style={{ color: "#aaa" }}>Game ID: {g.id}</Text>}
+                    title={<Text style={{ color: "white" }}>{g.game_name}</Text>}
+                    description={<Text style={{ color: "#aaa" }}>Game ID: {g.ID}</Text>}
                   />
                 </List.Item>
               )}

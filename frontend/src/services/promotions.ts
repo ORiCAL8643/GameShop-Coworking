@@ -22,6 +22,16 @@ export async function listPromotions(withGames = false): Promise<Promotion[]> {
   return handleResponse<Promotion[]>(res);
 }
 
+export async function getPromotion(
+  id: number,
+  withGames = false,
+): Promise<Promotion> {
+  const url = new URL(`${API_URL}/promotions/${id}`);
+  if (withGames) url.searchParams.set("with", "games");
+  const res = await fetch(url.toString());
+  return handleResponse<Promotion>(res);
+}
+
 export async function createPromotion(
   payload: CreatePromotionRequest,
 ): Promise<Promotion> {
