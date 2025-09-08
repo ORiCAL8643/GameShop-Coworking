@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
@@ -86,14 +87,32 @@ import (
 */
 func FindGames(c *gin.Context) {
 	var games []entity.Game
+	now := time.Now()
 	if err := configs.DB().
 		Preload("Categories").
+		Preload("Promotions", "status = ? AND start_date <= ? AND end_date >= ?", true, now, now).
 		Find(&games).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, games)
+	type response struct {
+		entity.Game
+		DiscountedPrice float64 `json:"discounted_price"`
+	}
+
+	var res []response
+	for _, g := range games {
+		discounted := float64(g.BasePrice)
+		for _, p := range g.Promotions {
+			if price := applyDiscount(float64(g.BasePrice), p.DiscountType, p.DiscountValue); price < discounted {
+				discounted = price
+			}
+		}
+		res = append(res, response{Game: g, DiscountedPrice: discounted})
+	}
+
+	c.JSON(http.StatusOK, res)
 }
 func CreateGame(c *gin.Context) {
 	var input struct {
