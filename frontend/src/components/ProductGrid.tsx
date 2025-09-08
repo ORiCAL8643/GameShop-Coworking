@@ -53,27 +53,39 @@ const ProductGrid = () => {
 
   const handleAddToCart = async (g: Game) => {
     try {
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: g.base_price,
-        order_status: 'PENDING',
-        order_items: [
-          {
-            unit_price: g.base_price,
-            qty: 1,
-            line_discount: 0,
-            line_total: g.base_price,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem('orderId', String(orderId));
-        navigate(`/category/Payment?id=${orderId}`);
-      } else {
-        navigate('/category/Payment');
+      // 1) ตรวจสอบว่ามี orderId ใน localStorage หรือไม่
+      let orderId = localStorage.getItem('orderId');
+
+      // 2) ถ้ายังไม่มี ให้สร้างออเดอร์ใหม่แล้วเก็บ orderId
+      if (!orderId) {
+        const orderRes = await axios.post(`${base_url}/orders`, {
+          user_id: 1,
+          total_amount: 0,
+          order_status: 'PENDING',
+        });
+        orderId = String(orderRes.data.ID || orderRes.data.id);
+        localStorage.setItem('orderId', orderId);
       }
+
+      // 3) เพิ่มสินค้าเข้า order_items ของออเดอร์
+      await axios.post(`${base_url}/order-items`, {
+        order_id: Number(orderId),
+        unit_price: g.base_price,
+        qty: 1,
+        line_discount: 0,
+        line_total: g.base_price,
+        game_key_id: g.key_id,
+      });
+
+      // 4) อัปเดตราคารวมของออเดอร์หลังเพิ่มสินค้า
+      const current = await axios.get(`${base_url}/orders/${orderId}`);
+      const currentTotal = current.data.total_amount || 0;
+      await axios.put(`${base_url}/orders/${orderId}`, {
+        total_amount: currentTotal + g.base_price,
+      });
+
+      // นำผู้ใช้ไปหน้า Payment พร้อมเลขออเดอร์
+      navigate(`/category/Payment?id=${orderId}`);
     } catch (err) {
       console.error('add to cart error', err);
     }
