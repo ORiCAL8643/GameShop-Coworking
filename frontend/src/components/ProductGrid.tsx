@@ -94,7 +94,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
         const orderRes = await axios.post(
           `${base_url}/orders`,
           {
-            user_id: userId,
             total_amount: 0,
             order_status: 'PENDING',
           },

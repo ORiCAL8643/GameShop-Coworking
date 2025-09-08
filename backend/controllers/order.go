@@ -16,9 +16,19 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
 		return
 	}
+
+	// ดึง user id จาก token
+	user, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid := user.(uint)
+	body.UserID = uid
+
 	// ตรวจ User
-	var user entity.User
-	if tx := configs.DB().First(&user, body.UserID); tx.RowsAffected == 0 {
+	var u entity.User
+	if tx := configs.DB().First(&u, uid); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
 		return
 	}
