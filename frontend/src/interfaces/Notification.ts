@@ -8,6 +8,9 @@ export interface Notification {
   message: string;
   user_id: number;
   user?: User;
+  created_at?: string;
+
+  is_read?: boolean;
 }
 
 export interface CreateNotificationRequest {

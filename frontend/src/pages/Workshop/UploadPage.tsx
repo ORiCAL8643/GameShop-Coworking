@@ -65,7 +65,7 @@ const Workshop = () => {
   };
 
   return (
-    <div style={{ background: "#141414", minHeight: "100vh" }}>
+    <div style={{ background: "#141414", minHeight: "100vh", flex: 1 }}>
       
       <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
         <Title level={2} style={{ color: "white" }}>

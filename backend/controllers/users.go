@@ -2,23 +2,59 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // POST /users
 func CreateUser(c *gin.Context) {
-	var body entity.User
-	if err := c.ShouldBindJSON(&body); err != nil {
+	var req struct {
+		Username  string `json:"username"`
+		Password  string `json:"password"`
+		Email     string `json:"email"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"last_name"`
+		Birthday  string `json:"birthday"`
+		RoleID    uint   `json:"role_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
 		return
 	}
+
+	birthday, err := time.Parse("2006-01-02", req.Birthday)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid birthday format"})
+		return
+	}
+
+	body := entity.User{
+		Username:  req.Username,
+		Password:  req.Password,
+		Email:     req.Email,
+		FirstName: req.FirstName,
+		LastName:  req.LastName,
+		Birthday:  birthday,
+		RoleID:    req.RoleID,
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+	body.Password = string(hashedPassword)
+
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	body.Password = ""
 	c.JSON(http.StatusCreated, body)
 }
 

@@ -3,7 +3,7 @@ package main
 
 import (
 	"example.com/sa-gameshop/configs"
-    //"example.com/sa-gameshop/entity"
+	//"example.com/sa-gameshop/entity"
 	"example.com/sa-gameshop/controllers"
 	"github.com/gin-gonic/gin"
 )
@@ -23,6 +23,7 @@ func main() {
 
 	router := r.Group("/")
 	{
+		router.POST("/login", controllers.Login)
 		// ===== Users =====
 		router.POST("/users", controllers.CreateUser)
 		router.GET("/users", controllers.FindUsers)
@@ -31,11 +32,11 @@ func main() {
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 
 		// ===== Games =====
-		router.POST("/games", controllers.CreateGame)
-		router.GET("/games", controllers.FindGames)
-		router.GET("/games/:id", controllers.FindGameByID)
+		router.POST("/new-game", controllers.CreateGame)
+		router.GET("/game", controllers.FindGames)
+		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
-		router.DELETE("/games/:id", controllers.DeleteGameByID)
+		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -60,14 +61,14 @@ func main() {
 
 		// ===== Reactions =====
 		router.POST("/reactions", controllers.CreateReaction)
-		router.GET("/reactions", controllers.FindReactions)      // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/reactions", controllers.FindReactions) // ใช้ ?target_type=&target_id=&user_id=
 		router.GET("/reactions/:id", controllers.FindReactionByID)
 		router.PUT("/reactions/:id", controllers.UpdateReaction)
 		router.DELETE("/reactions/:id", controllers.DeleteReactionByID)
 
 		// ===== Attachments =====
 		router.POST("/attachments", controllers.CreateAttachment)
-		router.GET("/attachments", controllers.FindAttachments)  // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/attachments", controllers.FindAttachments) // ใช้ ?target_type=&target_id=&user_id=
 		router.GET("/attachments/:id", controllers.FindAttachmentByID)
 		router.PUT("/attachments/:id", controllers.UpdateAttachment)
 		router.DELETE("/attachments/:id", controllers.DeleteAttachmentByID)
@@ -78,6 +79,56 @@ func main() {
 		router.GET("/notifications/:id", controllers.FindNotificationByID)
 		router.PUT("/notifications/:id", controllers.UpdateNotification)
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
+
+		// ===== Promotions
+		router.POST("/promotions", controllers.CreatePromotion)
+		router.GET("/promotions", controllers.FindPromotions)
+		router.GET("/promotions/:id", controllers.GetPromotionByID)
+		router.PUT("/promotions/:id", controllers.UpdatePromotion)
+		router.DELETE("/promotions/:id", controllers.DeletePromotion)
+		router.POST("/promotions/:id/games", controllers.SetPromotionGames)
+		router.GET("/promotions-active", controllers.FindActivePromotions)
+
+		// ===== Reviews
+		router.POST("/reviews", controllers.CreateReview)
+		router.GET("/reviews", controllers.FindReviews) // ?game_id=&user_id=
+		router.GET("/reviews/:id", controllers.GetReviewByID)
+		router.PUT("/reviews/:id", controllers.UpdateReview)
+		router.DELETE("/reviews/:id", controllers.DeleteReview)
+		router.POST("/reviews/:id/toggle_like", controllers.ToggleReviewLike)
+		router.GET("/games/:id/reviews", controllers.FindReviewsByGame)
+
+		// categories routes
+		router.GET("/categories", controllers.FindCategories)
+
+		// keygame routes
+		router.GET("/keygame", controllers.FindKeyGame)
+		router.POST("/new-keygame", controllers.CreateKeyGame)
+
+		//minimumspec routes
+		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
+		router.GET("/minimumspec", controllers.FindMinimumSpec)
+
+		// ===== Orders =====
+		router.POST("/orders", controllers.JWTAuthMiddleware(), controllers.CreateOrder)
+		router.GET("/orders", controllers.JWTAuthMiddleware(), controllers.FindOrders)
+		router.GET("/orders/:id", controllers.JWTAuthMiddleware(), controllers.FindOrderByID)
+		router.PUT("/orders/:id", controllers.JWTAuthMiddleware(), controllers.UpdateOrder)
+		router.DELETE("/orders/:id", controllers.JWTAuthMiddleware(), controllers.DeleteOrder)
+		// ===== Order Items =====
+		router.POST("/order-items", controllers.CreateOrderItem)
+		router.GET("/order-items", controllers.FindOrderItems)
+		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+
+		// ===== Payments =====
+		router.POST("/payments", controllers.CreatePayment)
+		router.GET("/payments", controllers.FindPayments)
+		router.PATCH("/payments/:id", controllers.UpdatePayment)
+		router.DELETE("/payments/:id", controllers.DeletePayment)
+		router.POST("/payments/:id/approve", controllers.ApprovePayment)
+		router.POST("/payments/:id/reject", controllers.RejectPayment)
+
 	}
 
 	// Run the server

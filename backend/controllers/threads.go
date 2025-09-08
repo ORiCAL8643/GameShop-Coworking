@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -37,20 +37,43 @@ func CreateThread(c *gin.Context) {
 	c.JSON(http.StatusCreated, body)
 }
 
-// GET /threads  (optional: ?user_id=...  ?game_id=...)
+// GET /threads  (optional: ?user_id=...  ?game_id=...  ?sort=likes|comments|latest)
 func FindThreads(c *gin.Context) {
-	var threads []entity.Thread
+	type ThreadWithCounts struct {
+		entity.Thread
+		LikesCount    int64 `json:"likes" gorm:"column:likes_count"`
+		CommentsCount int64 `json:"comments" gorm:"column:comments_count"`
+	}
+
+	var threads []ThreadWithCounts
 	db := configs.DB()
 
 	userID := c.Query("user_id")
 	gameID := c.Query("game_id")
+	sort := c.DefaultQuery("sort", "latest")
 
-	tx := db.Preload("User").Preload("Game").Model(&entity.Thread{})
+	tx := db.Model(&entity.Thread{}).
+		Select("threads.*, COUNT(DISTINCT r.id) AS likes_count, COUNT(DISTINCT c.id) AS comments_count").
+		Joins("LEFT JOIN reactions r ON r.target_id = threads.id AND r.target_type = ? AND r.type = ?", "thread", "like").
+		Joins("LEFT JOIN comments c ON c.thread_id = threads.id").
+		Preload("User").
+		Preload("Game").
+		Group("threads.id")
+
 	if userID != "" {
-		tx = tx.Where("user_id = ?", userID)
+		tx = tx.Where("threads.user_id = ?", userID)
 	}
 	if gameID != "" {
-		tx = tx.Where("game_id = ?", gameID)
+		tx = tx.Where("threads.game_id = ?", gameID)
+	}
+
+	switch sort {
+	case "likes":
+		tx = tx.Order("likes_count DESC")
+	case "comments":
+		tx = tx.Order("comments_count DESC")
+	default:
+		tx = tx.Order("threads.created_at DESC")
 	}
 
 	if err := tx.Find(&threads).Error; err != nil {

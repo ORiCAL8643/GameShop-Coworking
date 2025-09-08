@@ -1,8 +1,32 @@
-import { Input, Avatar, Space } from 'antd';
-import { SearchOutlined, ShoppingCartOutlined, BellOutlined, DollarCircleOutlined } from '@ant-design/icons';
+
+import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from '@ant-design/icons';
+import { useState } from 'react';
+import { Input, Avatar, Space, Button } from 'antd';
+import { useAuth } from '../context/AuthContext';
+
 import { Link } from 'react-router-dom';
+import AuthModal from '../components/AuthModal';
+import NotificationsBell from '../components/NotificationsBell';
+import type { Notification } from '../interfaces/Notification';
 
 const Navbar = () => {
+  const [openAuth, setOpenAuth] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { token, username, logout, userId } = useAuth();
+
+  const handleLoginSuccess = () => {
+    setNotifications((prev) => [
+      ...prev,
+      {
+        ID: Date.now(),
+        title: 'Login Successful',
+        message: 'You have logged in successfully',
+        type: 'system',
+        user_id: userId ?? 0,
+      },
+    ]);
+  };
+
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: '#1f1f1f' }}>
       {/* Search */}
@@ -14,7 +38,7 @@ const Navbar = () => {
 
       {/* Icons */}
       <Space size="large">
-        <BellOutlined style={{ color: 'white', fontSize: '18px' }} />
+        <NotificationsBell notifications={notifications} />
 
         {/* Refund Status Icon */}
         <Link to="/refund-status">
@@ -22,8 +46,23 @@ const Navbar = () => {
         </Link>
 
         <ShoppingCartOutlined style={{ color: 'white', fontSize: '18px' }} />
-        <Avatar src="https://i.pravatar.cc/300" />
+        {token ? (
+          <>
+            <span style={{ color: 'white' }}>{username}</span>
+            <Button onClick={logout}>Logout</Button>
+            <Avatar src="https://i.pravatar.cc/300" />
+          </>
+        ) : (
+          <Button type="primary" onClick={() => setOpenAuth(true)}>
+            Login
+          </Button>
+        )}
       </Space>
+      <AuthModal
+        open={openAuth}
+        onClose={() => setOpenAuth(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
   );
 };
