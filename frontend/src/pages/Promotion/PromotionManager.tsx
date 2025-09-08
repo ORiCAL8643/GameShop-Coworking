@@ -12,6 +12,7 @@ import {
   updatePromotion,
   deletePromotion,
 } from "../../services/promotions";
+import { useAuth } from "../../context/AuthContext";
 
 type GameLite = { id: string; title: string };
 
@@ -35,6 +36,7 @@ export default function PromotionManager() {
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
+  const { userId: currentUserId, token } = useAuth();
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 
@@ -91,12 +93,15 @@ export default function PromotionManager() {
       body.append("end_date", values.dateRange[1].toISOString());
       body.append("status", String(values.status));
       values.gameIds.forEach(id => body.append("game_ids", id));
+      if (currentUserId != null) {
+        body.append("user_id", String(currentUserId));
+      }
       if (promoFile) {
         body.append("promo_image", promoFile);
       }
       const saved = await (isEdit
-        ? updatePromotion(editingId!, body)
-        : createPromotion(body));
+        ? updatePromotion(editingId!, body, token || undefined)
+        : createPromotion(body, token || undefined));
       const normalized = normalizePromo(saved);
       setData(prev => (
         isEdit
@@ -114,7 +119,7 @@ export default function PromotionManager() {
 
   const onDelete = async (id: number) => {
     try {
-      await deletePromotion(id);
+      await deletePromotion(id, token || undefined);
       setData(prev => prev.filter(p => p.ID !== id));
       message.success("ลบแล้ว");
     } catch {
