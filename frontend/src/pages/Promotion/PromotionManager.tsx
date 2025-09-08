@@ -1,109 +1,188 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Layout, Card, Form, Input, InputNumber, DatePicker, Switch,
   Button, Space, Table, Tag, Popconfirm, message, Typography, Select, Upload
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
-import Sidebar from "../../components/Sidebar";
-import type { Promotion, GameLite } from "../Promotion/App.ts";
+import type {
+  Promotion,
+  CreatePromotionRequest,
+  UpdatePromotionRequest,
+  DiscountType,
+} from "../../interfaces/Promotion";
+
+type GameLite = { id: string; title: string };
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
-// mock data เฉพาะ UI
-const MOCK_GAMES: GameLite[] = [
-  { id: "g1", title: "Elden Ring" },
-  { id: "g2", title: "Baldur’s Gate 3" },
-];
-
-const MOCK_PROMOS: Promotion[] = [
-  {
-    id: "p1",
-    title: "Mid-Year Sale",
-    description: "ลดจัดหนักหลายเกมดัง",
-    discountPercent: 30,
-    startDate: dayjs().subtract(7, "day").toISOString(),
-    endDate: dayjs().add(7, "day").toISOString(),
-    active: true,
-    imageUrl: "https://picsum.photos/1200/400?grayscale",
-    gameIds: ["g1", "g2"],
-  },
-];
-
 type FormValues = {
   title: string;
   description?: string;
-  discountPercent: number;
-  active: boolean;
+  discount_type: DiscountType;
+  discount_value: number;
+  status: boolean;
   dateRange: [Dayjs, Dayjs];
   gameIds: string[];
-  imageFile?: any;
+  promo_image?: string;
 };
 
 export default function PromotionManager() {
   const [form] = Form.useForm<FormValues>();
-  const [data, setData] = useState<Promotion[]>(MOCK_PROMOS);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const isEdit = useMemo(() => Boolean(editingId), [editingId]);
+  const [data, setData] = useState<Promotion[]>([]);
+  const [games, setGames] = useState<GameLite[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const isEdit = useMemo(() => editingId !== null, [editingId]);
+  const discountType = Form.useWatch("discount_type", form);
+
+  const normalizePromo = (p: any): Promotion => ({
+    ID: p.ID ?? p.id,
+    title: p.title,
+    description: p.description,
+    discount_type: p.discount_type,
+    discount_value: p.discount_value ?? p.discountPercent ?? 0,
+    start_date: p.start_date ?? p.startDate,
+    end_date: p.end_date ?? p.endDate,
+    status: p.status ?? p.active,
+    promo_image: p.promo_image ?? p.imageUrl,
+    user_id: p.user_id,
+    user: p.user,
+    games: p.games,
+  });
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [gRes, pRes] = await Promise.all([
+          fetch("http://localhost:8088/games"),
+          fetch("http://localhost:8088/promotions?with=games"),
+        ]);
+        const gameJson = await gRes.json();
+        const promoJson = await pRes.json();
+        setGames(
+          gameJson.map((g: any) => ({
+            id: String(g.id ?? g.ID),
+            title: g.title ?? g.game_name,
+          })),
+        );
+        setData(promoJson.map((p: any) => normalizePromo(p)));
+      } catch {
+        message.error("โหลดข้อมูลล้มเหลว");
+      }
+    };
+    load();
+  }, []);
 
   const gameOptions = useMemo(
-    () => MOCK_GAMES.map(g => ({ label: g.title, value: g.id })),
-    []
+    () => games.map(g => ({ label: g.title, value: g.id })),
+    [games]
   );
 
   const onSubmit = async () => {
     try {
-      const values = await form.validateFields();
-      console.log("Form values:", values);
+      await form.validateFields();
       message.success(isEdit ? "จำลอง: อัปเดตแล้ว" : "จำลอง: สร้างแล้ว");
       form.resetFields();
       setEditingId(null);
-    } catch {/* validation */}
+    } catch {
+      message.error("บันทึกไม่สำเร็จ");
+    }
   };
 
-  const onDelete = (id: string) => {
-    message.success("จำลอง: ลบแล้ว");
-    setData(prev => prev.filter(p => p.id !== id));
+  const onDelete = async (id: number) => {
+    try {
+      const res = await fetch(`http://localhost:8088/promotions/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("api error");
+      setData(prev => prev.filter(p => p.ID !== id));
+      message.success("ลบแล้ว");
+    } catch {
+      message.error("ลบไม่สำเร็จ");
+    }
   };
 
   const columns = [
-    { title: "ชื่อโปรโมชัน", dataIndex: "title", key: "title",
-      render: (t: string) => <Text style={{ color: "white" }}>{t}</Text> },
-    { title: "% ลด", dataIndex: "discountPercent", key: "discountPercent",
-      render: (n: number) => <Tag color="magenta">{n}%</Tag> },
-    { title: "ช่วงเวลา", key: "date",
+    {
+      title: "ชื่อโปรโมชัน",
+      dataIndex: "title",
+      key: "title",
+      render: (t: string) => <Text style={{ color: "white" }}>{t}</Text>,
+    },
+    {
+      title: "ส่วนลด",
+      key: "discount",
+      render: (_: any, r: Promotion) =>
+        r.discount_type === "PERCENT" ? (
+          <Tag color="magenta">{r.discount_value}%</Tag>
+        ) : (
+          <Tag color="volcano">-{r.discount_value}</Tag>
+        ),
+    },
+    {
+      title: "ช่วงเวลา",
+      key: "date",
       render: (_: any, r: Promotion) => (
         <Text style={{ color: "#ccc" }}>
-          {dayjs(r.startDate).format("YYYY-MM-DD")} → {dayjs(r.endDate).format("YYYY-MM-DD")}
+          {dayjs(r.start_date).format("YYYY-MM-DD")} → {dayjs(r.end_date).format("YYYY-MM-DD")}
         </Text>
-      ) },
-    { title: "สถานะ", dataIndex: "active", key: "active",
-      render: (a: boolean) => a ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag> },
-    { title: "เกมที่ร่วม", key: "games",
+      ),
+    },
+    {
+      title: "สถานะ",
+      dataIndex: "status",
+      key: "status",
+      render: (a: boolean) => (a ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag>),
+    },
+    {
+      title: "เกมที่ร่วม",
+      key: "games",
       render: (_: any, r: Promotion) => (
         <div>
-          {r.gameIds.map(id => {
-            const title = MOCK_GAMES.find(g => g.id === id)?.title || id;
-            return <Tag key={id}>{title}</Tag>;
+          {r.games?.map((g: any) => {
+            const title =
+              games.find(gg => gg.id === String(g.ID))?.title || g.game_name || g.title || g.ID;
+            return <Tag key={g.ID}>{title}</Tag>;
           })}
         </div>
-      ) },
-    { title: "จัดการ", key: "actions",
+      ),
+    },
+    {
+      title: "จัดการ",
+      key: "actions",
       render: (_: any, r: Promotion) => (
         <Space>
-          <Button onClick={() => setEditingId(r.id)}>แก้ไข (UI)</Button>
+          <Button
+            onClick={() => {
+              setEditingId(r.ID);
+              form.setFieldsValue({
+                title: r.title,
+                description: r.description,
+                discount_type: r.discount_type,
+                discount_value: r.discount_value,
+                dateRange: [dayjs(r.start_date), dayjs(r.end_date)],
+                status: r.status,
+                gameIds: r.games?.map((g: any) => String(g.ID)) || [],
+                promo_image: r.promo_image,
+              });
+            }}
+          >
+            แก้ไข
+          </Button>
           <Popconfirm
             title="ลบโปรโมชันนี้?"
-            okText="ลบ" cancelText="ยกเลิก"
+            okText="ลบ"
+            cancelText="ยกเลิก"
             okButtonProps={{ danger: true }}
-            onConfirm={() => onDelete(r.id)}
+            onConfirm={() => onDelete(r.ID)}
           >
-            <Button danger>ลบ (UI)</Button>
+            <Button danger>ลบ</Button>
           </Popconfirm>
         </Space>
-      ) },
+      ),
+    },
   ];
 
   return (
@@ -113,13 +192,19 @@ export default function PromotionManager() {
           <Title level={2} style={{ color: "white" }}>Promotion Manager</Title>
 
           <Card style={{ marginBottom: 16, background: "#1f1f1f", color: "white", borderRadius: 10 }}>
-            <Form<FormValues> layout="vertical" form={form} requiredMark="optional"
+            <Form<FormValues>
+              layout="vertical"
+              form={form}
+              requiredMark="optional"
               initialValues={{
-                active: true,
-                dateRange: [dayjs(), dayjs().add(7, "day")]
+                discount_type: "PERCENT" as DiscountType,
+                status: true,
+                dateRange: [dayjs(), dayjs().add(7, "day")],
               }}
             >
-              <Form.Item name="title" label={<span style={{ color: "#ccc" }}>ชื่อโปรโมชัน</span>}
+              <Form.Item
+                name="title"
+                label={<span style={{ color: "#ccc" }}>ชื่อโปรโมชัน</span>}
                 rules={[{ required: true, message: "กรอกชื่อโปรโมชัน" }]}
               >
                 <Input placeholder="เช่น Mid-Year Sale" />
@@ -129,40 +214,63 @@ export default function PromotionManager() {
                 <Input.TextArea rows={3} placeholder="รายละเอียดโปรโมชัน" />
               </Form.Item>
 
-              <Form.Item name="discountPercent" label={<span style={{ color: "#ccc" }}>% ส่วนลด</span>}
-                rules={[{ required: true, message: "กรอก % ส่วนลด" }]}
+              <Form.Item
+                name="discount_type"
+                label={<span style={{ color: "#ccc" }}>ประเภทส่วนลด</span>}
               >
-                <InputNumber min={0} max={100} style={{ width: 160 }} />
+                <Select
+                  style={{ width: 160 }}
+                  options={[
+                    { label: "%", value: "PERCENT" },
+                    { label: "จำนวนเงิน", value: "AMOUNT" },
+                  ]}
+                />
               </Form.Item>
 
-              <Form.Item name="dateRange" label={<span style={{ color: "#ccc" }}>ช่วงเวลา</span>}
+              <Form.Item
+                name="discount_value"
+                label={<span style={{ color: "#ccc" }}>มูลค่าส่วนลด</span>}
+                rules={[{ required: true, message: "กรอกมูลค่าส่วนลด" }]}
+              >
+                <InputNumber
+                  min={0}
+                  max={discountType === "PERCENT" ? 100 : undefined}
+                  style={{ width: 160 }}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="dateRange"
+                label={<span style={{ color: "#ccc" }}>ช่วงเวลา</span>}
                 rules={[{ required: true, message: "เลือกช่วงเวลา" }]}
               >
                 <RangePicker />
               </Form.Item>
 
-              <Form.Item name="active" label={<span style={{ color: "#ccc" }}>สถานะ</span>} valuePropName="checked">
+              <Form.Item
+                name="status"
+                label={<span style={{ color: "#ccc" }}>สถานะ</span>}
+                valuePropName="checked"
+              >
                 <Switch />
               </Form.Item>
 
               <Form.Item name="gameIds" label={<span style={{ color: "#ccc" }}>เกมที่ร่วมรายการ</span>}>
-                <Select mode="multiple" placeholder="เลือกเกม" options={gameOptions} style={{ maxWidth: 600 }} />
+                <Select
+                  mode="multiple"
+                  placeholder="เลือกเกม"
+                  options={gameOptions}
+                  style={{ maxWidth: 600 }}
+                />
               </Form.Item>
 
-              {/* ช่องอัปโหลดรูปภาพ */}
-              <Form.Item name="imageFile" label={<span style={{ color: "#ccc" }}>อัปโหลดรูปภาพ</span>}>
-                <Upload
-                  listType="picture"
-                  maxCount={1}
-                  beforeUpload={() => false} // ปิดการอัปโหลดจริง เก็บไฟล์ใน form
-                >
-                  <Button icon={<UploadOutlined />}>เลือกไฟล์</Button>
-                </Upload>
+              <Form.Item name="imageUrl" label={<span style={{ color: "#ccc" }}>รูปภาพ (URL)</span>}>
+                <Input placeholder="เช่น https://…" />
               </Form.Item>
 
               <Space>
                 <Button type="primary" onClick={onSubmit}>
-                  {isEdit ? "บันทึกการแก้ไข (จำลอง)" : "สร้างโปรโมชัน (จำลอง)"}
+                  {isEdit ? "บันทึกการแก้ไข" : "สร้างโปรโมชัน"}
                 </Button>
                 <Button onClick={() => { form.resetFields(); setEditingId(null); }}>
                   ล้างฟอร์ม
@@ -172,7 +280,7 @@ export default function PromotionManager() {
           </Card>
 
           <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}>
-            <Table rowKey="id" columns={columns as any} dataSource={data} pagination={{ pageSize: 8 }} />
+            <Table rowKey="ID" columns={columns as any} dataSource={data} pagination={{ pageSize: 8 }} />
           </Card>
         </div>
       </Content>
