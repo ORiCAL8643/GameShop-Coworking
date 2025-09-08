@@ -283,17 +283,12 @@ export default function PromotionManager() {
                 />
               </Form.Item>
 
-<<<<<<< HEAD
-              <Form.Item name="imageUrl" label={<span style={{ color: "#ccc" }}>รูปภาพ (URL)</span>}>
-                <Input placeholder="เช่น https://…" />
-=======
               <Form.Item label={<span style={{ color: "#ccc" }}>รูปภาพ</span>}>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={e => setPromoFile(e.target.files?.[0] || null)}
                 />
->>>>>>> 6c282fb517efd9a4d08079118bb8fc062791ce33
               </Form.Item>
 
               <Space>
