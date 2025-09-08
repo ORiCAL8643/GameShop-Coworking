@@ -32,7 +32,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         return;
       }
 
-      await login(result.token, values.username);
+      await login(result.token, values.username, result.user_id);
       const notification = {
         ID: Date.now(),
         title: 'ระบบ',
@@ -66,7 +66,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
       }
 
       const data = await res.json();
-      await login(data.token, values.username);
+      // Optionally log the user in immediately if a token is returned
+      if (data.token && data.ID) {
+        await login(data.token, values.username, data.ID);
+      }
       onClose();
     } catch (error) {
       console.error(error);
