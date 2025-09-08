@@ -84,44 +84,49 @@ const ProductGrid = () => {
 
   return (
     <Row gutter={[16, 16]}>
-      {game.map((c) => (
-        <Col xs={24} sm={12} md={8} lg={6}>
-          <Card
-            style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
-            cover={
-              <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
-            }
-          >
-            <Card.Meta
-              title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
-              description={
-                <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
+      {game.map((c) => {
+        const hasDiscount =
+          c.discounted_price !== undefined &&
+          c.discounted_price < c.base_price;
+        return (
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Card
+              style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
+              cover={
+                <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
               }
-            />
-            <div style={{ marginTop: 10, color: "#9254de" }}>
-              {c.discounted_price ? (
-                <>
-                  <span
-                    style={{ textDecoration: "line-through", color: "#ccc" }}
-                  >
-                    {c.base_price}
-                  </span>
-                  <span style={{ marginLeft: 8 }}>{c.discounted_price}</span>
-                </>
-              ) : (
-                c.base_price
-              )}
-            </div>
-            <Button
-              block
-              style={{ marginTop: 10 }}
-              onClick={() => handleAddToCart(c)}
             >
-              Add to Cart
-            </Button>
-          </Card>
-        </Col>
-      ))}
+              <Card.Meta
+                title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
+                description={
+                  <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
+                }
+              />
+              <div style={{ marginTop: 10, color: "#9254de" }}>
+                {hasDiscount ? (
+                  <>
+                    <span
+                      style={{ textDecoration: "line-through", color: "#ccc" }}
+                    >
+                      {c.base_price}
+                    </span>
+                    <span style={{ marginLeft: 8 }}>{c.discounted_price}</span>
+                  </>
+                ) : (
+                  c.base_price
+                )}
+              </div>
+              <Button
+                block
+                style={{ marginTop: 10 }}
+                onClick={() => handleAddToCart(c)}
+              >
+                Add to Cart
+              </Button>
+            </Card>
+          </Col>
+        );
+      })}
       <Col xs={24} sm={12} md={8} lg={6}>
         <Link to={"/information/Add"}>
           <AddProductCard />
