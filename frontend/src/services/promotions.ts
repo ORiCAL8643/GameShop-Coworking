@@ -56,7 +56,7 @@ export async function deletePromotion(id: number): Promise<void> {
 }
 
 export async function listGames(): Promise<Game[]> {
-  const res = await fetch(`${API_URL}/games`);
+  const res = await fetch(`${API_URL}/game`);
   return handleResponse<Game[]>(res);
 }
 
