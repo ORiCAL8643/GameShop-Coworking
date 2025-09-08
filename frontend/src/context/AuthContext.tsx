@@ -5,7 +5,7 @@ interface AuthContextType {
   token: string | null;
   username: string | null;
   userId: number | null;
-  login: (token: string, username: string) => Promise<void>;
+  login: (token: string, username: string, userId: number) => Promise<void>;
   logout: () => void;
 }
 
@@ -25,31 +25,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return stored ? Number(stored) : null;
   });
 
-  const login = async (newToken: string, name: string) => {
+  const login = async (newToken: string, name: string, id: number) => {
     setToken(newToken);
     setUsername(name);
+    setUserId(id);
     localStorage.setItem('token', newToken);
     localStorage.setItem('username', name);
-
-    try {
-      const res = await fetch('http://localhost:8088/users/me', {
-        headers: {
-          Authorization: `Bearer ${newToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const id = data.ID ?? data.id;
-        if (typeof id === 'number') {
-          setUserId(id);
-          localStorage.setItem('userId', String(id));
-        } else {
-          console.warn('Invalid user ID received', data);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to fetch user info', err);
-    }
+    localStorage.setItem('userId', String(id));
   };
 
   const logout = () => {
