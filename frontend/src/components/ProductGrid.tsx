@@ -7,7 +7,11 @@ import axios from 'axios';
 
 const base_url = 'http://localhost:8088';
 
-const ProductGrid = () => {
+interface ProductGridProps {
+  userId: number | null;
+}
+
+const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   interface Game {
       ID: number;
       game_name: string;
@@ -59,7 +63,7 @@ const ProductGrid = () => {
       // 2) ถ้ายังไม่มี ให้สร้างออเดอร์ใหม่แล้วเก็บ orderId
       if (!orderId) {
         const orderRes = await axios.post(`${base_url}/orders`, {
-          user_id: 1,
+          user_id: userId,
           total_amount: 0,
           order_status: 'PENDING',
         });
