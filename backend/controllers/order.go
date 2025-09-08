@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -32,13 +33,19 @@ func CreateOrder(c *gin.Context) {
 }
 
 func FindOrders(c *gin.Context) {
-	var rows []entity.Order
-	db := configs.DB().Preload("User").Preload("OrderItems").Preload("Payments").Preload("OrderPromotions")
-	userID := c.Query("user_id")
-	status := c.Query("status")
-	if userID != "" {
-		db = db.Where("user_id = ?", userID)
+	user, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
 	}
+	userID := user.(uint)
+	if q := c.Query("user_id"); q != "" && q != fmt.Sprint(userID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	var rows []entity.Order
+	db := configs.DB().Preload("User").Preload("OrderItems").Preload("Payments").Preload("OrderPromotions").Where("user_id = ?", userID)
+	status := c.Query("status")
 	if status != "" {
 		db = db.Where("order_status = ?", status)
 	}
@@ -50,6 +57,12 @@ func FindOrders(c *gin.Context) {
 }
 
 func FindOrderByID(c *gin.Context) {
+	user, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid := user.(uint)
 	var row entity.Order
 	if tx := configs.DB().
 		Preload("User").
@@ -58,6 +71,10 @@ func FindOrderByID(c *gin.Context) {
 		Preload("OrderPromotions.Promotion").
 		First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
+		return
+	}
+	if row.UserID != uid {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 	c.JSON(http.StatusOK, row)

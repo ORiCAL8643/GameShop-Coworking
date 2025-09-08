@@ -15,6 +15,7 @@ import {
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -38,6 +39,7 @@ const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const PaymentPage = () => {
+  const { token, userId } = useAuth();
   const [items, setItems] = useState<CartItem[]>([]);
   const [order, setOrder] = useState<any | null>(null);
   const [payOpen, setPayOpen] = useState(false);
@@ -52,10 +54,15 @@ const PaymentPage = () => {
     localStorage.getItem("orderId");
 
   useEffect(() => {
-    if (!orderIdParam) return;
+    if (!orderIdParam || !token || !userId) return;
     const load = async () => {
       try {
-        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`);
+        await fetch(`http://localhost:8088/orders?user_id=${userId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (!res.ok) throw new Error("fetch order failed");
         const data = await res.json();
         setOrder(data);
@@ -72,7 +79,7 @@ const PaymentPage = () => {
       }
     };
     load();
-  }, [orderIdParam]);
+  }, [orderIdParam, token, userId]);
 
   const subtotal = useMemo(() => items.reduce((s, it) => s + it.price, 0), [items]);
   const fee = 0;
