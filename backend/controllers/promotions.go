@@ -3,6 +3,7 @@ package controllers
 
 import (
 	"fmt"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,16 +23,16 @@ func validatePromoWindow(start, end time.Time) bool {
 }
 
 type createPromotionRequest struct {
-	Title         string              `form:"title"          binding:"required"`
-	Description   string              `form:"description"`
-	DiscountType  entity.DiscountType `form:"discount_type"   binding:"required"`
-	DiscountValue int                 `form:"discount_value"  binding:"required,min=0"`
-	StartDate     time.Time           `form:"start_date"      binding:"required"`
-	EndDate       time.Time           `form:"end_date"        binding:"required"`
-	PromoImage    string              `form:"promo_image"`
-	Status        *bool               `form:"status"`
-	UserID        uint                `form:"user_id"`
-	GameIDs       []uint              `form:"game_ids"` // optional: set links to games
+	Title         string                `form:"title"          binding:"required"`
+	Description   string                `form:"description"`
+	DiscountType  entity.DiscountType   `form:"discount_type"   binding:"required"`
+	DiscountValue int                   `form:"discount_value"  binding:"required,min=0"`
+	StartDate     time.Time             `form:"start_date"      binding:"required"`
+	EndDate       time.Time             `form:"end_date"        binding:"required"`
+	PromoImage    *multipart.FileHeader `form:"promo_image"`
+	Status        *bool                 `form:"status"`
+	UserID        uint                  `form:"user_id"`
+	GameIDs       []uint                `form:"game_ids"` // optional: set links to games
 }
 
 // POST /promotions
@@ -46,19 +47,20 @@ func CreatePromotion(c *gin.Context) {
 		return
 	}
 
-	if file, err := c.FormFile("promo_image"); err == nil {
+	var promoImagePath string
+	if req.PromoImage != nil {
 		uploadDir := filepath.Join("uploads", "promotions")
 		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
 			return
 		}
-		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), req.PromoImage.Filename)
 		path := filepath.Join(uploadDir, filename)
-		if err := c.SaveUploadedFile(file, path); err != nil {
+		if err := c.SaveUploadedFile(req.PromoImage, path); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
 			return
 		}
-		req.PromoImage = path
+		promoImagePath = path
 	}
 
 	promo := entity.Promotion{
@@ -68,7 +70,7 @@ func CreatePromotion(c *gin.Context) {
 		DiscountValue: req.DiscountValue,
 		StartDate:     req.StartDate,
 		EndDate:       req.EndDate,
-		PromoImage:    req.PromoImage,
+		PromoImage:    promoImagePath,
 		Status:        true,
 		UserID:        req.UserID,
 	}
@@ -148,16 +150,16 @@ func GetPromotionByID(c *gin.Context) {
 }
 
 type updatePromotionRequest struct {
-	Title         *string              `form:"title"`
-	Description   *string              `form:"description"`
-	DiscountType  *entity.DiscountType `form:"discount_type"`
-	DiscountValue *int                 `form:"discount_value"  binding:"omitempty,min=0"`
-	StartDate     *time.Time           `form:"start_date"`
-	EndDate       *time.Time           `form:"end_date"`
-	PromoImage    *string              `form:"promo_image"`
-	Status        *bool                `form:"status"`
-	UserID        *uint                `form:"user_id"`
-	GameIDs       *[]uint              `form:"game_ids"` // if present, replace mapping
+	Title         *string               `form:"title"`
+	Description   *string               `form:"description"`
+	DiscountType  *entity.DiscountType  `form:"discount_type"`
+	DiscountValue *int                  `form:"discount_value"  binding:"omitempty,min=0"`
+	StartDate     *time.Time            `form:"start_date"`
+	EndDate       *time.Time            `form:"end_date"`
+	PromoImage    *multipart.FileHeader `form:"promo_image"`
+	Status        *bool                 `form:"status"`
+	UserID        *uint                 `form:"user_id"`
+	GameIDs       *[]uint               `form:"game_ids"` // if present, replace mapping
 }
 
 // PUT /promotions/:id
@@ -179,19 +181,20 @@ func UpdatePromotion(c *gin.Context) {
 		return
 	}
 
-	if file, err := c.FormFile("promo_image"); err == nil {
+	var promoImagePath string
+	if req.PromoImage != nil {
 		uploadDir := filepath.Join("uploads", "promotions")
 		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
 			return
 		}
-		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), req.PromoImage.Filename)
 		path := filepath.Join(uploadDir, filename)
-		if err := c.SaveUploadedFile(file, path); err != nil {
+		if err := c.SaveUploadedFile(req.PromoImage, path); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
 			return
 		}
-		req.PromoImage = &path
+		promoImagePath = path
 	}
 
 	// validate date window if both provided
@@ -221,8 +224,8 @@ func UpdatePromotion(c *gin.Context) {
 	if req.EndDate != nil {
 		updates["end_date"] = *req.EndDate
 	}
-	if req.PromoImage != nil {
-		updates["promo_image"] = *req.PromoImage
+	if promoImagePath != "" {
+		updates["promo_image"] = promoImagePath
 	}
 	if req.Status != nil {
 		updates["status"] = *req.Status
