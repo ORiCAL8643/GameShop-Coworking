@@ -40,8 +40,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (res.ok) {
         const data = await res.json();
         const id = data.ID ?? data.id;
-        setUserId(id);
-        localStorage.setItem('userId', String(id));
+        if (typeof id === 'number') {
+          setUserId(id);
+          localStorage.setItem('userId', String(id));
+        } else {
+          console.warn('Invalid user ID received', data);
+        }
       }
     } catch (err) {
       console.error('Failed to fetch user info', err);

@@ -56,6 +56,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   }, []);
 
   const handleAddToCart = async (g: Game) => {
+    if (!userId) {
+      alert('Please log in to continue');
+      return;
+    }
     try {
       // 1) ตรวจสอบว่ามี orderId ใน localStorage หรือไม่
       let orderId = localStorage.getItem('orderId');
