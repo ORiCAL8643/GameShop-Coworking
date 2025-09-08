@@ -15,6 +15,8 @@ const ProductGrid = () => {
       categories: {ID: number, title: string};
       release_date: string;
       base_price: number;
+      /** Price after applying promotion. Undefined when no promotion */
+      discounted_price?: number;
       img_src: string;
       age_rating: number;
       status: string;
@@ -53,16 +55,17 @@ const ProductGrid = () => {
 
   const handleAddToCart = async (g: Game) => {
     try {
+      const price = g.discounted_price ?? g.base_price;
       const res = await axios.post(`${base_url}/orders`, {
         user_id: 1,
-        total_amount: g.base_price,
+        total_amount: price,
         order_status: 'PENDING',
         order_items: [
           {
-            unit_price: g.base_price,
+            unit_price: price,
             qty: 1,
             line_discount: 0,
-            line_total: g.base_price,
+            line_total: price,
             game_key_id: g.key_id,
           },
         ],
@@ -86,7 +89,18 @@ const ProductGrid = () => {
           cover={ <img src={resolveImgUrl(c.img_src)} style={{height: 150}}/>}
         >
         <Card.Meta title={<div style={{color: '#ffffffff'}}>{c.game_name}</div>} description={<div style={{color: '#ffffffff'}}>{c.categories.title}</div>}/>
-          <div style={{ marginTop: 10, color: '#9254de' }}>{c.base_price}</div>
+          <div style={{ marginTop: 10, color: '#9254de' }}>
+            {c.discounted_price ? (
+              <>
+                <span style={{ textDecoration: 'line-through', color: '#ccc' }}>
+                  {c.base_price}
+                </span>
+                <span style={{ marginLeft: 8 }}>{c.discounted_price}</span>
+              </>
+            ) : (
+              c.base_price
+            )}
+          </div>
           <Button
             block
             style={{ marginTop: 10 }}
