@@ -71,7 +71,9 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
         } catch (error) {
           if (
             axios.isAxiosError(error) &&
-            (error.response?.status === 404 || error.response?.status === 400)
+            (error.response?.status === 404 ||
+              error.response?.status === 400 ||
+              error.response?.status === 403)
           ) {
             // ถ้าออเดอร์ไม่พบหรือไม่ถูกต้อง ให้ลบ orderId และสร้างใหม่
             localStorage.removeItem('orderId');

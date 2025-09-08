@@ -41,6 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userId');
+    localStorage.removeItem('orderId');
   };
 
   return (
