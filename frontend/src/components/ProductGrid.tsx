@@ -108,7 +108,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
       // นำผู้ใช้ไปหน้า Payment พร้อมเลขออเดอร์
       navigate(`/category/Payment?id=${orderId}`);
-    } catch (err) {
+    } catch (err) {   
       console.error('add to cart error', err);
     }
   };
