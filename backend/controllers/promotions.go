@@ -2,7 +2,10 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	"example.com/sa-gameshop/configs"
@@ -19,20 +22,22 @@ func validatePromoWindow(start, end time.Time) bool {
 }
 
 type createPromotionRequest struct {
-	DiscountType  entity.DiscountType `json:"discount_type"   binding:"required"`
-	DiscountValue int                 `json:"discount_value"  binding:"required,min=0"`
-	StartDate     time.Time           `json:"start_date"      binding:"required"`
-	EndDate       time.Time           `json:"end_date"        binding:"required"`
-	PromoImage    string              `json:"promo_image"`
-	Status        *bool               `json:"status"`
-	UserID        uint                `json:"user_id"`
-	GameIDs       []uint              `json:"game_ids"` // optional: set links to games
+	Title         string              `form:"title"          binding:"required"`
+	Description   string              `form:"description"`
+	DiscountType  entity.DiscountType `form:"discount_type"   binding:"required"`
+	DiscountValue int                 `form:"discount_value"  binding:"required,min=0"`
+	StartDate     time.Time           `form:"start_date"      binding:"required"`
+	EndDate       time.Time           `form:"end_date"        binding:"required"`
+	PromoImage    string              `form:"promo_image"`
+	Status        *bool               `form:"status"`
+	UserID        uint                `form:"user_id"`
+	GameIDs       []uint              `form:"game_ids"` // optional: set links to games
 }
 
 // POST /promotions
 func CreatePromotion(c *gin.Context) {
 	var req createPromotionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
 		return
 	}
@@ -41,7 +46,24 @@ func CreatePromotion(c *gin.Context) {
 		return
 	}
 
+	if file, err := c.FormFile("promo_image"); err == nil {
+		uploadDir := filepath.Join("uploads", "promotions")
+		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+			return
+		}
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		path := filepath.Join(uploadDir, filename)
+		if err := c.SaveUploadedFile(file, path); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+			return
+		}
+		req.PromoImage = path
+	}
+
 	promo := entity.Promotion{
+		Title:         req.Title,
+		Description:   req.Description,
 		DiscountType:  req.DiscountType,
 		DiscountValue: req.DiscountValue,
 		StartDate:     req.StartDate,
@@ -126,20 +148,22 @@ func GetPromotionByID(c *gin.Context) {
 }
 
 type updatePromotionRequest struct {
-	DiscountType  *entity.DiscountType `json:"discount_type"`
-	DiscountValue *int                 `json:"discount_value"  binding:"omitempty,min=0"`
-	StartDate     *time.Time           `json:"start_date"`
-	EndDate       *time.Time           `json:"end_date"`
-	PromoImage    *string              `json:"promo_image"`
-	Status        *bool                `json:"status"`
-	UserID        *uint                `json:"user_id"`
-	GameIDs       *[]uint              `json:"game_ids"` // if present, replace mapping
+	Title         *string              `form:"title"`
+	Description   *string              `form:"description"`
+	DiscountType  *entity.DiscountType `form:"discount_type"`
+	DiscountValue *int                 `form:"discount_value"  binding:"omitempty,min=0"`
+	StartDate     *time.Time           `form:"start_date"`
+	EndDate       *time.Time           `form:"end_date"`
+	PromoImage    *string              `form:"promo_image"`
+	Status        *bool                `form:"status"`
+	UserID        *uint                `form:"user_id"`
+	GameIDs       *[]uint              `form:"game_ids"` // if present, replace mapping
 }
 
 // PUT /promotions/:id
 func UpdatePromotion(c *gin.Context) {
 	var req updatePromotionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
 		return
 	}
@@ -155,6 +179,21 @@ func UpdatePromotion(c *gin.Context) {
 		return
 	}
 
+	if file, err := c.FormFile("promo_image"); err == nil {
+		uploadDir := filepath.Join("uploads", "promotions")
+		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+			return
+		}
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+		path := filepath.Join(uploadDir, filename)
+		if err := c.SaveUploadedFile(file, path); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+			return
+		}
+		req.PromoImage = &path
+	}
+
 	// validate date window if both provided
 	if req.StartDate != nil && req.EndDate != nil {
 		if !validatePromoWindow(*req.StartDate, *req.EndDate) {
@@ -164,13 +203,33 @@ func UpdatePromotion(c *gin.Context) {
 	}
 	// apply partial fields
 	updates := map[string]any{}
-	if req.DiscountType != nil { updates["discount_type"] = *req.DiscountType }
-	if req.DiscountValue != nil { updates["discount_value"] = *req.DiscountValue }
-	if req.StartDate != nil { updates["start_date"] = *req.StartDate }
-	if req.EndDate != nil { updates["end_date"] = *req.EndDate }
-	if req.PromoImage != nil { updates["promo_image"] = *req.PromoImage }
-	if req.Status != nil { updates["status"] = *req.Status }
-	if req.UserID != nil { updates["user_id"] = *req.UserID }
+	if req.Title != nil {
+		updates["title"] = *req.Title
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if req.DiscountType != nil {
+		updates["discount_type"] = *req.DiscountType
+	}
+	if req.DiscountValue != nil {
+		updates["discount_value"] = *req.DiscountValue
+	}
+	if req.StartDate != nil {
+		updates["start_date"] = *req.StartDate
+	}
+	if req.EndDate != nil {
+		updates["end_date"] = *req.EndDate
+	}
+	if req.PromoImage != nil {
+		updates["promo_image"] = *req.PromoImage
+	}
+	if req.Status != nil {
+		updates["status"] = *req.Status
+	}
+	if req.UserID != nil {
+		updates["user_id"] = *req.UserID
+	}
 
 	if len(updates) > 0 {
 		if err := db.Model(&row).Updates(updates).Error; err != nil {

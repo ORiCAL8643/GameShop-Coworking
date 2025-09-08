@@ -4,12 +4,7 @@ import {
   Button, Space, Table, Tag, Popconfirm, message, Typography, Select,
 } from "antd";
 import dayjs, { Dayjs } from "dayjs";
-import type {
-  Promotion,
-  CreatePromotionRequest,
-  UpdatePromotionRequest,
-  DiscountType,
-} from "../../interfaces/Promotion";
+import type { Promotion, DiscountType } from "../../interfaces/Promotion";
 import {
   listPromotions,
   listGames,
@@ -32,7 +27,6 @@ type FormValues = {
   status: boolean;
   dateRange: [Dayjs, Dayjs];
   gameIds: string[];
-  promo_image?: string;
 };
 
 export default function PromotionManager() {
@@ -40,6 +34,7 @@ export default function PromotionManager() {
   const [data, setData] = useState<Promotion[]>([]);
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [promoFile, setPromoFile] = useState<File | null>(null);
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 
@@ -87,20 +82,21 @@ export default function PromotionManager() {
   const onSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const body: CreatePromotionRequest | UpdatePromotionRequest = {
-        title: values.title,
-        description: values.description,
-        discount_type: values.discount_type,
-        discount_value: values.discount_value,
-        start_date: values.dateRange[0].toISOString(),
-        end_date: values.dateRange[1].toISOString(),
-        status: values.status,
-        promo_image: values.promo_image,
-        game_ids: values.gameIds.map(id => Number(id)),
-      };
+      const body = new FormData();
+      body.append("title", values.title);
+      if (values.description) body.append("description", values.description);
+      body.append("discount_type", values.discount_type);
+      body.append("discount_value", String(values.discount_value));
+      body.append("start_date", values.dateRange[0].toISOString());
+      body.append("end_date", values.dateRange[1].toISOString());
+      body.append("status", String(values.status));
+      values.gameIds.forEach(id => body.append("game_ids", id));
+      if (promoFile) {
+        body.append("promo_image", promoFile);
+      }
       const saved = await (isEdit
-        ? updatePromotion(editingId!, body as UpdatePromotionRequest)
-        : createPromotion(body as CreatePromotionRequest));
+        ? updatePromotion(editingId!, body)
+        : createPromotion(body));
       const normalized = normalizePromo(saved);
       setData(prev => (
         isEdit
@@ -109,6 +105,7 @@ export default function PromotionManager() {
       ));
       message.success(isEdit ? "อัปเดตแล้ว" : "สร้างแล้ว");
       form.resetFields();
+      setPromoFile(null);
       setEditingId(null);
     } catch {
       message.error("บันทึกไม่สำเร็จ");
@@ -186,8 +183,8 @@ export default function PromotionManager() {
                 dateRange: [dayjs(r.start_date), dayjs(r.end_date)],
                 status: r.status,
                 gameIds: r.games?.map((g: any) => String(g.ID)) || [],
-                promo_image: r.promo_image,
               });
+              setPromoFile(null);
             }}
           >
             แก้ไข
@@ -286,8 +283,12 @@ export default function PromotionManager() {
                 />
               </Form.Item>
 
-              <Form.Item name="promo_image" label={<span style={{ color: "#ccc" }}>รูปภาพ (URL)</span>}>
-                <Input placeholder="เช่น https://…" />
+              <Form.Item label={<span style={{ color: "#ccc" }}>รูปภาพ</span>}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setPromoFile(e.target.files?.[0] || null)}
+                />
               </Form.Item>
 
               <Space>

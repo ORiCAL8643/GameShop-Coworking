@@ -1,8 +1,4 @@
-import type {
-  Promotion,
-  CreatePromotionRequest,
-  UpdatePromotionRequest,
-} from "../interfaces/Promotion";
+import type { Promotion } from "../interfaces/Promotion";
 import type { Game } from "../interfaces/Game";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8088";
@@ -32,25 +28,21 @@ export async function getPromotion(
   return handleResponse<Promotion>(res);
 }
 
-export async function createPromotion(
-  payload: CreatePromotionRequest,
-): Promise<Promotion> {
+export async function createPromotion(payload: FormData): Promise<Promotion> {
   const res = await fetch(`${API_URL}/promotions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: payload,
   });
   return handleResponse<Promotion>(res);
 }
 
 export async function updatePromotion(
   id: number,
-  payload: UpdatePromotionRequest,
+  payload: FormData,
 ): Promise<Promotion> {
   const res = await fetch(`${API_URL}/promotions/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: payload,
   });
   return handleResponse<Promotion>(res);
 }
