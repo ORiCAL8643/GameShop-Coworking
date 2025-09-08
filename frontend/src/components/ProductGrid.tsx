@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Card, Button } from 'antd';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 const base_url = 'http://localhost:8088';
 
@@ -41,6 +42,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
   const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
+  const { token: authToken } = useAuth();
 
   async function GetGame() {
     try {
@@ -61,13 +63,16 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
       return;
     }
     try {
+      const token = authToken || localStorage.getItem('token');
       // 1) ตรวจสอบว่ามี orderId ใน localStorage หรือไม่
       let orderId = localStorage.getItem('orderId');
 
       // 2) ถ้ามี orderId ให้ตรวจสอบว่าออเดอร์ยังมีอยู่หรือไม่
       if (orderId) {
         try {
-          await axios.get(`${base_url}/orders/${orderId}`);
+          await axios.get(`${base_url}/orders/${orderId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
         } catch (error) {
           if (
             axios.isAxiosError(error) &&
@@ -86,11 +91,17 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
       // 3) ถ้ายังไม่มี ให้สร้างออเดอร์ใหม่แล้วเก็บ orderId
       if (!orderId) {
-        const orderRes = await axios.post(`${base_url}/orders`, {
-          user_id: userId,
-          total_amount: 0,
-          order_status: 'PENDING',
-        });
+        const orderRes = await axios.post(
+          `${base_url}/orders`,
+          {
+            user_id: userId,
+            total_amount: 0,
+            order_status: 'PENDING',
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         orderId = String(orderRes.data.ID || orderRes.data.id);
         localStorage.setItem('orderId', orderId);
       }
@@ -106,11 +117,19 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
       });
 
       // 5) อัปเดตราคารวมของออเดอร์หลังเพิ่มสินค้า
-      const current = await axios.get(`${base_url}/orders/${orderId}`);
-      const currentTotal = current.data.total_amount || 0;
-      await axios.put(`${base_url}/orders/${orderId}`, {
-        total_amount: currentTotal + g.base_price,
+      const current = await axios.get(`${base_url}/orders/${orderId}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
+      const currentTotal = current.data.total_amount || 0;
+      await axios.put(
+        `${base_url}/orders/${orderId}`,
+        {
+          total_amount: currentTotal + g.base_price,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
       // นำผู้ใช้ไปหน้า Payment พร้อมเลขออเดอร์
       navigate(`/category/Payment?id=${orderId}`);
