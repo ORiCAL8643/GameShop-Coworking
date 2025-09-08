@@ -46,12 +46,18 @@ func SetupDatabase() {
 	if err := db.AutoMigrate(
 		&entity.User{},
 		&entity.Game{},
+		&entity.KeyGame{},
 		&entity.Thread{},
 		&entity.UserGame{},
 		&entity.Comment{},
 		&entity.Reaction{},
 		&entity.Attachment{},
 		&entity.Notification{},
+		&entity.Order{},
+		&entity.Payment{},
+		&entity.PaymentSlip{},
+		&entity.Categories{},
+		&entity.MinimumSpec{},
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}

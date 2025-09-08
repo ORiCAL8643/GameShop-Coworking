@@ -45,6 +45,10 @@ const items: groupItem[] = [
     key: '/workshop',
     label:'Workshop',
   },
+    {
+    key: '/promotion',
+    label:'Promotion',
+  },
   {
     key: '/refund',
     label:'การคืนเงินผู้ใช้',

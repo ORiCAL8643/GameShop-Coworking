@@ -14,7 +14,8 @@ export type Thread = {
   author: string;
   createdAt: string;
   likes: number;
-  comments: ThreadComment[];
+  commentCount: number;
+  comments?: ThreadComment[];
   images?: string[];           // ✅ แนบรูปในเธรด
 };
 

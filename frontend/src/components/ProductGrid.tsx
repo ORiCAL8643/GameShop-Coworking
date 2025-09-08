@@ -1,11 +1,11 @@
 import { Row, Col } from 'antd';
 import AddProductCard from './AddProductCard';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, Button } from 'antd';
-import { useState,useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const base_url = 'http://localhost:8088'
+const base_url = 'http://localhost:8088';
 
 const ProductGrid = () => {
   interface Game {
@@ -35,19 +35,49 @@ const ProductGrid = () => {
     return `${base_url}/${clean}`;
   };
 
-  const[game, Setgame] = useState<Game[]>([])
+  const [game, Setgame] = useState<Game[]>([]);
+  const navigate = useNavigate();
+
   async function GetGame() {
-        try {
-        const response = await axios.get(`${base_url}/game`)
-        Setgame(response.data)
-        console.log(response.data)
-        } catch(err) {
-        console.log('get game error',err)
-        }  
-}
-    useEffect(() =>{
-        GetGame()
-    }, [])
+    try {
+      const response = await axios.get(`${base_url}/game`);
+      Setgame(response.data);
+      console.log(response.data);
+    } catch (err) {
+      console.log('get game error', err);
+    }
+  }
+  useEffect(() => {
+    GetGame();
+  }, []);
+
+  const handleAddToCart = async (g: Game) => {
+    try {
+      const res = await axios.post(`${base_url}/orders`, {
+        user_id: 1,
+        total_amount: g.base_price,
+        order_status: 'PENDING',
+        order_items: [
+          {
+            unit_price: g.base_price,
+            qty: 1,
+            line_discount: 0,
+            line_total: g.base_price,
+            game_key_id: g.key_id,
+          },
+        ],
+      });
+      const orderId = res.data.ID || res.data.id;
+      if (orderId) {
+        localStorage.setItem('orderId', String(orderId));
+        navigate(`/category/Payment?id=${orderId}`);
+      } else {
+        navigate('/category/Payment');
+      }
+    } catch (err) {
+      console.error('add to cart error', err);
+    }
+  };
 
   return (
     <Row gutter={[16, 16]}> 
@@ -59,7 +89,13 @@ const ProductGrid = () => {
         >
         <Card.Meta title={<div style={{color: '#ffffffff'}}>{c.game_name}</div>} description={<div style={{color: '#ffffffff'}}>{c.categories.title}</div>}/>
           <div style={{ marginTop: 10, color: '#9254de' }}>{c.base_price}</div>
-          <Button block style={{ marginTop: 10 }}>Add to Cart</Button>
+          <Button
+            block
+            style={{ marginTop: 10 }}
+            onClick={() => handleAddToCart(c)}
+          >
+            Add to Cart
+          </Button>
           </Card>
         </Col>
       ))

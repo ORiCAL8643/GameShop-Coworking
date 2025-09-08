@@ -1,33 +1,60 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
 func CreatePaymentSlip(c *gin.Context) {
-	var body entity.PaymentSlip
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file is required"})
+		return
+	}
+	pidStr := c.PostForm("payment_id")
+	if pidStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment_id is required"})
+		return
+	}
+	pid, err := strconv.ParseUint(pidStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payment_id"})
 		return
 	}
 	var pm entity.Payment
-	if tx := configs.DB().First(&pm, body.PaymentID); tx.RowsAffected == 0 {
+	if tx := configs.DB().First(&pm, pid); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "payment_id not found"})
 		return
 	}
-	if body.UploadAt.IsZero() {
-		body.UploadAt = time.Now()
+	uploadDir := filepath.Join("uploads", "payment_slips")
+	if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+		return
 	}
-	if err := configs.DB().Create(&body).Error; err != nil {
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+	filePath := filepath.Join(uploadDir, filename)
+	if err := c.SaveUploadedFile(file, filePath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		return
+	}
+	slip := entity.PaymentSlip{
+		PaymentID: uint(pid),
+		FileURL:   filePath,
+		UploadAt:  time.Now(),
+	}
+	if err := configs.DB().Create(&slip).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, body)
+	c.JSON(http.StatusCreated, slip)
 }
 
 func FindPaymentSlips(c *gin.Context) {
