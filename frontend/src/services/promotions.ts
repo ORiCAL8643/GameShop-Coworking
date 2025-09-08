@@ -28,9 +28,10 @@ export async function getPromotion(
   return handleResponse<Promotion>(res);
 }
 
-export async function createPromotion(payload: FormData): Promise<Promotion> {
+export async function createPromotion(payload: FormData, token?: string): Promise<Promotion> {
   const res = await fetch(`${API_URL}/promotions`, {
     method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: payload,
   });
   return handleResponse<Promotion>(res);
@@ -39,17 +40,20 @@ export async function createPromotion(payload: FormData): Promise<Promotion> {
 export async function updatePromotion(
   id: number,
   payload: FormData,
+  token?: string,
 ): Promise<Promotion> {
   const res = await fetch(`${API_URL}/promotions/${id}`, {
     method: "PUT",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: payload,
   });
   return handleResponse<Promotion>(res);
 }
 
-export async function deletePromotion(id: number): Promise<void> {
+export async function deletePromotion(id: number, token?: string): Promise<void> {
   const res = await fetch(`${API_URL}/promotions/${id}`, {
     method: "DELETE",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!res.ok) {
     const text = await res.text();
