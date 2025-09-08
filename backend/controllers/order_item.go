@@ -3,14 +3,25 @@ package controllers
 import (
 	"math"
 	"net/http"
+	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
+// payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
+type createOrderItemRequest struct {
+	UnitPrice    float64  `json:"unit_price" binding:"required"`
+	QTY          int      `json:"qty" binding:"required"`
+	OrderID      uint     `json:"order_id" binding:"required"`
+	GameKeyID    *uint    `json:"game_key_id"`
+	LineDiscount *float64 `json:"line_discount"`
+	LineTotal    *float64 `json:"line_total"`
+}
+
 func CreateOrderItem(c *gin.Context) {
-	var body entity.OrderItem
+	var body createOrderItemRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
 		return
@@ -25,6 +36,7 @@ func CreateOrderItem(c *gin.Context) {
 	}
 
 	// ตรวจ GameKey (ถ้าระบุ)
+	var gameID uint
 	if body.GameKeyID != nil {
 		var gk entity.KeyGame
 		if tx := db.First(&gk, *body.GameKeyID); tx.RowsAffected == 0 {
@@ -40,17 +52,66 @@ func CreateOrderItem(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "game key already assigned"})
 			return
 		}
+		gameID = gk.GameID
 	}
 
-	// คำนวณ line total แบบง่าย
+	// หาส่วนลดจากโปรโมชั่นที่ผูกกับเกมหรือออร์เดอร์
 	sub := body.UnitPrice * float64(body.QTY)
-	total := sub - body.LineDiscount
-	if total < 0 {
-		total = 0
-	}
-	body.LineTotal = math.Round(total*100) / 100
+	discount := 0.0
 
-	if err := db.Create(&body).Error; err != nil {
+	now := time.Now()
+	var promos []entity.Promotion
+	// โปรโมชันจากเกม
+	if gameID != 0 {
+		var gamePromos []entity.Promotion
+		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
+			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", gameID, now, now).
+			Find(&gamePromos)
+		promos = append(promos, gamePromos...)
+	}
+	// โปรโมชันจากออร์เดอร์
+	var orderPromos []entity.Promotion
+	db.Joins("JOIN order_promotions op ON op.promotion_id = promotions.id").
+		Where("op.order_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.OrderID, now, now).
+		Find(&orderPromos)
+	promos = append(promos, orderPromos...)
+
+	for _, p := range promos {
+		var d float64
+		if p.DiscountType == entity.DiscountPercent {
+			d = sub * float64(p.DiscountValue) / 100
+		} else if p.DiscountType == entity.DiscountAmount {
+			d = float64(p.DiscountValue) * float64(body.QTY)
+		}
+		if d > discount {
+			discount = d
+		}
+	}
+	if discount > sub {
+		discount = sub
+	}
+	// ตรวจสอบถ้ามีส่ง line_discount/line_total มาต้องตรงกับที่คำนวณ
+	if body.LineDiscount != nil && math.Round(*body.LineDiscount*100)/100 != math.Round(discount*100)/100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "line_discount mismatch"})
+		return
+	}
+	total := sub - discount
+	total = math.Round(total*100) / 100
+	if body.LineTotal != nil && math.Round(*body.LineTotal*100)/100 != total {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "line_total mismatch"})
+		return
+	}
+
+	item := entity.OrderItem{
+		UnitPrice:    body.UnitPrice,
+		QTY:          body.QTY,
+		LineDiscount: math.Round(discount*100) / 100,
+		LineTotal:    total,
+		OrderID:      body.OrderID,
+		GameKeyID:    body.GameKeyID,
+	}
+
+	if err := db.Create(&item).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -59,10 +120,10 @@ func CreateOrderItem(c *gin.Context) {
 	if body.GameKeyID != nil {
 		db.Model(&entity.KeyGame{}).
 			Where("id = ?", *body.GameKeyID).
-			Update("order_item_id", body.ID)
+			Update("order_item_id", item.ID)
 	}
 
-	c.JSON(http.StatusCreated, body)
+	c.JSON(http.StatusCreated, item)
 }
 
 func FindOrderItems(c *gin.Context) {
