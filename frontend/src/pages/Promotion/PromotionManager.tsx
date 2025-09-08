@@ -11,6 +11,13 @@ import type {
   UpdatePromotionRequest,
   DiscountType,
 } from "../../interfaces/Promotion";
+import {
+  listPromotions,
+  listGames,
+  createPromotion,
+  updatePromotion,
+  deletePromotion,
+} from "../../services/promotions";
 
 type GameLite = { id: string; title: string };
 
@@ -42,11 +49,11 @@ export default function PromotionManager() {
     title: p.title,
     description: p.description,
     discount_type: p.discount_type,
-    discount_value: p.discount_value ?? p.discountPercent ?? 0,
-    start_date: p.start_date ?? p.startDate,
-    end_date: p.end_date ?? p.endDate,
-    status: p.status ?? p.active,
-    promo_image: p.promo_image ?? p.imageUrl,
+    discount_value: p.discount_value,
+    start_date: p.start_date,
+    end_date: p.end_date,
+    status: p.status,
+    promo_image: p.promo_image,
     user_id: p.user_id,
     user: p.user,
     games: p.games,
@@ -55,19 +62,17 @@ export default function PromotionManager() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [gRes, pRes] = await Promise.all([
-          fetch("http://localhost:8088/games"),
-          fetch("http://localhost:8088/promotions?with=games"),
+        const [gameRows, promoRows] = await Promise.all([
+          listGames(),
+          listPromotions(true),
         ]);
-        const gameJson = await gRes.json();
-        const promoJson = await pRes.json();
         setGames(
-          gameJson.map((g: any) => ({
-            id: String(g.id ?? g.ID),
-            title: g.title ?? g.game_name,
+          gameRows.map(g => ({
+            id: String(g.ID),
+            title: g.game_name,
           })),
         );
-        setData(promoJson.map((p: any) => normalizePromo(p)));
+        setData(promoRows.map(p => normalizePromo(p)));
       } catch {
         message.error("โหลดข้อมูลล้มเหลว");
       }
@@ -82,8 +87,28 @@ export default function PromotionManager() {
 
   const onSubmit = async () => {
     try {
-      await form.validateFields();
-      message.success(isEdit ? "จำลอง: อัปเดตแล้ว" : "จำลอง: สร้างแล้ว");
+      const values = await form.validateFields();
+      const body: CreatePromotionRequest | UpdatePromotionRequest = {
+        title: values.title,
+        description: values.description,
+        discount_type: values.discount_type,
+        discount_value: values.discount_value,
+        start_date: values.dateRange[0].toISOString(),
+        end_date: values.dateRange[1].toISOString(),
+        status: values.status,
+        promo_image: values.promo_image,
+        game_ids: values.gameIds.map(id => Number(id)),
+      };
+      const saved = await (isEdit
+        ? updatePromotion(editingId!, body as UpdatePromotionRequest)
+        : createPromotion(body as CreatePromotionRequest));
+      const normalized = normalizePromo(saved);
+      setData(prev => (
+        isEdit
+          ? prev.map(p => (p.ID === normalized.ID ? normalized : p))
+          : [...prev, normalized]
+      ));
+      message.success(isEdit ? "อัปเดตแล้ว" : "สร้างแล้ว");
       form.resetFields();
       setEditingId(null);
     } catch {
@@ -93,10 +118,7 @@ export default function PromotionManager() {
 
   const onDelete = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:8088/promotions/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("api error");
+      await deletePromotion(id);
       setData(prev => prev.filter(p => p.ID !== id));
       message.success("ลบแล้ว");
     } catch {
