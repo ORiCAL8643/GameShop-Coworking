@@ -58,6 +58,7 @@ func SetupDatabase() {
 		&entity.PaymentSlip{},
 		&entity.Categories{},
 		&entity.MinimumSpec{},
+		&entity.Request{},
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}

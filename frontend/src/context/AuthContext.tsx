@@ -2,63 +2,48 @@ import { createContext, useState, useContext } from 'react';
 import type { ReactNode } from 'react';
 
 interface AuthContextType {
+  id: number | null;
   token: string | null;
   username: string | null;
-  userId: number | null;
-  login: (token: string, username: string) => Promise<void>;
+  login: (id:number, token: string, username: string) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
+  id: null,
   token: null,
   username: null,
-  userId: null,
-  login: async () => {},
+  login: () => {},
   logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [username, setUsername] = useState<string | null>(localStorage.getItem('username'));
-  const [userId, setUserId] = useState<number | null>(() => {
-    const stored = localStorage.getItem('userId');
-    return stored ? Number(stored) : null;
+  const [id, setId] = useState<number | null>(() => {
+    const s = localStorage.getItem("userid");
+    return s ? Number(s) : null;
   });
-
-  const login = async (newToken: string, name: string) => {
+  const login = (newId: number, newToken: string, name: string) => {
+    setId(newId);
     setToken(newToken);
     setUsername(name);
     localStorage.setItem('token', newToken);
     localStorage.setItem('username', name);
-
-    try {
-      const res = await fetch('http://localhost:8088/users/me', {
-        headers: {
-          Authorization: `Bearer ${newToken}`,
-        },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const id = data.ID ?? data.id;
-        setUserId(id);
-        localStorage.setItem('userId', String(id));
-      }
-    } catch (err) {
-      console.error('Failed to fetch user info', err);
-    }
+    localStorage.setItem('userid', String(newId));
   };
 
   const logout = () => {
+    setId(null);
     setToken(null);
     setUsername(null);
-    setUserId(null);
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    localStorage.removeItem('userId');
+    localStorage.removeItem('userid');
   };
 
   return (
-    <AuthContext.Provider value={{ token, username, userId, login, logout }}>
+    <AuthContext.Provider value={{ id, token, username, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

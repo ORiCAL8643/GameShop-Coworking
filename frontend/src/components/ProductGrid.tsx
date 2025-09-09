@@ -113,9 +113,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     }
   };
 
+  const approveGames = game.filter(game => game.status === "approve");
   return (
     <Row gutter={[16, 16]}> 
-      {game.map((c) => ( 
+      {approveGames.map((c) => ( 
         <Col xs={24} sm={12} md={8} lg={6} >
           <Card
           style={{ background: '#1f1f1f', color: 'white', borderRadius: 10 }}
