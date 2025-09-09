@@ -1,13 +1,14 @@
 package controllers
 
 import (
-	"math"
-	"net/http"
-	"time"
+        "math"
+        "net/http"
+        "time"
 
-	"example.com/sa-gameshop/configs"
-	"example.com/sa-gameshop/entity"
-	"github.com/gin-gonic/gin"
+        "example.com/sa-gameshop/configs"
+        "example.com/sa-gameshop/entity"
+        "github.com/gin-gonic/gin"
+        "gorm.io/gorm"
 )
 
 // payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
@@ -102,28 +103,33 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	item := entity.OrderItem{
-		UnitPrice:    body.UnitPrice,
-		QTY:          body.QTY,
-		LineDiscount: math.Round(discount*100) / 100,
-		LineTotal:    total,
-		OrderID:      body.OrderID,
-		GameKeyID:    body.GameKeyID,
-	}
+        item := entity.OrderItem{
+                UnitPrice:    body.UnitPrice,
+                QTY:          body.QTY,
+                LineDiscount: math.Round(discount*100) / 100,
+                LineTotal:    total,
+                OrderID:      body.OrderID,
+                GameKeyID:    body.GameKeyID,
+        }
 
-	if err := db.Create(&item).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+        if err := db.Create(&item).Error; err != nil {
+                c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+                return
+        }
 
-	// ถ้าผูก GameKey ให้ตั้ง owner
-	if body.GameKeyID != nil {
-		db.Model(&entity.KeyGame{}).
-			Where("id = ?", *body.GameKeyID).
-			Update("order_item_id", item.ID)
-	}
+        // ถ้าผูก GameKey ให้ตั้ง owner
+        if body.GameKeyID != nil {
+                db.Model(&entity.KeyGame{}).
+                        Where("id = ?", *body.GameKeyID).
+                        Update("order_item_id", item.ID)
+        }
 
-	c.JSON(http.StatusCreated, item)
+        // อัปเดตยอดรวมของออร์เดอร์
+        db.Model(&entity.Order{}).
+                Where("id = ?", body.OrderID).
+                UpdateColumn("total_amount", gorm.Expr("total_amount + ?", item.LineTotal))
+
+        c.JSON(http.StatusCreated, item)
 }
 
 func FindOrderItems(c *gin.Context) {
