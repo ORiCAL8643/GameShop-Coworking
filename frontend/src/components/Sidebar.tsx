@@ -37,12 +37,6 @@ const items: GroupItem[] = [
     ],
   },
 
-  // 👇 เมนูระบบบทบาท (Role)
-  {
-    key: "/roles",
-    label: "บทบาท (Role)",
-  },
-
   {
     key: "/workshop",
     label: "Workshop",
