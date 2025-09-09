@@ -14,10 +14,12 @@ import ModDetail from "../pages/Workshop/ModDetail.tsx";
 import Workshop from "../pages/Workshop/UploadPage.tsx";
 
 // 🟣 Import เพิ่ม
+import ReportPage from "../pages/Report/ReportPage.tsx";
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
+
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -39,10 +41,8 @@ const refunds: Refund[] = [
 ];
 
 // 🟣 Mock ฟังก์ชัน
-const addNotification = (msg: string) =>
-  console.log("Notification:", msg);
-const addRefundUpdate = (msg: string) =>
-  console.log("Refund update:", msg);
+const addNotification = (msg: string) => console.log("Notification:", msg);
+const addRefundUpdate = (msg: string) => console.log("Refund update:", msg);
 
 const router = createBrowserRouter([
   {
@@ -51,6 +51,10 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <Home /> },
       { path: "/home", element: <Home /> },
+
+      // ✅ เพิ่มหน้ารีพอร์ต
+      { path: "/report", element: <ReportPage /> },
+
       { path: "/request", element: <Request /> },
       { path: "/requestinfo", element: <Requestinfo /> },
 
@@ -83,12 +87,17 @@ const router = createBrowserRouter([
       {
         path: "/Admin",
         children: [
-          { path: "/Admin/Page", element:<AdminPage
-            refunds={refunds}
-            setRefunds={() => {}}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          /> },
+          {
+            path: "/Admin/Page",
+            element: (
+              <AdminPage
+                refunds={refunds}
+                setRefunds={() => {}}
+                addNotification={addNotification}
+                addRefundUpdate={addRefundUpdate}
+              />
+            ),
+          },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
         ],
       },
