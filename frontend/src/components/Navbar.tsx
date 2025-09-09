@@ -1,26 +1,34 @@
 
-import { SearchOutlined, ShoppingCartOutlined, BellOutlined, DollarCircleOutlined } from '@ant-design/icons';
+import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import { Input, Avatar, Space, Button } from 'antd';
 import { useAuth } from '../context/AuthContext';
 
 import { Link } from 'react-router-dom';
 import AuthModal from '../components/AuthModal';
+import NotificationsBell from '../components/NotificationsBell';
+import type { Notification } from '../interfaces/Notification';
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
-  const { token, username, logout } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { token, username, logout, userId } = useAuth();
+
+  const handleLoginSuccess = () => {
+    setNotifications((prev) => [
+      ...prev,
+      {
+        ID: Date.now(),
+        title: 'Login Successful',
+        message: 'You have logged in successfully',
+        type: 'system',
+        user_id: userId ?? 0,
+      },
+    ]);
+  };
 
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px', background: '#1f1f1f' }}>
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        padding: '16px',
-        background: '#1f1f1f',
-      }}
-    >
       {/* Search */}
       <Input
         prefix={<SearchOutlined />}
@@ -30,7 +38,7 @@ const Navbar = () => {
 
       {/* Icons */}
       <Space size="large">
-        <BellOutlined style={{ color: 'white', fontSize: '18px' }} />
+        <NotificationsBell notifications={notifications} />
 
         {/* Refund Status Icon */}
         <Link to="/refund-status">
@@ -50,9 +58,12 @@ const Navbar = () => {
           </Button>
         )}
       </Space>
-      <AuthModal open={openAuth} onClose={() => setOpenAuth(false)} />
+      <AuthModal
+        open={openAuth}
+        onClose={() => setOpenAuth(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
     </div>
-  </div>
   );
 };
 

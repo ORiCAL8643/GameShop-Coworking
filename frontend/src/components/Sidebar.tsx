@@ -47,6 +47,22 @@ const items: GroupItem[] = [
     key: "/workshop",
     label: "Workshop",
   },
+    {
+    key: '/promotion',
+    label:'Promotion',
+  },
+  {
+    key: '/refund',
+    label:'การคืนเงินผู้ใช้',
+  },
+  {
+    key: '/Admin',
+    label:'Admin',
+    children: [
+        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
+        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
+    ],
+  },
 ];
 
 const Sidebar = () => {

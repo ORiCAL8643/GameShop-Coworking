@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -53,7 +53,7 @@ func FindOrderByID(c *gin.Context) {
 	var row entity.Order
 	if tx := configs.DB().
 		Preload("User").
-		Preload("OrderItems.GameKey").
+		Preload("OrderItems.KeyGame.Game").
 		Preload("Payments.PaymentSlips").
 		Preload("OrderPromotions.Promotion").
 		First(&row, c.Param("id")); tx.RowsAffected == 0 {

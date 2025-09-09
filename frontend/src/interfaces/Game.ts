@@ -1,12 +1,15 @@
 // src/interfaces/Game.ts
 export interface Game {
   ID: number;
-  game_name: string;
-  game_price: number;
-  description: string;
-  // relations
-  threads?: Thread[];
-  user_games?: UserGame[];
+      game_name: string;
+      key_id: number;
+      categories: {ID: number, title: string};
+      release_date: string;
+      base_price: number;
+      img_src: string;
+      age_rating: number;
+      status: string;
+      minimum_spec_id: number;
 }
 
 export interface CreateGameRequest {
@@ -22,5 +25,4 @@ export interface UpdateGameRequest {
   description?: string;
 }
 
-import type { Thread } from "./Thread";
-import type { UserGame } from "./UserGame";
+

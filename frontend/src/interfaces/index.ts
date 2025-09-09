@@ -9,3 +9,5 @@ export * from "./Notification";
 export * from "./UserGame";
 export * from "./OrderItem";
 export * from "./KeyGame";
+export * from "./Promotion";
+export * from "./Review";

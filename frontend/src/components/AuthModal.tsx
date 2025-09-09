@@ -1,162 +1,115 @@
-import { useState } from "react";
-import { Modal, Form, Input, Button, DatePicker, message } from "antd";
-import dayjs from "dayjs";
-import { useAuth } from "../context/AuthContext";
+import { useState } from 'react';
+import { Modal, Form, Input, Button, DatePicker } from 'antd';
+import { useAuth } from '../context/AuthContext';
+import type { Notification } from '../interfaces/Notification';
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
+  onLoginSuccess?: (notif: Notification) => void;
 }
 
-type LoginValues = { username: string; password: string };
-type SignupValues = {
-  username: string;
-  password: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-  birthday: dayjs.Dayjs;
-};
-
-const API_URL = "http://localhost:8088";
-
-const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
+const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const { login } = useAuth();
 
-  // message API (indicator กลางจอด้านบน)
-  const [messageApi, contextHolder] = message.useMessage();
+  const toggleMode = () => setIsLogin(!isLogin);
 
-  // สถานะโหลดสำหรับแต่ละฟอร์ม
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [signupLoading, setSignupLoading] = useState(false);
-
-  // สำหรับควบคุม/เติมค่า Form
-  const [loginForm] = Form.useForm<LoginValues>();
-  const [signupForm] = Form.useForm<SignupValues>();
-
-  const toggleMode = () => setIsLogin((v) => !v);
-
-  const handleLogin = async (values: LoginValues) => {
-    const key = "auth-login";
+  const handleLogin = async (values: { username: string; password: string }) => {
     try {
-      setLoginLoading(true);
-      messageApi.open({ key, type: "loading", content: "กำลังเข้าสู่ระบบ...", duration: 0 });
-
-      const res = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('http://localhost:8088/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: values.username,
           password: values.password,
         }),
       });
 
+      const result = await res.json();
       if (!res.ok) {
-        const errTxt = await res.text().catch(() => "");
-        throw new Error(errTxt || "Login failed");
+        Modal.error({ title: 'เข้าสู่ระบบไม่สำเร็จ', content: result.error });
+        return;
       }
 
-      const data = await res.json();
-      // เก็บ token ผ่าน AuthContext
-      login(data.token, values.username);
-
-      messageApi.open({ key, type: "success", content: "เข้าสู่ระบบสำเร็จ", duration: 4.0 });
+      login(result.id, result.token, result.username ?? values.username);
+      const notification = {
+        ID: Date.now(),
+        title: 'ระบบ',
+        type: 'system',
+        message: 'เข้าสู่ระบบสำเร็จ',
+        created_at: new Date().toLocaleString(),
+        is_read: false,
+      } as Notification;
+      onLoginSuccess?.(notification);
       onClose();
-      loginForm.resetFields();
-    } catch (error: any) {
-      messageApi.open({
-        key,
-        type: "error",
-        content: error?.message || "เข้าสู่ระบบไม่สำเร็จ",
-        duration: 4.0,
-      });
-    } finally {
-      setLoginLoading(false);
+    } catch (error) {
+      Modal.error({ title: 'เกิดข้อผิดพลาด', content: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์' });
+      console.log('เกิดข้อผิดพลาดไม่สามารถเชื่อมต่อเซิร์ฟเวอร์',error);
     }
   };
 
-  const handleSignup = async (values: SignupValues) => {
-    const key = "auth-signup";
+  const handleSignup = async (values: any) => {
     try {
-      setSignupLoading(true);
-      messageApi.open({ key, type: "loading", content: "กำลังสมัครสมาชิก...", duration: 0 });
-
       const payload = {
-        username: values.username,
-        password: values.password,
-        email: values.email,
-        first_name: values.first_name,
-        last_name: values.last_name,
-        birthday: values.birthday?.format("YYYY-MM-DD"),
+        ...values,
+        birthday: values.birthday?.format('YYYY-MM-DD'),
       };
 
-      const res = await fetch(`${API_URL}/users`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch('http://localhost:8088/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
+      
       if (!res.ok) {
-        const errTxt = await res.text().catch(() => "");
-        throw new Error(errTxt || "Signup failed");
+        throw new Error('Signup failed');
+      }
+       // สมัครสำเร็จ → ล็อกอินด้วย username/password เดิม
+      const loginRes = await fetch('http://localhost:8088/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: values.username, password: values.password }),
+      });
+      const loginData = await loginRes.json();
+
+      if (!loginRes.ok) {
+        Modal.error({ title: 'เข้าสู่ระบบหลังสมัครไม่สำเร็จ', content: loginData?.error || 'Login failed' });
+        return;
       }
 
-      // สมัครสำเร็จ: แจ้งเตือน + เด้งไปหน้า Login (ไม่ auto login ตามที่ต้องการ)
-      messageApi.open({ key, type: "success", content: "สมัครสมาชิกสำเร็จ! กรุณาเข้าสู่ระบบ", duration: 2.5 });
-
-      // เติม username ให้ฟอร์ม Login เพื่อความสะดวก
-      loginForm.setFieldsValue({
-        username: values.username,
-        password: "", // ให้ผู้ใช้กรอกรหัสผ่านอีกครั้งเอง
-      });
-
-      // เคลียร์ฟอร์มสมัคร & สลับไปหน้า Login
-      signupForm.resetFields();
-      setIsLogin(true);
-    } catch (error: any) {
-      messageApi.open({
-        key,
-        type: "error",
-        content: error?.message || "สมัครสมาชิกไม่สำเร็จ",
-        duration: 2.5,
-      });
-    } finally {
-      setSignupLoading(false);
+      login(loginData.id, loginData.token, loginData.username ?? values.username);
+      onClose();
+    } catch (error) {
+      console.error(error);
     }
   };
 
   return (
-    <Modal open={open} onCancel={onClose} footer={null} centered destroyOnClose>
-      {/* ให้ message ทำงานใน modal นี้ */}
-      {contextHolder}
-
+    <Modal open={open} onCancel={onClose} footer={null} centered>
       {isLogin ? (
         <>
-          <h2 style={{ textAlign: "center", marginBottom: 24 }}>Login</h2>
-          <Form<LoginValues> form={loginForm} layout="vertical" onFinish={handleLogin}>
+          <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Login</h2>
+          <Form layout="vertical" onFinish={handleLogin}>
             <Form.Item
               label="Username"
               name="username"
-              rules={[{ required: true, message: "Please enter your username" }]}
+              rules={[{ required: true, message: 'Please enter your username' }]}
             >
-              <Input autoComplete="username" />
+              <Input />
             </Form.Item>
-
             <Form.Item
               label="Password"
               name="password"
-              rules={[{ required: true, message: "Please enter your password" }]}
+              rules={[{ required: true, message: 'Please enter your password' }]}
             >
-              <Input.Password autoComplete="current-password" />
+              <Input.Password />
             </Form.Item>
-
             <Form.Item>
-              <Button type="primary" htmlType="submit" block loading={loginLoading}>
+              <Button type="primary" htmlType="submit" block>
                 Login
               </Button>
             </Form.Item>
-
             <Form.Item>
               <Button type="link" onClick={toggleMode} block>
                 Don't have an account? Sign Up
@@ -166,62 +119,55 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose }) => {
         </>
       ) : (
         <>
-          <h2 style={{ textAlign: "center", marginBottom: 24 }}>Sign Up</h2>
-          <Form<SignupValues> form={signupForm} layout="vertical" onFinish={handleSignup}>
+          <h2 style={{ textAlign: 'center', marginBottom: 24 }}>Sign Up</h2>
+          <Form layout="vertical" onFinish={handleSignup}>
             <Form.Item
               label="Username"
               name="username"
-              rules={[{ required: true, message: "Please enter your username" }]}
+              rules={[{ required: true, message: 'Please enter your username' }]}
             >
-              <Input autoComplete="username" />
+              <Input />
             </Form.Item>
-
             <Form.Item
               label="Password"
               name="password"
-              rules={[{ required: true, message: "Please enter your password" }]}
+              rules={[{ required: true, message: 'Please enter your password' }]}
             >
-              <Input.Password autoComplete="new-password" />
+              <Input.Password />
             </Form.Item>
-
             <Form.Item
               label="Email"
               name="email"
-              rules={[{ required: true, type: "email", message: "Please enter a valid email" }]}
+              rules={[{ required: true, type: 'email', message: 'Please enter a valid email' }]}
             >
-              <Input autoComplete="email" />
+              <Input />
             </Form.Item>
-
             <Form.Item
               label="First Name"
               name="first_name"
-              rules={[{ required: true, message: "Please enter your first name" }]}
+              rules={[{ required: true, message: 'Please enter your first name' }]}
             >
-              <Input autoComplete="given-name" />
+              <Input />
             </Form.Item>
-
             <Form.Item
               label="Last Name"
               name="last_name"
-              rules={[{ required: true, message: "Please enter your last name" }]}
+              rules={[{ required: true, message: 'Please enter your last name' }]}
             >
-              <Input autoComplete="family-name" />
+              <Input />
             </Form.Item>
-
             <Form.Item
               label="Birthday"
               name="birthday"
-              rules={[{ required: true, message: "Please select your birthday" }]}
+              rules={[{ required: true, message: 'Please select your birthday' }]}
             >
-              <DatePicker style={{ width: "100%" }} />
+              <DatePicker style={{ width: '100%' }} />
             </Form.Item>
-
             <Form.Item>
-              <Button type="primary" htmlType="submit" block loading={signupLoading}>
+              <Button type="primary" htmlType="submit" block>
                 Sign Up
               </Button>
             </Form.Item>
-
             <Form.Item>
               <Button type="link" onClick={toggleMode} block>
                 Already have an account? Login
