@@ -10,11 +10,28 @@ import dayjs from "dayjs";
 const { Content } = Layout;
 const { Title, Text } = Typography;
 
+const base_url = import.meta.env.VITE_API_URL || "http://localhost:8088";
+
 export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const navigate = useNavigate();
+
+  const resolveImgUrl = (src?: string) => {
+    if (!src) return "";
+    if (src.startsWith("blob:")) return "";
+    if (src.startsWith("data:image/")) return src;
+    if (
+      src.startsWith("http://") ||
+      src.startsWith("https://") ||
+      src.startsWith("blob:")
+    ) {
+      return src;
+    }
+    const clean = src.startsWith("/") ? src.slice(1) : src;
+    return `${base_url}/${clean}`;
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -49,7 +66,7 @@ export default function PromotionDetail() {
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           {promotion.promo_image && (
-            <Image src={promotion.promo_image} alt={promotion.title} preview={false} style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 16 }} />
+            <Image src={resolveImgUrl(promotion.promo_image)} alt={promotion.title} preview={false} style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 16 }} />
           )}
 
           <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10, marginBottom: 16 }}>
