@@ -4,14 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 
 const base_url = "http://localhost:8088";
 
-interface ProductGridProps {
-  userId: number | null;
-}
-
-const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
+const ProductGrid: React.FC = () => {
+  const { id } = useAuth();
   interface Game {
     ID: number;
     game_name: string;
@@ -62,23 +60,47 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   }, []);
 
   const handleAddToCart = async (g: Game) => {
+    if (!id) return; // ต้องเข้าสู่ระบบก่อนสั่งซื้อ
     try {
-      const price = g.discounted_price ?? g.base_price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: price,
-            qty: 1,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
+      const stored = localStorage.getItem("orderId");
+      if (!stored) {
+        // สร้างออร์เดอร์ใหม่พร้อมรายการแรก
+        const res = await axios.post(`${base_url}/orders`, {
+          user_id: id,
+          total_amount: g.base_price,
+          order_status: "PENDING",
+          order_items: [
+            {
+              unit_price: g.base_price,
+              qty: 1,
+              game_key_id: g.key_id,
+            },
+          ],
+        });
+        const newId = res.data.ID || res.data.id;
+        if (newId) {
+          localStorage.setItem("orderId", String(newId));
+          const orderRes = await axios.get(`${base_url}/orders/${newId}`);
+          const total = (orderRes.data.order_items || []).reduce(
+            (sum: number, it: any) => sum + Number(it.line_total),
+            0
+          );
+          await axios.put(`${base_url}/orders/${newId}`, { total_amount: total });
+        }
+      } else {
+        // เพิ่มรายการเข้าออร์เดอร์เดิม
+        await axios.post(`${base_url}/order_items`, {
+          order_id: Number(stored),
+          game_key_id: g.key_id,
+          qty: 1,
+          unit_price: g.base_price,
+        });
+        const orderRes = await axios.get(`${base_url}/orders/${stored}`);
+        const total = (orderRes.data.order_items || []).reduce(
+          (sum: number, it: any) => sum + Number(it.line_total),
+          0
+        );
+        await axios.put(`${base_url}/orders/${stored}`, { total_amount: total });
       }
       navigate("/category/Payment");
     } catch (err) {

@@ -14,7 +14,6 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
-import { useParams, useSearchParams } from "react-router-dom";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -43,13 +42,7 @@ const PaymentPage = () => {
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const orderIdParam =
-    id ||
-    searchParams.get("id") ||
-    searchParams.get("order_id") ||
-    localStorage.getItem("orderId");
+  const orderIdParam = localStorage.getItem("orderId");
 
   useEffect(() => {
     if (!orderIdParam) return;
