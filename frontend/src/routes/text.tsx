@@ -21,6 +21,7 @@ import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
+import ReportSuccessPage from "../pages/Report/ReportSuccess.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
