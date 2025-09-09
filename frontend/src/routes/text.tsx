@@ -20,6 +20,7 @@ import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
+import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -78,6 +79,8 @@ const router = createBrowserRouter([
       { path: "/upload", element: <Workshop /> },
 
       { path: "/promotion", element: <PromotionManager /> },
+      { path: "/promotion/:id", element: <PromotionDetail /> },
+
 
       // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
