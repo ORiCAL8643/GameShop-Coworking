@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Layout, Typography, Card, Tag, List, Button, Empty } from "antd";
+import { Layout, Typography, Card, Tag, List, Button, Empty, Image } from "antd";
 import Sidebar from "../../components/Sidebar";
 import type { Promotion } from "../../interfaces/Promotion";
 import type { Game } from "../../interfaces/Game";
@@ -48,15 +48,7 @@ export default function PromotionDetail() {
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           {promotion.promo_image && (
-            <div
-              style={{
-                width: "100%", height: 220, borderRadius: 10,
-                backgroundImage: `url(${promotion.promo_image})`,
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-                marginBottom: 16,
-              }}
-            />
+            <Image src={promotion.promo_image} alt={promotion.title} preview={false} style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 16 }} />
           )}
 
           <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10, marginBottom: 16 }}>
