@@ -139,6 +139,9 @@ const ModDetail: React.FC = () => {
                             <Button type="primary" href={mod.file_path} target="_blank">
                                 Download
                             </Button>
+                            <Button onClick={() => navigate(`/workshop/upload?gameId=${mod.game_id}&modId=${mod.ID}`)}>
+                                Edit
+                            </Button>
                         </Space>
 
                         <Divider style={{ borderColor: "#333" }} />
