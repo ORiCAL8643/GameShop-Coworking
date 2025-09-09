@@ -12,7 +12,7 @@ import {
   message,
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
-import { getGame, listMods, listUserGames } from "../../services/workshop";
+import { getGame, listMods, listGames, listUserGames } from "../../services/workshop";
 import type { Game, Mod } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
@@ -24,37 +24,69 @@ const WorkshopDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { id: userId } = useAuth();
+
   const [game, setGame] = useState<Game | null>(null);
   const [mods, setMods] = useState<Mod[]>([]);
   const [searchText, setSearchText] = useState("");
   const [filteredMods, setFilteredMods] = useState<Mod[]>([]);
   const [userGames, setUserGames] = useState<number[]>([]);
 
+  // โหลดข้อมูลเกมและม็อด
   useEffect(() => {
-    if (id) {
-      const gameId = Number(id);
-      getGame(gameId).then(setGame).catch(console.error);
-      listMods(gameId).then((ms) => {
+    if (!id) return;
+    const gameId = Number(id);
+
+    // บางโปรเจกต์ backend ไม่มี GET /games/:id
+    // เลยทำ fallback: ถ้า getGame ล้มเหลว จะ list ทั้งหมดแล้วหา ID ที่ตรง
+    (async () => {
+      try {
+        const g = await getGame(gameId);
+        setGame(g);
+      } catch {
+        try {
+          const all = await listGames();
+          const found = all.find((x) => x.ID === gameId) || null;
+          setGame(found);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    })();
+
+    // ม็อดของเกมนี้ (ถ้า backend ยังไม่มี /mods ก็ไม่เป็นไร หน้าไม่พัง)
+    listMods(gameId)
+      .then((ms) => {
         setMods(ms);
         setFilteredMods(ms);
+      })
+      .catch((e) => {
+        console.warn("listMods failed or not implemented:", e);
+        setMods([]);
+        setFilteredMods([]);
       });
-    }
   }, [id]);
 
+  // โหลดรายการเกมที่ผู้ใช้มี
   useEffect(() => {
-    if (userId) {
-      listUserGames(userId)
-        .then((rows) => setUserGames(rows.map((r) => r.game_id)))
-        .catch(console.error);
-    }
+    if (!userId) return;
+    listUserGames(userId)
+      .then((rows) => setUserGames(rows.map((r) => r.game_id)))
+      .catch(console.error);
   }, [userId]);
 
   const handleUpload = () => {
-    if (game && userGames.includes(game.ID)) {
-      navigate(`/upload?gameId=${game.ID}`);
-    } else {
-      message.error("คุณไม่มีเกมนี้ ไม่สามารถอัปโหลดม็อดได้");
+    if (!game) {
+      message.error("ไม่พบข้อมูลเกม");
+      return;
     }
+
+    // ถ้าไม่ได้เป็นเจ้าของเกม เตือน แต่ยังพาไปหน้าอัปโหลด (เพื่อให้ทดสอบ/กรอกได้)
+    if (!userGames.includes(game.ID)) {
+      message.warning("คุณไม่ได้เป็นเจ้าของเกมนี้ ระบบจะพาไปหน้าอัปโหลดเพื่อทดสอบ");
+    }
+
+    // นำทางไปหน้าอัปโหลดเสมอ
+    navigate(`/upload?gameId=${game.ID}`);
   };
 
   const handleSearch = (value: string) => {
@@ -65,6 +97,7 @@ const WorkshopDetail: React.FC = () => {
     setFilteredMods(result);
   };
 
+  // เมื่อ mods เปลี่ยน ให้รีเซ็ตผลกรอง
   useEffect(() => {
     setFilteredMods(mods);
   }, [mods]);
@@ -117,7 +150,7 @@ const WorkshopDetail: React.FC = () => {
             Showing {filteredMods.length} mods
           </Text>
 
-          {/* Search + Sort */}
+          {/* Search */}
           <div
             style={{
               marginTop: 20,

@@ -19,6 +19,11 @@ import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx"
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
+
+// 🟣 Import Role pages
+import RoleManagement from "../pages/role/RoleManagement.tsx";
+import RoleEdit from "../pages/role/RoleEdit.tsx";
+
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -86,15 +91,24 @@ const router = createBrowserRouter([
       {
         path: "/Admin",
         children: [
-          { path: "/Admin/Page", element:<AdminPage
-            refunds={refunds}
-            setRefunds={() => {}}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          /> },
+          {
+            path: "/Admin/Page",
+            element: (
+              <AdminPage
+                refunds={refunds}
+                setRefunds={() => {}}
+                addNotification={addNotification}
+                addRefundUpdate={addRefundUpdate}
+              />
+            ),
+          },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
         ],
       },
+
+      // 🟣 Roles
+      { path: "/roles", element: <RoleManagement /> },
+      { path: "/roles/:id", element: <RoleEdit /> },
     ],
   },
 ]);

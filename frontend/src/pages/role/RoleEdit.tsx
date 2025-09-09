@@ -69,15 +69,14 @@ const RoleEdit: React.FC = () => {
   const [permissionStates, setPermissionStates] = useState<Record<number, boolean>>({});
   const [rolePermissionMap, setRolePermissionMap] = useState<Record<number, number>>({});
   const [permissionSearch, setPermissionSearch] = useState("");
+  const [bulkLoading, setBulkLoading] = useState(false); // 🔹 สถานะโหลดเวลาทำ Select All / Clear All
 
   // Users
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
-  // ----- Search states (แยก 2 ส่วน) -----
-  // ค้นหา "สมาชิกในบทบาท" (แท็บจัดการสมาชิก)
-  const [memberSearch, setMemberSearch] = useState("");
-  // ค้นหา "ผู้ใช้ทั้งหมดในระบบ" (โมดอลเพิ่มสมาชิก)
-  const [addSearchText, setAddSearchText] = useState("");
+  // Search states
+  const [memberSearch, setMemberSearch] = useState("");    // ในแท็บ “จัดการสมาชิก”
+  const [addSearchText, setAddSearchText] = useState("");  // ในโมดอล “เพิ่มสมาชิก”
 
   // Modal add members
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -176,56 +175,46 @@ const RoleEdit: React.FC = () => {
     }
   };
 
-const deleteRole = async () => {
-  if (!roleIdNum) return;
-  try {
-    setDeleting(true);
-    const key = "deleteRole";
-    // แสดงสถานะกำลังลบ
-    messageApi.open({ key, type: "loading", content: "กำลังลบบทบาท...", duration: 0 });
+  const deleteRole = async () => {
+    if (!roleIdNum) return;
+    try {
+      setDeleting(true);
+      const key = "deleteRole";
+      messageApi.open({ key, type: "loading", content: "กำลังลบบทบาท...", duration: 0 });
 
-    // ลบ
-    await axios.delete(`${API_URL}/roles/${roleIdNum}`);
+      await axios.delete(`${API_URL}/roles/${roleIdNum}`);
 
-    // โหลดรายการบทบาทล่าสุด
-    const rolesRes = await axios.get<Role[]>(`${API_URL}/roles`);
-    const fresh = rolesRes.data || [];
-    setRoles(fresh);
+      const rolesRes = await axios.get<Role[]>(`${API_URL}/roles`);
+      const fresh = rolesRes.data || [];
+      setRoles(fresh);
 
-    // แสดงสำเร็จ
-    messageApi.open({ key, type: "success", content: "ลบบทบาทเรียบร้อย", duration: 1.6 });
+      messageApi.open({ key, type: "success", content: "ลบบทบาทเรียบร้อย", duration: 1.6 });
 
-    // อยู่ที่หน้าเดิม (RoleEdit) และเลือกบทบาทข้างเคียงให้อัตโนมัติ
-    if (fresh.length) {
-      // หา index ของบทบาทที่เพิ่งลบ จากรายการเดิม (roles state เก่า)
-      const oldIdx = roles.findIndex((r) => r.ID === roleIdNum);
-      // พยายามเลือกตัวก่อนหน้า ถ้าไม่มีให้เลือกตัวแรกของรายการใหม่
-      const nextIdx = Math.min(Math.max(oldIdx - 1, 0), fresh.length - 1);
-      const nextId = fresh[nextIdx]?.ID;
-      if (nextId) {
-        // เปลี่ยนพาธเป็นบทบาทถัดไป แต่ยังคงอยู่หน้า RoleEdit
-        navigate(`/roles/${nextId}`, { replace: true });
+      if (fresh.length) {
+        const oldIdx = roles.findIndex((r) => r.ID === roleIdNum);
+        const nextIdx = Math.min(Math.max(oldIdx - 1, 0), fresh.length - 1);
+        const nextId = fresh[nextIdx]?.ID;
+        if (nextId) {
+          navigate(`/roles/${nextId}`, { replace: true });
+        }
+      } else {
+        setRoleName("");
+        setRoleDescription("");
+        setColor(colorPalette[0]);
+        setMembers([]);
+        setPermissionStates({});
+        setRolePermissionMap({});
       }
-    } else {
-      // ไม่เหลือบทบาทแล้ว: เคลียร์ฟอร์มให้อยู่ในหน้าเดิมแบบว่าง
-      setRoleName("");
-      setRoleDescription("");
-      setColor(colorPalette[0]);
-      setMembers([]);
-      setPermissionStates({});
-      setRolePermissionMap({});
-      // ไม่ navigate ไปไหนทั้งนั้น
+    } catch (err: any) {
+      messageApi.open({
+        type: "error",
+        content: err?.response?.data?.error || "ลบบทบาทไม่สำเร็จ",
+        duration: 2.4,
+      });
+    } finally {
+      setDeleting(false);
     }
-  } catch (err: any) {
-    messageApi.open({
-      type: "error",
-      content: err?.response?.data?.error || "ลบบทบาทไม่สำเร็จ",
-      duration: 2.4,
-    });
-  } finally {
-    setDeleting(false);
-  }
-};
+  };
 
   const updateRole = async () => {
     if (!roleIdNum) return;
@@ -263,6 +252,81 @@ const deleteRole = async () => {
       }
     } catch {
       messageApi.error("อัปเดตสิทธิ์ไม่สำเร็จ");
+    }
+  };
+
+  // 🔹 ช่วยเหลือสำหรับเลือก/ล้าง ทั้งชุด (ทำตามผลการค้นหา)
+  const enablePermissions = async (pids: number[]) => {
+    if (!roleIdNum) return;
+    // เฉพาะตัวที่ยังไม่เปิดอยู่
+    const toCreate = pids.filter((pid) => !permissionStates[pid]);
+    if (!toCreate.length) return;
+    const results = await Promise.all(
+      toCreate.map((pid) =>
+        axios.post(`${API_URL}/rolepermissions`, {
+          role_id: roleIdNum,
+          permission_id: pid,
+        })
+      )
+    );
+    // อัปเดต map/state ทีเดียว
+    const newMap = { ...rolePermissionMap };
+    const newState = { ...permissionStates };
+    results.forEach((res, idx) => {
+      const pid = toCreate[idx];
+      const id = (res.data as any).ID;
+      newMap[pid] = id;
+      newState[pid] = true;
+    });
+    setRolePermissionMap(newMap);
+    setPermissionStates(newState);
+  };
+
+  const disablePermissions = async (pids: number[]) => {
+    if (!roleIdNum) return;
+    // เฉพาะตัวที่เปิดอยู่
+    const toDelete = pids.filter((pid) => !!permissionStates[pid]);
+    if (!toDelete.length) return;
+    await Promise.all(
+      toDelete.map((pid) => {
+        const rpID = rolePermissionMap[pid];
+        if (!rpID) return Promise.resolve(null as any);
+        return axios.delete(`${API_URL}/rolepermissions/${rpID}`);
+      })
+    );
+    const newMap = { ...rolePermissionMap };
+    const newState = { ...permissionStates };
+    toDelete.forEach((pid) => {
+      delete newMap[pid];
+      newState[pid] = false;
+    });
+    setRolePermissionMap(newMap);
+    setPermissionStates(newState);
+  };
+
+  const handleSelectAll = async () => {
+    try {
+      setBulkLoading(true);
+      const ids = filteredPermissions.map((p) => p.ID); // ตามผลการค้นหา
+      await enablePermissions(ids);
+      messageApi.success("เปิดสิทธิ์ทั้งหมดตามที่แสดงแล้ว");
+    } catch {
+      messageApi.error("เปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      setBulkLoading(true);
+      const ids = filteredPermissions.map((p) => p.ID); // ตามผลการค้นหา
+      await disablePermissions(ids);
+      messageApi.success("ปิดสิทธิ์ทั้งหมดตามที่แสดงแล้ว");
+    } catch {
+      messageApi.error("ปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -323,14 +387,12 @@ const deleteRole = async () => {
   const handleCancel = () => setIsModalVisible(false);
 
   // -------- filters --------
-  // รายชื่อผู้ใช้ที่ยังไม่ได้อยู่ในบทบาทนี้ (ใช้ในโมดอล)
   const filteredUsers = allUsers.filter(
     (u) =>
       u.username.toLowerCase().includes(addSearchText.toLowerCase()) &&
       !members.some((m) => m.ID === u.ID)
   );
 
-  // รายชื่อสมาชิกของบทบาทนี้ (ใช้ในแท็บจัดการสมาชิก)
   const filteredMembersTab = useMemo(
     () =>
       members.filter((m) =>
@@ -339,10 +401,12 @@ const deleteRole = async () => {
     [members, memberSearch]
   );
 
-  // Permissions filter
   const filteredPermissions = permissions.filter((p) =>
     (p.title || "").toLowerCase().includes((permissionSearch || "").toLowerCase())
   );
+
+  // 🔹 ความสูงสกอร์ลเฉพาะส่วน
+  const scrollAreaHeight = "calc(100vh - 260px)";
 
   return (
     <ConfigProvider
@@ -361,30 +425,11 @@ const deleteRole = async () => {
     >
       {contextHolder}
 
-      <style>{`
-        .role-page .ant-input,
-        .role-page .ant-input-affix-wrapper,
-        .role-page .ant-input-textarea textarea {
-          background: #2f3136 !important;
-          color: #fff !important;
-          border: 1px solid #3a3a3a !important;
-        }
-        .role-page .ant-input:focus,
-        .role-page .ant-input-affix-wrapper-focused,
-        .role-page .ant-input-textarea:focus-within {
-          border-color: #1677ff !important;
-          box-shadow: none !important;
-        }
-        .role-page .ant-switch { background-color: #555 !important; }
-        .role-page .ant-switch-checked { background-color: #1677ff !important; }
-        .role-page .ant-tabs-nav::before { border-bottom: 1px solid #333 !important; }
-
-        .role-scroll::-webkit-scrollbar { width: 8px; }
-        .role-scroll::-webkit-scrollbar-track { background: #2f3136; }
-        .role-scroll::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-      `}</style>
-
-      <div className="role-page" style={{ background: "#141414", minHeight: "100vh", flex: 1, display: "flex" }}>
+      {/* ไม่แตะ CSS ภายนอก — ใช้เฉพาะ inline style */}
+      <div
+        className="role-page"
+        style={{ background: "#141414", height: "100vh", flex: 1, overflow: "hidden", display: "flex" }}
+      >
         {/* Left */}
         <div style={{ width: 220, padding: 12, borderRight: "1px solid #333", display: "flex", flexDirection: "column" }}>
           <div style={{ marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center", color: "white" }}>
@@ -400,7 +445,7 @@ const deleteRole = async () => {
             <Button type="text" size="small" icon={<PlusOutlined />} onClick={addRole} style={{ color: "white" }} title="สร้างบทบาทใหม่" />
           </div>
 
-          <div className="role-scroll" style={{ flex: 1, overflowY: "auto" }}>
+          <div style={{ flex: 1, overflowY: "auto" }}>
             <Spin spinning={rolesLoading}>
               {roles.map((role) => {
                 const isActive = role.ID === roleIdNum;
@@ -430,8 +475,20 @@ const deleteRole = async () => {
         </div>
 
         {/* Right */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", padding: "16px 32px", boxSizing: "border-box", maxWidth: "1000px", margin: "0 auto" }}>
-          {/* Header */}
+        <div
+          style={{
+            flex: 1,
+            padding: "16px 32px",
+            boxSizing: "border-box",
+            maxWidth: "1000px",
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header (fixed) */}
           <div style={{ display: "flex", marginBottom: 16, alignItems: "center", gap: 16 }}>
             <Title level={4} style={{ color: "white", margin: 0 }}>
               แก้ไขบทบาท – {roleName ? roleName.toUpperCase() : "LOADING"}
@@ -444,106 +501,146 @@ const deleteRole = async () => {
             </div>
           </div>
 
-          <Spin spinning={loadingDetail}>
-            <Tabs
-              activeKey={activeTab}
-              onChange={setActiveTab}
-              items={[
-                {
-                  key: "display",
-                  label: <Text style={{ color: "white" }}>การแสดงผล</Text>,
-                  children: (
-                    <div style={{ maxWidth: 700 }}>
-                      <div style={{ marginBottom: 16 }}>
-                        <Text style={{ color: "white" }}>
-                          ชื่อตำแหน่ง <Text type="danger">*</Text>
-                        </Text>
-                        <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} style={{ marginTop: 8 }} />
-                      </div>
-
-                      <div style={{ marginBottom: 16 }}>
-                        <Text style={{ color: "white" }}>คำอธิบายตำแหน่ง</Text>
-                        <Input.TextArea value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} rows={3} style={{ marginTop: 8 }} />
-                      </div>
-
-                      <div>
-                        <Text style={{ color: "white" }}>
-                          สีตำแหน่ง <Text type="danger">*</Text>
-                        </Text>
-                        <Row gutter={[8, 8]} style={{ marginTop: 8 }}>
-                          {colorPalette.map((c) => (
-                            <Col key={c}>
-                              <div
-                                onClick={() => setColor(c)}
-                                style={{
-                                  width: 32, height: 32, borderRadius: 6, cursor: "pointer",
-                                  background: c, border: color === c ? "2px solid #fff" : "2px solid transparent",
-                                }}
-                              />
-                            </Col>
-                          ))}
-                        </Row>
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  key: "permissions",
-                  label: <Text style={{ color: "white" }}>การอนุญาต</Text>,
-                  children: (
-                    <div style={{ maxWidth: 700 }}>
-                      <Input.Search placeholder="ค้นหาสิทธิ์" value={permissionSearch} onChange={(e) => setPermissionSearch(e.target.value)} style={{ marginBottom: 16 }} />
-                      {filteredPermissions.map((perm) => (
-                        <div
-                          key={perm.ID}
-                          style={{
-                            display: "flex", justifyContent: "space-between", alignItems: "center",
-                            padding: "10px 0", borderBottom: "1px solid #333", color: "white",
-                          }}
-                        >
-                          <div style={{ paddingRight: 16 }}>
-                            <div style={{ fontWeight: 600 }}>{perm.title}</div>
-                            {perm.description && (<div style={{ color: "#aaa", fontSize: 12 }}>{perm.description}</div>)}
-                          </div>
-                          <Switch checked={!!permissionStates[perm.ID]} onChange={(checked) => togglePermission(perm.ID, checked)} />
+          {/* Tabs */}
+          <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
+            <Spin spinning={loadingDetail}>
+              <Tabs
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                items={[
+                  {
+                    key: "display",
+                    label: <Text style={{ color: "white" }}>การแสดงผล</Text>,
+                    children: (
+                      <div style={{ maxWidth: 700, height: scrollAreaHeight, overflowY: "auto", paddingRight: 8 }}>
+                        <div style={{ marginBottom: 16 }}>
+                          <Text style={{ color: "white" }}>
+                            ชื่อตำแหน่ง <Text type="danger">*</Text>
+                          </Text>
+                          <Input value={roleName} onChange={(e) => setRoleName(e.target.value)} style={{ marginTop: 8 }} />
                         </div>
-                      ))}
-                      {!filteredPermissions.length && <div style={{ color: "#aaa" }}>ไม่พบสิทธิ์ที่ค้นหา</div>}
-                    </div>
-                  ),
-                },
-                {
-                  key: "members",
-                  label: <Text style={{ color: "white" }}>จัดการสมาชิก</Text>,
-                  children: (
-                    <div>
-                      <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", gap: 12 }}>
-                        <Input
-                          placeholder="ค้นหาสมาชิก"
-                          value={memberSearch}
-                          onChange={(e) => setMemberSearch(e.target.value)}
-                          style={{ width: "70%" }}
-                        />
-                        <Button type="primary" onClick={showModal}>เพิ่มสมาชิก</Button>
-                      </div>
 
-                      {filteredMembersTab.length === 0 ? (
-                        <div style={{ color: "#aaa", textAlign: "center" }}>
-                          ไม่พบสมาชิก{memberSearch ? "ตามคำค้น" : ""}{" "}
-                          {!memberSearch && (
-                            <a style={{ color: "#1890ff" }} onClick={showModal}>
-                              เพิ่มสมาชิกให้กับบทบาทนี้
-                            </a>
+                        <div style={{ marginBottom: 16 }}>
+                          <Text style={{ color: "white" }}>คำอธิบายตำแหน่ง</Text>
+                          <Input.TextArea value={roleDescription} onChange={(e) => setRoleDescription(e.target.value)} rows={3} style={{ marginTop: 8 }} />
+                        </div>
+
+                        <div>
+                          <Text style={{ color: "white" }}>
+                            สีตำแหน่ง <Text type="danger">*</Text>
+                          </Text>
+                          <Row gutter={[8, 8]} style={{ marginTop: 8 }}>
+                            {colorPalette.map((c) => (
+                              <Col key={c}>
+                                <div
+                                  onClick={() => setColor(c)}
+                                  style={{
+                                    width: 32, height: 32, borderRadius: 6, cursor: "pointer",
+                                    background: c, border: color === c ? "2px solid #fff" : "2px solid transparent",
+                                  }}
+                                />
+                              </Col>
+                            ))}
+                          </Row>
+                        </div>
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "permissions",
+                    label: <Text style={{ color: "white" }}>การอนุญาต</Text>,
+                    children: (
+                      <div style={{ maxWidth: 700 }}>
+                        {/* แถวควบคุมค้นหา + ปุ่มเลือก/ล้างทั้งหมด */}
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
+                          <Input.Search
+                            placeholder="ค้นหาสิทธิ์"
+                            value={permissionSearch}
+                            onChange={(e) => setPermissionSearch(e.target.value)}
+                            style={{ flex: "1 1 260px", minWidth: 220 }}
+                            allowClear
+                          />
+                          <Button
+                            onClick={handleSelectAll}
+                            loading={bulkLoading}
+                            disabled={bulkLoading || filteredPermissions.length === 0}
+                          >
+                            เลือกทั้งหมด (ตามที่แสดง)
+                          </Button>
+                          <Button
+                            onClick={handleClearAll}
+                            loading={bulkLoading}
+                            disabled={bulkLoading || filteredPermissions.length === 0}
+                          >
+                            ล้างทั้งหมด (ตามที่แสดง)
+                          </Button>
+                        </div>
+
+                        {/* 🔹 เลื่อนเฉพาะรายการสิทธิ์ */}
+                        <div style={{ height: scrollAreaHeight, overflowY: "auto", paddingRight: 8 }}>
+                          {filteredPermissions.map((perm) => (
+                            <div
+                              key={perm.ID}
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                padding: "10px 0",
+                                borderBottom: "1px solid #333",
+                                color: "white",
+                              }}
+                            >
+                              <div style={{ paddingRight: 16 }}>
+                                <div style={{ fontWeight: 600 }}>{perm.title}</div>
+                                {perm.description && (
+                                  <div style={{ color: "#aaa", fontSize: 12 }}>{perm.description}</div>
+                                )}
+                              </div>
+                              <Switch
+                                checked={!!permissionStates[perm.ID]}
+                                onChange={(checked) => togglePermission(perm.ID, checked)}
+                              />
+                            </div>
+                          ))}
+                          {!filteredPermissions.length && (
+                            <div style={{ color: "#aaa" }}>ไม่พบสิทธิ์ที่ค้นหา</div>
                           )}
                         </div>
-                      ) : (
-                        <List
-                          dataSource={filteredMembersTab}
-                          renderItem={(m) => (
-                            <List.Item
-                              actions={
-                                roleIdNum !== defaultRoleId
-                                  ? [
+                      </div>
+                    ),
+                  },
+                  {
+                    key: "members",
+                    label: <Text style={{ color: "white" }}>จัดการสมาชิก</Text>,
+                    children: (
+                      <div style={{ height: scrollAreaHeight, overflowY: "auto", paddingRight: 8 }}>
+                        <div style={{ marginBottom: 16, display: "flex", justifyContent: "space-between", gap: 12 }}>
+                          <Input
+                            placeholder="ค้นหาสมาชิก"
+                            value={memberSearch}
+                            onChange={(e) => setMemberSearch(e.target.value)}
+                            style={{ width: "70%" }}
+                          />
+                          <Button type="primary" onClick={showModal}>เพิ่มสมาชิก</Button>
+                        </div>
+
+                        {filteredMembersTab.length === 0 ? (
+                          <div style={{ color: "#aaa", textAlign: "center" }}>
+                            ไม่พบสมาชิก{memberSearch ? "ตามคำค้น" : ""}{" "}
+                            {!memberSearch && (
+                              <a style={{ color: "#1890ff" }} onClick={showModal}>
+                                เพิ่มสมาชิกให้กับบทบาทนี้
+                              </a>
+                            )}
+                          </div>
+                        ) : (
+                          <List
+                            dataSource={filteredMembersTab}
+                            renderItem={(m) => (
+                              <List.Item
+                                actions={
+                                  roleIdNum !== defaultRoleId
+                                    ? [
                                       <Tooltip title="ลบสมาชิกออก" key="remove">
                                         <Popconfirm
                                           title={`ยืนยันนำ ${m.username} ออกจากบทบาทนี้?`}
@@ -555,20 +652,21 @@ const deleteRole = async () => {
                                         </Popconfirm>
                                       </Tooltip>,
                                     ]
-                                  : []
-                              }
-                            >
-                              <span style={{ color: "white" }}>{m.username}</span>
-                            </List.Item>
-                          )}
-                        />
-                      )}
-                    </div>
-                  ),
-                },
-              ]}
-            />
-          </Spin>
+                                    : []
+                                }
+                              >
+                                <span style={{ color: "white" }}>{m.username}</span>
+                              </List.Item>
+                            )}
+                          />
+                        )}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
+            </Spin>
+          </div>
 
           {/* Modal: เพิ่มสมาชิก */}
           <Modal
@@ -586,7 +684,7 @@ const deleteRole = async () => {
               onChange={(e) => setAddSearchText(e.target.value)}
               style={{ marginBottom: 16 }}
             />
-            <div className="role-scroll" style={{ maxHeight: 360, overflowY: "auto" }}>
+            <div style={{ maxHeight: 360, overflowY: "auto" }}>
               <List
                 dataSource={filteredUsers}
                 renderItem={(user) => {
@@ -600,7 +698,7 @@ const deleteRole = async () => {
                         borderRadius: 6,
                         marginBottom: 6,
                         padding: "10px 12px",
-                        backgroundColor: selected ? "#e6f4ff" : "transparent",  // ฟ้าอ่อน อ่านง่าย
+                        backgroundColor: selected ? "#e6f4ff" : "transparent",
                         border: selected ? "1px solid #91caff" : "1px solid transparent",
                         transition: "background-color 0.15s, border-color 0.15s",
                       }}
