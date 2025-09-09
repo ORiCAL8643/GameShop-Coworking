@@ -1,10 +1,12 @@
 import Navbar from "../components/Navbar";
 import ProductGrid from "../components/ProductGrid";
 import { Button, Space, Typography } from "antd";
+import { useAuth } from "../context/AuthContext";
 
 const { Title } = Typography;
 
 const Home = () => {
+  const { id } = useAuth();
   return (
     <div style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
       <Navbar />
@@ -17,7 +19,7 @@ const Home = () => {
           <Button shape="round">Recommended</Button>
           <Button shape="round">Filter</Button>
         </Space>
-        <ProductGrid />
+        <ProductGrid userId={id} />
       </div>
     </div>
   );
