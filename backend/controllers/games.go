@@ -90,11 +90,8 @@ func FindGames(c *gin.Context) {
 	now := time.Now()
 	if err := configs.DB().
 		Preload("Categories").
-<<<<<<< HEAD
 		Preload("Promotions", "status = ? AND start_date <= ? AND end_date >= ?", true, now, now).
-=======
 		Preload("Requests").
->>>>>>> main
 		Find(&games).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
