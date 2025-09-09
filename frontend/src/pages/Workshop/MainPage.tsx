@@ -11,8 +11,8 @@ import {
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
-import { listGames, listUserGames } from "../../services/workshop";
-import type { Game } from "../../interfaces";
+import { listGames, listUserGames, listMods } from "../../services/workshop";
+import type { Game, Mod } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider } = Layout;
@@ -21,27 +21,52 @@ const { Search } = Input;
 
 const WorkshopMain: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [activeMenu, setActiveMenu] = useState("all");
+  const [activeMenu, setActiveMenu] = useState<"all" | "your-games">("all");
   const [games, setGames] = useState<Game[]>([]);
   const [yourGames, setYourGames] = useState<number[]>([]);
+  const [modCounts, setModCounts] = useState<Record<number, number>>({}); // gameID -> count
+
   const navigate = useNavigate();
   const { id: userId } = useAuth();
 
   useEffect(() => {
+    // ดึงรายชื่อเกมทั้งหมด
     listGames().then(setGames).catch(console.error);
+
+    // ดึงม็อดทั้งหมดแล้วนับจำนวนต่อเกม (ทำครั้งเดียว)
+    listMods()
+      .then((mods: Mod[]) => {
+        const counts: Record<number, number> = {};
+        for (const m of mods ?? []) {
+          const gid = Number((m as any)?.game_id ?? (m as any)?.gameId ?? (m as any)?.GameID);
+          if (Number.isFinite(gid)) counts[gid] = (counts[gid] || 0) + 1;
+        }
+        setModCounts(counts);
+      })
+      .catch((e) => {
+        console.warn("listMods failed or not implemented:", e);
+        setModCounts({});
+      });
+
+    // ดึงเกมที่ผู้ใช้เป็นเจ้าของ (ถ้ามี userId)
     if (userId) {
-      listUserGames(userId)
-        .then((rows) => setYourGames(rows.map((r) => r.game_id)))
+      listUserGames(Number(userId))
+        .then((rows: any[]) => {
+          const ids = (rows ?? [])
+            .map((r) => Number(r.game_id ?? r.gameId ?? r.GameID))
+            .filter((n) => Number.isFinite(n)) as number[];
+          setYourGames(ids);
+        })
         .catch(console.error);
     }
   }, [userId]);
 
   const filtered = games.filter((g) => {
-    const matchesSearch = g.game_name
+    const matchesSearch = (g.game_name ?? "")
       .toLowerCase()
       .includes(search.toLowerCase());
     if (activeMenu === "your-games") {
-      return yourGames.includes(g.ID) && matchesSearch;
+      return yourGames.includes((g as any).ID) && matchesSearch;
     }
     return matchesSearch;
   });
@@ -64,40 +89,151 @@ const WorkshopMain: React.FC = () => {
         </div>
 
         <Row gutter={[16, 16]}>
-          {filtered.map((g) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={g.ID}>
-              <Card
-                hoverable
-                onClick={() => navigate(`/workshop/${g.ID}`)}
-                style={{ background: "#1f1f1f", borderRadius: 8 }}
-                cover={
-                  g.img_src ? (
-                    <img
-                      alt={g.game_name}
-                      src={g.img_src}
-                      style={{ height: 120, objectFit: "cover" }}
-                    />
-                  ) : (
+          {filtered.map((g) => {
+            const gid = (g as any).ID ?? (g as any).id;
+            const count = modCounts[gid] ?? 0;
+            const img = g.img_src || ""; // ถ้าไม่มี จะใช้ placeholder box ด้านล่างแทน
+
+            return (
+              <Col xs={24} sm={12} md={8} lg={6} key={gid}>
+                <Card
+                  hoverable
+                  onClick={() => navigate(`/workshop/${gid}`)}
+                  style={{
+                    background: "#1a1a1a",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    border: "1px solid #262626",
+                    boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+                  }}
+                  bodyStyle={{ padding: 0 }}
+                  cover={
+                    img ? (
+                      <div
+                        style={{
+                          height: 220, // ✅ ภาพใหญ่ขึ้น
+                          position: "relative",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <img
+                          alt={g.game_name}
+                          src={img}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            transform: "scale(1.05)",
+                            transition: "transform .35s ease",
+                          }}
+                          onLoad={(e) => {
+                            // ปรับลด scale หลังโหลดเพื่อให้โฮเวอร์ดู smooth
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.0)";
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.03)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.0)";
+                          }}
+                        />
+                        {/* เงาด้านล่างเพื่ออ่านชื่อชัด */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            background:
+                              "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0.7) 100%)",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          height: 220, // ✅ ความสูงเท่ากันแม้ไม่มีรูป
+                          background:
+                            "linear-gradient(135deg, #2b2b2b 0%, #1f1f1f 100%)",
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          color: "#888",
+                          fontSize: 40,
+                        }}
+                      >
+                        <PictureOutlined />
+                      </div>
+                    )
+                  }
+                >
+                  {/* ✅ เนื้อหาพร้อมพื้นหลังรูปแบบจางๆ + เบลอ สไตล์ Steam */}
+                  <div
+                    style={{
+                      position: "relative",
+                      padding: "14px 16px 16px",
+                      minHeight: 84,
+                      overflow: "hidden",
+                      borderTop: "1px solid #262626",
+                    }}
+                  >
+                    {/* ชั้นพื้นหลัง: ใช้รูปเดิมแบบเบลอและจาง */}
                     <div
+                      aria-hidden
                       style={{
-                        height: 120,
-                        background: "#2a2a2a",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        color: "#888",
-                        fontSize: 24,
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage: img ? `url(${img})` : undefined,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        filter: "blur(14px)",
+                        transform: "scale(1.2)",
+                        opacity: 0.28,
                       }}
-                    >
-                      <PictureOutlined />
+                    />
+                    {/* ไล่เฉดทับอีกชั้นให้อ่านง่าย */}
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(0deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.85) 60%, rgba(20,20,20,0.6) 100%)",
+                      }}
+                    />
+
+                    {/* เนื้อหาจริง */}
+                    <div style={{ position: "relative", zIndex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            fontSize: 16,
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {g.game_name}
+                        </Text>
+                      </div>
+
+                      <Text
+                        type="secondary"
+                        style={{ color: "#bfbfbf", fontSize: 12 }}
+                      >
+                        {count} {count === 1 ? "item" : "items"}
+                      </Text>
                     </div>
-                  )
-                }
-              >
-                <Text style={{ color: "white" }}>{g.game_name}</Text>
-              </Card>
-            </Col>
-          ))}
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
         </Row>
 
         <div style={{ marginTop: 20, textAlign: "center" }}>
@@ -117,8 +253,8 @@ const WorkshopMain: React.FC = () => {
         <h3 style={{ color: "white" }}>Menu</h3>
         <List
           dataSource={[
-            { name: "All Workshops", key: "all" },
-            { name: "Your Games", key: "your-games" },
+            { name: "All Workshops", key: "all" as const },
+            { name: "Your Games", key: "your-games" as const },
           ]}
           renderItem={(item) => (
             <List.Item
@@ -130,12 +266,14 @@ const WorkshopMain: React.FC = () => {
                 marginBottom: 4,
                 borderRadius: 6,
                 background:
-                  activeMenu === item.key ? "#1890ff33" : "transparent", // highlight
+                  activeMenu === item.key ? "#1890ff33" : "transparent",
                 borderLeft:
-                  activeMenu === item.key ? "3px solid #1890ff" : "3px solid transparent", // กรอบข้างซ้าย
+                  activeMenu === item.key
+                    ? "3px solid #1890ff"
+                    : "3px solid transparent",
                 transition: "all 0.2s",
               }}
-              onClick={() => setActiveMenu(item.key)} // 👈 เปลี่ยนเมนู
+              onClick={() => setActiveMenu(item.key)}
             >
               {item.name}
             </List.Item>

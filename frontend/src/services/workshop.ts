@@ -1,3 +1,4 @@
+// src/services/workshop.ts
 import type {
   Game,
   UserGame,
@@ -8,62 +9,113 @@ import type {
   CreateModRatingRequest,
 } from "../interfaces";
 
-const API_URL = 'http://localhost:8088';
+const API_URL = "http://localhost:8088";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
-    const text = await res.text();
+    const text = await res.text().catch(() => "");
     throw new Error(text || "API request failed");
   }
   return res.json() as Promise<T>;
 }
 
-// 🔧 ปรับให้ตรง backend ปัจจุบัน
+// ---------- helpers: normalize keys (รองรับ snake/camel/Upper) ----------
+const toNum = (v: any): number | undefined => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const pickId = (obj: any) => toNum(obj?.id ?? obj?.ID ?? obj?.Id);
+const pickGameId = (obj: any) => toNum(obj?.game_id ?? obj?.gameId ?? obj?.GameID);
+const pickUserId = (obj: any) => toNum(obj?.user_id ?? obj?.userId ?? obj?.UserID);
+
+function addAliases<T extends Record<string, any>>(row: T) {
+  const id = pickId(row);
+  const game_id = pickGameId(row);
+  const user_id = pickUserId(row);
+
+  return {
+    ...row,
+    id: id ?? row.id,
+    ID: id ?? row.ID,
+    Id: id ?? row.Id,
+
+    game_id: game_id ?? row.game_id,
+    gameId: game_id ?? row.gameId,
+    GameID: game_id ?? row.GameID,
+
+    user_id: user_id ?? row.user_id,
+    userId: user_id ?? row.userId,
+    UserID: user_id ?? row.UserID,
+  };
+}
+
+// ------------------------------- Games -------------------------------
 export async function listGames(): Promise<Game[]> {
-  // backend ใช้ /game (เอกพจน์) สำหรับลิสต์ทั้งหมด
+  // NOTE: โปรเจกต์นี้ใช้ /game สำหรับลิสต์ทั้งหมด
   const res = await fetch(`${API_URL}/game`);
   return handleResponse<Game[]>(res);
 }
 
-// 🔧 backend ยังไม่มี GET /games/:id → ดึงทั้งหมดแล้วกรองเอา id ที่ต้องการ
 export async function getGame(id: number): Promise<Game> {
   const games = await listGames();
-  const found = games.find((g) => g.ID === id);
+  const found = games.find((g: any) => (g?.ID ?? g?.id ?? g?.Id) === id);
   if (!found) throw new Error(`Game ${id} not found`);
   return found;
 }
 
+// ----------------------------- UserGames -----------------------------
 export async function listUserGames(userId: number): Promise<UserGame[]> {
-  // ตรงกับ backend: GET /user-games?user_id=...
   const url = new URL(`${API_URL}/user-games`);
   url.searchParams.set("user_id", String(userId));
   const res = await fetch(url.toString());
-  return handleResponse<UserGame[]>(res);
+  const rows = await handleResponse<any[]>(res);
+  return (rows ?? []).map((r) => addAliases<UserGame>(r));
 }
 
-// ด้านล่างนี้แล้วแต่ระบบคุณว่ามี endpoint จริงไหม
+// ------------------------------- Mods --------------------------------
 export async function listMods(gameId?: number): Promise<Mod[]> {
-  const res = await fetch(`${API_URL}/mods`); // ถ้า backend ยังไม่มี จะ 404
+  const res = await fetch(`${API_URL}/mods`);
   let mods = await handleResponse<Mod[]>(res);
   if (gameId !== undefined) {
-    mods = mods.filter((m) => m.game_id === gameId);
+    mods = mods.filter(
+      (m: any) => (m?.game_id ?? m?.gameId ?? m?.GameID) === gameId
+    );
   }
   return mods;
 }
 
 export async function getMod(id: number): Promise<Mod> {
-  const res = await fetch(`${API_URL}/mods/${id}`); // ถ้า backend ยังไม่มี จะ 404
+  const res = await fetch(`${API_URL}/mods/${id}`);
   return handleResponse<Mod>(res);
 }
 
-export async function createMod(formData: FormData): Promise<Mod> {
+export async function createMod(formData: FormData, authToken?: string): Promise<Mod> {
   const res = await fetch(`${API_URL}/mods`, {
     method: "POST",
-    body: formData,
+    body: formData, // อย่าตั้ง Content-Type เอง
+    headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
   });
   return handleResponse<Mod>(res);
 }
 
+export async function updateMod(
+  id: number,
+  payload: Partial<Pick<Mod, "title" | "description" | "game_id" | "user_game_id">>,
+  authToken?: string
+): Promise<Mod> {
+  const res = await fetch(`${API_URL}/mods/${id}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Mod>(res);
+}
+
+// ----------------------------- Comments ------------------------------
 export async function listComments(threadId: number): Promise<Comment[]> {
   const url = new URL(`${API_URL}/comments`);
   url.searchParams.set("thread_id", String(threadId));
@@ -80,10 +132,11 @@ export async function createComment(payload: CreateCommentRequest): Promise<Comm
   return handleResponse<Comment>(res);
 }
 
+// --------------------------- Mod Ratings -----------------------------
 export async function listModRatings(modId: number): Promise<ModRating[]> {
-  const res = await fetch(`${API_URL}/modratings`); // ถ้า backend ยังไม่มี จะ 404
+  const res = await fetch(`${API_URL}/modratings`);
   const ratings = await handleResponse<ModRating[]>(res);
-  return ratings.filter((r) => r.mod_id === modId);
+  return ratings.filter((r: any) => (r?.mod_id ?? r?.modId ?? r?.ModID) === modId);
 }
 
 export async function createModRating(payload: CreateModRatingRequest): Promise<ModRating> {

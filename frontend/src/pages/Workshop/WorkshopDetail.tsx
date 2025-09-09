@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Layout,
@@ -23,21 +23,24 @@ const { Search } = Input;
 const WorkshopDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { id: userId } = useAuth();
+  const { id: rawUserId } = useAuth() as { id?: number | string };
+
+  // antd v5: useMessage ให้ toast แสดงแน่นอน
+  const [msg, contextHolder] = message.useMessage();
+
+  const userId = useMemo(() => (rawUserId != null ? Number(rawUserId) : undefined), [rawUserId]);
 
   const [game, setGame] = useState<Game | null>(null);
   const [mods, setMods] = useState<Mod[]>([]);
   const [searchText, setSearchText] = useState("");
   const [filteredMods, setFilteredMods] = useState<Mod[]>([]);
-  const [userGames, setUserGames] = useState<number[]>([]);
+  const [userGames, setUserGames] = useState<number[]>([]); // game_id list ที่ผู้ใช้มี
 
   // โหลดข้อมูลเกมและม็อด
   useEffect(() => {
     if (!id) return;
     const gameId = Number(id);
 
-    // บางโปรเจกต์ backend ไม่มี GET /games/:id
-    // เลยทำ fallback: ถ้า getGame ล้มเหลว จะ list ทั้งหมดแล้วหา ID ที่ตรง
     (async () => {
       try {
         const g = await getGame(gameId);
@@ -45,15 +48,14 @@ const WorkshopDetail: React.FC = () => {
       } catch {
         try {
           const all = await listGames();
-          const found = all.find((x) => x.ID === gameId) || null;
-          setGame(found);
+          const found = all.find((x: any) => (x?.ID ?? x?.id) === gameId) || null;
+          setGame(found as Game | null);
         } catch (e) {
           console.error(e);
         }
       }
     })();
 
-    // ม็อดของเกมนี้ (ถ้า backend ยังไม่มี /mods ก็ไม่เป็นไร หน้าไม่พัง)
     listMods(gameId)
       .then((ms) => {
         setMods(ms);
@@ -70,135 +72,299 @@ const WorkshopDetail: React.FC = () => {
   useEffect(() => {
     if (!userId) return;
     listUserGames(userId)
-      .then((rows) => setUserGames(rows.map((r) => r.game_id)))
+      .then((rows: any[]) => {
+        const ids = (rows ?? [])
+          .map((r) => Number(r.game_id ?? r.gameId ?? r.GameID))
+          .filter((n) => Number.isFinite(n)) as number[];
+        setUserGames(ids);
+      })
       .catch(console.error);
   }, [userId]);
 
   const handleUpload = () => {
-    if (!game) {
-      message.error("ไม่พบข้อมูลเกม");
+    const gid = (game as any)?.ID ?? (game as any)?.id;
+
+    if (!game || !gid) {
+      msg.error({ content: "ไม่พบข้อมูลเกม", duration: 2 });
+      return;
+    }
+    if (!userId) {
+      msg.error({ content: "กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด", duration: 2 });
       return;
     }
 
-    // ถ้าไม่ได้เป็นเจ้าของเกม เตือน แต่ยังพาไปหน้าอัปโหลด (เพื่อให้ทดสอบ/กรอกได้)
-    if (!userGames.includes(game.ID)) {
-      message.warning("คุณไม่ได้เป็นเจ้าของเกมนี้ ระบบจะพาไปหน้าอัปโหลดเพื่อทดสอบ");
+    const isOwner = userGames.includes(Number(gid));
+    if (!isOwner) {
+      msg.error({
+        content: "ไม่สามารถอัปโหลดม็อดของเกมนี้ได้ เนื่องจากคุณไม่ได้เป็นเจ้าของเกมนี้",
+        duration: 2.5,
+      });
+      return; // ไม่พาไปหน้าอัปโหลด
     }
 
-    // นำทางไปหน้าอัปโหลดเสมอ
-    navigate(`/upload?gameId=${game.ID}`);
+    // เป็นเจ้าของ → ไปหน้าอัปโหลด
+    navigate(`/upload?gameId=${gid}`);
   };
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    const result = mods.filter((m) =>
-      m.title.toLowerCase().includes(value.toLowerCase())
-    );
+    const result = mods.filter((m) => m.title.toLowerCase().includes(value.toLowerCase()));
     setFilteredMods(result);
   };
 
-  // เมื่อ mods เปลี่ยน ให้รีเซ็ตผลกรอง
   useEffect(() => {
     setFilteredMods(mods);
   }, [mods]);
 
+  // ใช้ค่านี้เพื่อปรับสไตล์ปุ่ม (กดได้เสมอ แต่ถ้าไม่เป็นเจ้าของทำให้อ่อนลงนิดหน่อย)
+  const isOwner = useMemo(() => {
+    const gid = (game as any)?.ID ?? (game as any)?.id;
+    return gid != null && userGames.includes(Number(gid));
+  }, [game, userGames]);
+
+  // helper: หา url รูปของม็อดอย่างปลอดภัย
+  const getModImg = (m: any): string =>
+    m?.image_path ?? m?.image ?? m?.imageUrl ?? m?.img_src ?? "";
+
+  const bannerImg = (game as any)?.img_src ?? "";
+
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
-      {/* Header Banner */}
+      {/* toast context */}
+      {contextHolder}
+
+      {/* ===== Hero Banner สไตล์ Steam ===== */}
       <Header
         style={{
-          background: "#1f1f1f",
+          background: "#0f1419",
           padding: 0,
-          height: 200,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
+          height: 340,
+          position: "relative",
+          overflow: "hidden",
+          borderBottom: "1px solid #1f2933",
         }}
       >
-        {game?.img_src ? (
-          <img
-            src={game.img_src}
-            alt={game.game_name}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
-        ) : (
+        {/* พื้นหลังรูปแบบเบลอ/จาง */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: bannerImg ? `url(${bannerImg})` : undefined,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(16px)",
+            transform: "scale(1.2)",
+            opacity: 0.35,
+          }}
+        />
+        {/* ไล่เฉดทับให้อ่านง่าย */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(180deg, rgba(15,20,25,0.3) 0%, rgba(15,20,25,0.75) 60%, rgba(15,20,25,0.95) 100%)",
+          }}
+        />
+        {/* เนื้อหาแบนเนอร์ */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            height: "100%",
+            display: "grid",
+            gridTemplateColumns: "1fr minmax(260px, 380px)",
+            gap: 20,
+            alignItems: "center",
+            padding: "24px 28px",
+          }}
+        >
+          {/* ซ้าย: ชื่อเกม + สถิติ */}
+          <div>
+            <div
+              style={{
+                color: "#fff",
+                fontSize: 28,
+                fontWeight: 700,
+                lineHeight: 1.2,
+                textShadow: "0 2px 10px rgba(0,0,0,0.4)",
+                marginBottom: 8,
+              }}
+            >
+              {game?.game_name || "Untitled Game"}
+            </div>
+            <div style={{ color: "#c9d1d9" }}>
+              <span style={{ fontSize: 14 }}>
+                {filteredMods.length} {filteredMods.length === 1 ? "mod" : "mods"} available
+              </span>
+            </div>
+
+            {/* Search วางในแบนเนอร์ */}
+            <div style={{ marginTop: 16, maxWidth: 380 }}>
+              <Search
+                placeholder="Search mods..."
+                allowClear
+                value={searchText}
+                onChange={(e) => handleSearch(e.target.value)}
+                onSearch={handleSearch}
+              />
+            </div>
+          </div>
+
+          {/* ขวา: ปกเกมชัดๆ */}
           <div
             style={{
-              width: "90%",
-              height: "100%",
-              background: "#2a2a2a",
+              justifySelf: "end",
+              width: "100%",
+              maxWidth: 380,
+              height: 240,
+              borderRadius: 12,
+              overflow: "hidden",
+              background: "#1f2933",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.45)",
+              border: "1px solid #2b3a42",
               display: "flex",
-              justifyContent: "center",
               alignItems: "center",
-              color: "#888",
-              fontSize: 20,
+              justifyContent: "center",
             }}
           >
-            <PictureOutlined style={{ fontSize: 40, marginRight: 10 }} />
-            Banner for {game?.game_name || ""}
+            {bannerImg ? (
+              <img
+                src={bannerImg}
+                alt={game?.game_name}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                style={{
+                  color: "#8899a6",
+                  fontSize: 32,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <PictureOutlined />
+                No cover image
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </Header>
 
       <Layout>
         {/* Content */}
         <Content style={{ padding: "20px" }}>
-          <Title level={3} style={{ color: "black" }}>
-            {game?.game_name}
-          </Title>
-          <Text style={{ color: "black" }}>
-            Showing {filteredMods.length} mods
-          </Text>
-
-          {/* Search */}
-          <div
-            style={{
-              marginTop: 20,
-              marginBottom: 20,
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <Search
-              placeholder="Search mods..."
-              allowClear
-              style={{ maxWidth: 250 }}
-              value={searchText}
-              onChange={(e) => handleSearch(e.target.value)}
-              onSearch={handleSearch}
-            />
-          </div>
-
           {/* Grid Mods */}
           <Row gutter={[16, 16]}>
-            {filteredMods.map((mod) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={mod.ID}>
-                <Card
-                  hoverable
-                  style={{ background: "#1f1f1f", borderRadius: 8 }}
-                  cover={
+            {filteredMods.map((mod) => {
+              const modImg = getModImg(mod);
+              return (
+                <Col xs={24} sm={12} md={8} lg={6} key={mod.ID}>
+                  <Card
+                    hoverable
+                    style={{
+                      background: "#1a1a1a",
+                      borderRadius: 12,
+                      overflow: "hidden",
+                      border: "1px solid #262626",
+                      boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+                    }}
+                    bodyStyle={{ padding: 0 }}
+                    cover={
+                      modImg ? (
+                        <div style={{ height: 180, position: "relative", overflow: "hidden" }}>
+                          <img
+                            alt={mod.title}
+                            src={modImg}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "cover",
+                              transform: "scale(1.02)",
+                              transition: "transform .3s ease",
+                            }}
+                            onMouseEnter={(e) => ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.05)")}
+                            onMouseLeave={(e) => ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.02)")}
+                          />
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              background:
+                                "linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.55) 85%, rgba(0,0,0,0.75) 100%)",
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            height: 180,
+                            background: "linear-gradient(135deg, #2b2b2b 0%, #1f1f1f 100%)",
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            color: "#888",
+                            fontSize: 32,
+                          }}
+                        >
+                          <PictureOutlined />
+                        </div>
+                      )
+                    }
+                    onClick={() => navigate(`/mod/${mod.ID}`)}
+                  >
+                    {/* body: พื้นหลังภาพแบบจาง+เบลอ */}
                     <div
                       style={{
-                        height: 120,
-                        background: "#2a2a2a",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        color: "#888",
-                        fontSize: 24,
+                        position: "relative",
+                        padding: "12px 14px 14px",
+                        minHeight: 70,
+                        overflow: "hidden",
+                        borderTop: "1px solid #262626",
                       }}
                     >
-                      <PictureOutlined />
+                      <div
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          backgroundImage: modImg ? `url(${modImg})` : undefined,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          filter: "blur(12px)",
+                          transform: "scale(1.2)",
+                          opacity: 0.25,
+                        }}
+                      />
+                      <div
+                        aria-hidden
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          background:
+                            "linear-gradient(0deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.85) 60%, rgba(20,20,20,0.6) 100%)",
+                        }}
+                      />
+                      <div style={{ position: "relative", zIndex: 1 }}>
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            fontSize: 15,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {mod.title}
+                        </Text>
+                      </div>
                     </div>
-                  }
-                  onClick={() => navigate(`/mod/${mod.ID}`)}
-                >
-                  <Text style={{ color: "white" }}>{mod.title}</Text>
-                </Card>
-              </Col>
-            ))}
+                  </Card>
+                </Col>
+              );
+            })}
 
             {filteredMods.length === 0 && (
               <Col span={24} style={{ textAlign: "center", color: "#aaa" }}>
@@ -232,12 +398,8 @@ const WorkshopDetail: React.FC = () => {
                   padding: "8px 0",
                   transition: "color 0.2s",
                 }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget.style.color = "#40a9ff"))
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget.style.color = "white"))
-                }
+                onMouseEnter={(e) => ((e.currentTarget.style.color = "#40a9ff"))}
+                onMouseLeave={(e) => ((e.currentTarget.style.color = "white"))}
               >
                 {item.name}
               </List.Item>
@@ -247,7 +409,7 @@ const WorkshopDetail: React.FC = () => {
           <Button
             type="primary"
             block
-            style={{ marginTop: 20 }}
+            style={{ marginTop: 20, opacity: isOwner ? 1 : 0.85 }}
             onClick={handleUpload}
           >
             Upload Mod
