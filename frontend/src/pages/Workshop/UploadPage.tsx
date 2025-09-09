@@ -14,7 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 const { Title } = Typography;
 const { Dragger } = Upload;
 
-const API_URL = 'http://localhost:8088';
+const API_URL = "http://localhost:8088";
 
 const Workshop: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -55,65 +55,99 @@ const Workshop: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
 
-  // File handlers (prevent auto upload by returning false)
+  // --- file handlers ---
   const handleModFile = (file: File) => {
     setModFile(file);
     message.success(`${file.name} selected`);
-    return false;
+    return false; // stop auto-upload
+  };
+  const handleModFileChange: React.ComponentProps<typeof Upload>["onChange"] = (info) => {
+    const f = info.file.originFileObj as File | undefined;
+    if (f) setModFile(f);
+  };
+  const handleModFileRemove = () => {
+    setModFile(null);
   };
 
   const handleModImage = (file: File) => {
     setModImage(file);
     setImagePreview(URL.createObjectURL(file));
     message.success(`${file.name} selected`);
-    return false;
+    return false; // stop auto-upload
+  };
+  const handleModImageChange: React.ComponentProps<typeof Upload>["onChange"] = (info) => {
+    const f = info.file.originFileObj as File | undefined;
+    if (f) {
+      setModImage(f);
+      setImagePreview(URL.createObjectURL(f));
+    }
+  };
+  const handleModImageRemove = () => {
+    setModImage(null);
+    setImagePreview("");
   };
 
   const handleUpload = async () => {
-    if (!gameId) {
-      message.error("ไม่พบรหัสเกม");
-      return;
-    }
-    if (!modTitle || !modFile) {
-      message.error("กรุณาใส่ชื่อม็อดและเลือกไฟล์ม็อดก่อนอัปโหลด");
-      return;
-    }
-    // ถ้าอยากบังคับว่าอัปโหลดได้เฉพาะเกมที่ตัวเองมี
-    if (userGameId == null) {
-      message.error("คุณไม่มีเกมนี้ในคลัง จึงไม่สามารถอัปโหลดม็อดได้");
-      return;
-    }
-
+    console.log("[Upload] clicked");
+    const toastKey = "modUpload";
     try {
+      if (!gameId) {
+        message.error("ไม่พบรหัสเกม");
+        return;
+      }
+      if (!modTitle.trim()) {
+        message.error("กรุณาใส่ชื่อม็อด");
+        return;
+      }
+      if (!modFile) {
+        message.error("กรุณาเลือกไฟล์ม็อด");
+        return;
+      }
+      if (userGameId == null) {
+        message.error("คุณไม่มีเกมนี้ในคลัง จึงไม่สามารถอัปโหลดม็อดได้");
+        return;
+      }
+
       setUploading(true);
+      message.open({ key: toastKey, type: "loading", content: "กำลังอัปโหลด...", duration: 0 });
+
       const fd = new FormData();
       fd.append("title", modTitle);
       fd.append("description", modDescription);
       fd.append("game_id", String(gameId));
-      fd.append("user_game_id", String(userGameId)); // ให้แบ็กเอนด์เชื่อมโยงผู้ใช้
-      fd.append("mod_file", modFile);                // <<< ชื่อฟิลด์ไฟล์ม็อด
-      if (modImage) fd.append("image", modImage);    // <<< ชื่อฟิลด์รูปภาพ (ไม่บังคับ)
+      fd.append("user_game_id", String(userGameId));
+      fd.append("mod_file", modFile);
+      if (modImage) fd.append("image", modImage);
+
+      console.log("[Upload] POST /mods", { gameId, userGameId, modTitle, hasImage: !!modImage });
 
       const res = await fetch(`${API_URL}/mods`, {
         method: "POST",
-        body: fd, // อย่าใส่ Content-Type เอง ให้ browser เซ็ต boundary
+        body: fd, // อย่าตั้ง Content-Type เอง
       });
 
       if (!res.ok) {
         const text = await res.text().catch(() => "");
-        throw new Error(text || "Upload failed");
+        console.error("[Upload] server error:", res.status, text);
+        throw new Error(text || `Upload failed (status ${res.status})`);
       }
 
-      message.success("อัปโหลดเรียบร้อยแล้ว!");
-      // รีเซ็ตฟอร์ม
+      message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 1.8 });
+
+      // reset form
       setModTitle("");
       setModDescription("");
       setModFile(null);
       setModImage(null);
       setImagePreview("");
     } catch (err: any) {
-      console.error(err);
-      message.error(err?.message || "อัปโหลดไม่สำเร็จ");
+      console.error("[Upload] failed:", err);
+      message.open({
+        key: toastKey,
+        type: "error",
+        content: err?.message || "อัปโหลดไม่สำเร็จ",
+        duration: 2.5,
+      });
     } finally {
       setUploading(false);
     }
@@ -170,6 +204,8 @@ const Workshop: React.FC = () => {
         >
           <Dragger
             beforeUpload={handleModFile}
+            onChange={handleModFileChange}
+            onRemove={handleModFileRemove}
             showUploadList={!!modFile}
             multiple={false}
             accept=".zip,.rar,.7z"
@@ -178,15 +214,11 @@ const Workshop: React.FC = () => {
             <p className="ant-upload-drag-icon">
               <InboxOutlined style={{ color: "#9254de" }} />
             </p>
-            <p style={{ color: "white" }}>
-              Click or drag mod file to this area
-            </p>
+            <p style={{ color: "white" }}>Click or drag mod file to this area</p>
             <p style={{ color: "#aaa" }}>รองรับ .zip, .rar, .7z</p>
           </Dragger>
           {modFile && (
-            <p style={{ color: "white", marginTop: 8 }}>
-              Selected: {modFile.name}
-            </p>
+            <p style={{ color: "white", marginTop: 8 }}>Selected: {modFile.name}</p>
           )}
         </Card>
 
@@ -207,6 +239,8 @@ const Workshop: React.FC = () => {
         >
           <Dragger
             beforeUpload={handleModImage}
+            onChange={handleModImageChange}
+            onRemove={handleModImageRemove}
             showUploadList={!!modImage}
             accept="image/*"
             maxCount={1}
@@ -215,9 +249,7 @@ const Workshop: React.FC = () => {
             <p className="ant-upload-drag-icon">
               <InboxOutlined style={{ color: "#52c41a" }} />
             </p>
-            <p style={{ color: "white" }}>
-              Click or drag image to this area
-            </p>
+            <p style={{ color: "white" }}>Click or drag image to this area</p>
             <p style={{ color: "#aaa" }}>รองรับ .jpg, .png, .gif</p>
           </Dragger>
           {imagePreview && (
@@ -258,7 +290,7 @@ const Workshop: React.FC = () => {
         </Card>
 
         {/* ปุ่มอัปโหลด */}
-        <div style={{ textAlign: "right" }}>
+        <div style={{ textAlign: "right", position: "relative", zIndex: 1 }}>
           <Button
             type="primary"
             size="large"
