@@ -1,8 +1,11 @@
-import { useMemo, useRef, useState } from "react";
-import { message, Space } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { message, Space, Select } from "antd";
+import axios from "axios";
 import ThreadList from "./ThreadList";
 import ThreadDetail from "./ThreadDetail";
 import type { Thread, ThreadComment } from "./types";
+
+const base_url = "http://localhost:8088";
 
 export default function CommunityPage() {
   // --- mock data เริ่มต้น ---
@@ -14,6 +17,7 @@ export default function CommunityPage() {
       author: "neurougue",
       createdAt: "3 ชม.ที่แล้ว",
       likes: 2,
+      commentCount: 2,
       comments: [
         { id: 11, author: "Yanis_zaky", content: "1", datetime: "3 ชม. @ 8:17am" },
         { id: 12, author: "MaT", content: "2", datetime: "3 ชม. @ 5:06pm" },
@@ -26,6 +30,7 @@ export default function CommunityPage() {
       author: "Sil Halcorrn",
       createdAt: "8 ชม.ที่แล้ว",
       likes: 1,
+      commentCount: 0,
       comments: [],
     },
   ]);
@@ -33,6 +38,9 @@ export default function CommunityPage() {
 
   const idRef = useRef(1000);
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<'latest' | 'likes' | 'comments'>(
+    'latest'
+  );
 
   const activeThread = useMemo(
     () => threads.find((t) => t.id === activeId) || null,
@@ -41,19 +49,20 @@ export default function CommunityPage() {
 
   // สร้างเธรดใหม่ (หน้า List เท่านั้น)
   const createThread = ({ title, body, images }: { title: string; body: string; images?: string[] }) => {
-  const n: Thread = {
-    id: idRef.current++,
-    title,
-    body,
-    author: "คุณ",
-    createdAt: "เพิ่งโพสต์",
-    likes: 0,
-    comments: [],
-    images, // ✅ เก็บรูปไปกับเธรด
+    const n: Thread = {
+      id: idRef.current++,
+      title,
+      body,
+      author: "คุณ",
+      createdAt: "เพิ่งโพสต์",
+      likes: 0,
+      commentCount: 0,
+      comments: [],
+      images, // ✅ เก็บรูปไปกับเธรด
+    };
+    setThreads((prev) => [n, ...prev]);
+    message.success("สร้างเธรดใหม่แล้ว");
   };
-  setThreads((prev) => [n, ...prev]);
-  message.success("สร้างเธรดใหม่แล้ว");
-};
 
   // เพิ่มคอมเมนต์ที่ระดับ root ของเธรดที่เปิดอยู่ (หน้า Detail เท่านั้น)
   const replyRoot = ({ content }: { content: string }) => {
@@ -65,10 +74,33 @@ export default function CommunityPage() {
       datetime: "เพิ่งตอบกลับ",
     };
     setThreads((prev) =>
-      prev.map((t) => (t.id === activeThread.id ? { ...t, comments: [...t.comments, newC] } : t))
+      prev.map((t) =>
+        t.id === activeThread.id
+          ? { ...t, comments: [...t.comments, newC], commentCount: t.commentCount + 1 }
+          : t
+      )
     );
     message.success("ตอบกลับแล้ว");
   };
+
+  useEffect(() => {
+    axios
+      .get(`${base_url}/threads`, { params: { sort: sortBy } })
+      .then((res) => {
+        const data = res.data.map((t: any) => ({
+          id: t.ID,
+          title: t.title,
+          body: t.content,
+          author: t.user?.username || "",
+          createdAt: t.CreatedAt || "",
+          likes: t.likes,
+          commentCount: t.comments,
+          comments: [],
+        })) as Thread[];
+        setThreads(data);
+      })
+      .catch(() => {});
+  }, [sortBy]);
 
   return (
     <div style={{minHeight:'100vh', padding: 24 , flex: 1 , background: "#1e1e2f"}}>
@@ -80,11 +112,24 @@ export default function CommunityPage() {
           onReplyRoot={replyRoot}
         />
       ) : (
-        <ThreadList
-          threads={threads}
-          onOpen={(id) => setActiveId(id)}
-          onCreate={createThread}
-        />
+        <>
+          <Select
+            value={sortBy}
+            onChange={(v) => setSortBy(v)}
+            style={{ width: 200 }}
+            options={[
+              { value: 'latest', label: 'Latest' },
+              { value: 'likes', label: 'Likes' },
+              { value: 'comments', label: 'Comments' }
+            ]}
+          />
+          <ThreadList
+            threads={threads}
+            sortBy={sortBy}
+            onOpen={(id) => setActiveId(id)}
+            onCreate={createThread}
+          />
+        </>
       )}
     </Space>
     </div>

@@ -12,7 +12,7 @@ import type { Notification } from '../interfaces/Notification';
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { token, username, logout } = useAuth();
+  const { token, username, logout, userId } = useAuth();
 
   const handleLoginSuccess = () => {
     setNotifications((prev) => [
@@ -22,7 +22,7 @@ const Navbar = () => {
         title: 'Login Successful',
         message: 'You have logged in successfully',
         type: 'system',
-        user_id: 0,
+        user_id: userId ?? 0,
       },
     ]);
   };

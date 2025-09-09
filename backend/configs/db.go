@@ -46,8 +46,23 @@ func SetupDatabase() {
 	// ✅ ไม่แตะตารางของทีมอื่น — migrate เฉพาะของเราเท่านั้น
 	//    ถ้าตาราง users/games/categories ของทีมมีอยู่แล้ว เราแค่อ้างอิงใช้งานได้เลย
 	if err := db.AutoMigrate(
-		&entity.ProblemReport{},
-		&entity.ProblemAttachment{},
+		&entity.User{},
+		&entity.Game{},
+		&entity.KeyGame{},
+		&entity.Thread{},
+		&entity.UserGame{},
+		&entity.Comment{},
+		&entity.Reaction{},
+		&entity.Attachment{},
+		&entity.Notification{},
+		&entity.Order{},
+		&entity.OrderItem{},
+		&entity.Payment{},
+		&entity.PaymentSlip{},
+		&entity.PaymentReview{},
+		&entity.Categories{},
+		&entity.MinimumSpec{},
+		&entity.Request{},
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}

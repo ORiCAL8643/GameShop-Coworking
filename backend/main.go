@@ -35,10 +35,12 @@ func main() {
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 
 		// ===== Games =====
-		router.POST("/games", controllers.CreateGame)
-		router.GET("/games", controllers.FindGames)
-		// alias เก่า (บางหน้าเรียก /game)
+		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
+		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
+		/*router.GET("/games/:id", controllers.FindGameByID)
+		router.PUT("/games/:id", controllers.UpdateGame)
+		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -107,14 +109,34 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
-		// ===== Problem Reports (ของเรา) =====
-		router.POST("/reports", controllers.CreateReport)
-		router.GET("/reports", controllers.FindReports)
-		router.GET("/reports/:id", controllers.GetReportByID)
-		router.PUT("/reports/:id", controllers.UpdateReport)
-		router.DELETE("/reports/:id", controllers.DeleteReport)
+		//request routes
+		router.POST("/new-request", controllers.CreateRequest)
+		router.GET("/request", controllers.FindRequest)
+
+		// ===== Orders =====
+		router.POST("/orders", controllers.CreateOrder)
+		router.GET("/orders", controllers.FindOrders)
+		router.GET("/orders/:id", controllers.FindOrderByID)
+		router.PUT("/orders/:id", controllers.UpdateOrder)
+		router.DELETE("/orders/:id", controllers.DeleteOrder)
+		// ===== Order Items =====
+		router.POST("/order-items", controllers.CreateOrderItem)
+		router.GET("/order-items", controllers.FindOrderItems)
+		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+
+		// ===== Payments =====
+		router.POST("/payments", controllers.CreatePayment)
+		router.GET("/payments", controllers.FindPayments)
+		router.PATCH("/payments/:id", controllers.UpdatePayment)
+		router.DELETE("/payments/:id", controllers.DeletePayment)
+		router.POST("/payments/:id/approve", controllers.ApprovePayment)
+		router.POST("/payments/:id/reject", controllers.RejectPayment)
+
 	}
 
+	// Run the server
+	// แก้สเปซตรง "localhost:" ให้ถูกต้อง
 	r.Run("localhost:" + PORT)
 }
 
