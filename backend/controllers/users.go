@@ -74,7 +74,7 @@ func FindUsers(c *gin.Context) {
 	if email != "" {
 		tx = tx.Where("email = ?", email)
 	}
-	if err := tx.Find(&users).Error; err != nil {
+	if err := tx.Preload("Requests").Find(&users).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
