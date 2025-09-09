@@ -135,6 +135,11 @@ func main() {
 		router.POST("/payments/:id/approve", controllers.ApprovePayment)
 		router.POST("/payments/:id/reject", controllers.RejectPayment)
 
+		// ===== Payment Slips =====
+		router.POST("/payment_slips", controllers.CreatePaymentSlip)
+		router.GET("/payment_slips", controllers.FindPaymentSlips)
+		router.DELETE("/payment_slips/:id", controllers.DeletePaymentSlip)
+
 	}
 
 	// Run the server
