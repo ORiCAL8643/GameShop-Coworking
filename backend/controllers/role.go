@@ -11,7 +11,7 @@ import (
 // GET /roles
 func GetRoles(c *gin.Context) {
 	var roles []entity.Role
-	if err := configs.DB().Find(&roles).Error; err != nil {
+	if err := configs.DB().Preload("Users").Find(&roles).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -22,7 +22,8 @@ func GetRoles(c *gin.Context) {
 func GetRoleById(c *gin.Context) {
 	id := c.Param("id")
 	var role entity.Role
-	if tx := configs.DB().Where("id = ?", id).First(&role); tx.RowsAffected == 0 {
+	if tx := configs.DB().Preload("RolePermissions").Preload("RolePermissions.Permission").Preload("Users").Where("id = ?", id).First(&role); 
+		tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "role not found"})
 		return
 	}
