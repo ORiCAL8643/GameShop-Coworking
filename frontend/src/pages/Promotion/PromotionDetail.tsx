@@ -47,7 +47,7 @@ export default function PromotionDetail() {
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
-      <Sidebar />
+      
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
           {promotion.promo_image && (
