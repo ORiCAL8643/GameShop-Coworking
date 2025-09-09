@@ -41,13 +41,13 @@ const ProductGrid = () => {
     return `${base_url}/${clean}`;
   };
 
-  const [game, Setgame] = useState<Game[]>([]);
+  const [game, Setgame] = useState<Game[] | null>(null);
   const navigate = useNavigate();
 
   async function GetGame() {
     try {
       const response = await axios.get(`${base_url}/game`);
-      Setgame(response.data);
+      Setgame(Array.isArray(response.data) ? response.data : []);
       console.log(response.data);
     } catch (err) {
       console.log("get game error", err);
@@ -84,7 +84,7 @@ const ProductGrid = () => {
 
   return (
     <Row gutter={[16, 16]}>
-      {game.map((c) => {
+      {game?.map((c) => {
         const hasDiscount =
           c.discounted_price !== undefined &&
           c.discounted_price < c.base_price;
