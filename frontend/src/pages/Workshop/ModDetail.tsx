@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
     Layout,
     Typography,
@@ -27,15 +27,15 @@ const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
 interface ModItem {
-    id: string;
+    id: number;
     title: string;
-    author: string;
+    author?: string;
     image?: string;
     description?: string;
     date?: string;
-    downloads?: number; // ถ้าจะเก็บรวม
-    views?: number; // จำนวนผู้เข้าชม (Unique Visitors)
-    subscribers?: number; // จำนวน Subscribers
+    downloads?: number;
+    views?: number;
+    subscribers?: number;
 }
 
 interface CommentItem {
@@ -47,41 +47,73 @@ interface CommentItem {
 const ModDetail: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const mod = location.state as ModItem;
-
-    const [comments, setComments] = useState<CommentItem[]>([
-        {
-            author: "Player1",
-            content: "This mod is awesome! 🔥",
-            datetime: "2025-09-05 12:30",
-        },
-        {
-            author: "Player2",
-            content: "Can you update for the latest version?",
-            datetime: "2025-09-05 13:10",
-        },
-    ]);
-
+    const params = useParams<{ title: string }>();
+    const initial = location.state as ModItem | undefined;
+    const [mod, setMod] = useState<ModItem | undefined>(initial);
+    const [comments, setComments] = useState<CommentItem[]>([]);
     const [newComment, setNewComment] = useState("");
+    const [rating, setRating] = useState<number>(0);
+    const [averageRating, setAverageRating] = useState<number>(0);
+    const [ratingCount, setRatingCount] = useState<number>(0);
 
-    // ⭐ Rating states
-    const [rating, setRating] = useState<number>(0); // คะแนนที่ user ให้
-    const [averageRating, setAverageRating] = useState<number>(4.2); // mock ค่าเฉลี่ย
-    const [ratingCount, setRatingCount] = useState<number>(125); // mock จำนวนโหวต
-
-    // mock fetch จาก API
     useEffect(() => {
-        const fetchRating = async () => {
-            // TODO: แก้เป็น fetch("/api/mods/:id/rating")
-            const data = { avg: 4.2, count: 125 };
-            setAverageRating(data.avg);
-            setRatingCount(data.count);
-        };
-        fetchRating();
-    }, []);
+        const id = params.title || mod?.id?.toString();
+        if (!id) return;
+        const fetchData = async () => {
+            try {
+                const [modRes, ratingRes] = await Promise.all([
+                    fetch(`http://localhost:8088/mods/${id}`),
+                    fetch(`http://localhost:8088/modratings`),
+                ]);
 
-    const handleAddComment = () => {
-        if (!newComment.trim()) return;
+                const modData: any = await modRes.json();
+                setMod({
+                    id: modData.ID,
+                    title: modData.title,
+                    description: modData.description,
+                    date: modData.upload_date,
+                });
+
+                const ratings: any[] = await ratingRes.json();
+                const related = ratings.filter((r) => r.mod_id === Number(id));
+                setComments(
+                    related.map((r) => ({
+                        author: `User ${r.user_game_id}`,
+                        content: r.review,
+                        datetime: r.CreatedAt || "",
+                    }))
+                );
+                const nums = related
+                    .map((r) => parseFloat(r.rating))
+                    .filter((n) => !isNaN(n));
+                const count = nums.length;
+                const avg = count ? nums.reduce((a, b) => a + b, 0) / count : 0;
+                setAverageRating(avg);
+                setRatingCount(count);
+            } catch (err) {
+                console.error(err);
+            }
+        };
+        fetchData();
+    }, [params.title]);
+
+    const handleAddComment = async () => {
+        if (!mod || !newComment.trim()) return;
+
+        try {
+            await fetch(`http://localhost:8088/modratings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    rating: rating.toString(),
+                    review: newComment,
+                    user_game_id: 1,
+                    mod_id: mod.id,
+                }),
+            });
+        } catch (err) {
+            console.error(err);
+        }
 
         const newItem: CommentItem = {
             author: "You",
@@ -89,22 +121,17 @@ const ModDetail: React.FC = () => {
             datetime: new Date().toLocaleString(),
         };
 
+        const newCount = ratingCount + 1;
+        const newAvg = (averageRating * ratingCount + rating) / newCount;
+        setRatingCount(newCount);
+        setAverageRating(newAvg);
+
         setComments([newItem, ...comments]);
         setNewComment("");
     };
 
-    const handleRateChange = async (value: number) => {
+    const handleRateChange = (value: number) => {
         setRating(value);
-
-        // TODO: ส่งค่าไป backend
-        // fetch(`/api/mods/${mod.id}/rate`, { method: "POST", body: JSON.stringify({ value }) })
-        console.log("User rated:", value);
-
-        // mock update ค่าเฉลี่ย
-        const newCount = ratingCount + 1;
-        const newAvg = (averageRating * ratingCount + value) / newCount;
-        setRatingCount(newCount);
-        setAverageRating(newAvg);
     };
 
     if (!mod) {

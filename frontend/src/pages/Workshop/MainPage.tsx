@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Row,
@@ -11,13 +11,14 @@ import {
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import type { Game, Mod, UserGame } from "../../interfaces";
 
 const { Content, Sider } = Layout;
 const { Text } = Typography;
 const { Search } = Input;
 
 interface WorkshopItem {
-  id: string;
+  id: number;
   title: string;
   items: number;
   image?: string;
@@ -25,22 +26,43 @@ interface WorkshopItem {
 
 const WorkshopMain: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [activeMenu, setActiveMenu] = useState("all"); // 👈 เก็บเมนูปัจจุบัน
+  const [activeMenu, setActiveMenu] = useState("all");
   const navigate = useNavigate();
+  const [workshops, setWorkshops] = useState<WorkshopItem[]>([]);
+  const [yourGamesIds, setYourGamesIds] = useState<number[]>([]);
 
-  const workshops: WorkshopItem[] = [
-    { id: "1", title: "Magneta Box", items: 9, image: "" },
-    { id: "2", title: "Carbrix", items: 2, image: "" },
-    { id: "3", title: "New Day", items: 81, image: "" },
-    { id: "4", title: "Exospace", items: 6, image: "" },
-    { id: "5", title: "Your Boy", items: 6, image: "" },
-    { id: "6", title: "Nijima", items: 20, image: "" },
-    { id: "7", title: "Centoo Rescue", items: 8, image: "" },
-    { id: "8", title: "Tamako", items: 6, image: "" },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [gameRes, modRes, userGameRes] = await Promise.all([
+          fetch("http://localhost:8088/games"),
+          fetch("http://localhost:8088/mods"),
+          fetch("http://localhost:8088/user-games?user_id=1"),
+        ]);
 
-  // สมมุติว่าเกมที่ผู้ใช้มีจริง ๆ คือ id 1,3,5
-  const yourGamesIds = ["1", "3", "5"];
+        const games: Game[] = await gameRes.json();
+        const mods: Mod[] = await modRes.json();
+        const userGames: UserGame[] = await userGameRes.json();
+
+        const modCount: Record<number, number> = mods.reduce((acc: Record<number, number>, m) => {
+          acc[m.game_id] = (acc[m.game_id] || 0) + 1;
+          return acc;
+        }, {});
+
+        const formatted: WorkshopItem[] = games.map((g) => ({
+          id: g.ID,
+          title: g.game_name,
+          items: modCount[g.ID] || 0,
+          image: g.img_src,
+        }));
+        setWorkshops(formatted);
+        setYourGamesIds(userGames.map((ug) => ug.game_id));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchData();
+  }, []);
 
   // filter ข้อมูล
   const filtered = workshops.filter((w) => {

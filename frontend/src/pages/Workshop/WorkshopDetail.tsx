@@ -20,16 +20,16 @@ const { Search } = Input;
 const { Option } = Select;
 
 interface WorkshopItem {
-  id: string;
+  id: number;
   title: string;
   items: number;
   image?: string;
 }
 
 interface ModItem {
-  id: string;
+  id: number;
   title: string;
-  author: string;
+  author?: string;
   downloads?: number;
   visitors?: number;
 }
@@ -38,27 +38,16 @@ const WorkshopDetail: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const workshop = location.state as WorkshopItem;
-
-  // mock data mods
-  const mods: ModItem[] = [
-    { id: "m1", title: "Weapons Course", author: "Asmisint", downloads: 120, visitors: 900 },
-    { id: "m2", title: "CS:CTF Double Cross", author: "CS:CTF", downloads: 80, visitors: 400 },
-    { id: "m3", title: "CS:CTF 2Fort", author: "CS:CTF", downloads: 200, visitors: 1200 },
-    { id: "m4", title: "Mocha", author: "Bevster", downloads: 50, visitors: 100 },
-    { id: "m5", title: "CS:CTF Turbine", author: "CS:CTF", downloads: 150, visitors: 800 },
-    { id: "m6", title: "1v1_the_desert_pit", author: "MMArezech_", downloads: 70, visitors: 300 },
-  ];
+  const [mods, setMods] = useState<ModItem[]>([]);
+  const [userGameIds, setUserGameIds] = useState<number[]>([]);
 
   // state สำหรับ search และ sort
   const [searchText, setSearchText] = useState("");
   const [sortBy, setSortBy] = useState<string>("downloads");
   const [filteredMods, setFilteredMods] = useState<ModItem[]>([]);
 
-  // mock: เกมที่ user มี
-  const userGames = ["1", "3", "6"];
-
   const handleUpload = () => {
-    if (userGames.includes(workshop.id)) {
+    if (userGameIds.includes(workshop.id)) {
       navigate(`/upload?gameId=${workshop.id}`);
     } else {
       message.error("คุณไม่มีเกมนี้ ไม่สามารถอัปโหลดม็อดได้");
@@ -80,7 +69,7 @@ const WorkshopDetail: React.FC = () => {
     let result = mods.filter(
       (m) =>
         m.title.toLowerCase().includes(search.toLowerCase()) ||
-        m.author.toLowerCase().includes(search.toLowerCase())
+        (m.author || "").toLowerCase().includes(search.toLowerCase())
     );
 
     if (sort === "downloads") {
@@ -92,10 +81,30 @@ const WorkshopDetail: React.FC = () => {
     setFilteredMods(result);
   };
 
-  // sort ค่า default ตอน mount
+  // fetch mods and user games
   useEffect(() => {
-    filterAndSort("", "downloads");
-  }, []);
+    const fetchMods = async () => {
+      try {
+        const [modRes, userGameRes] = await Promise.all([
+          fetch("http://localhost:8088/mods"),
+          fetch("http://localhost:8088/user-games?user_id=1"),
+        ]);
+
+        const modsData: any[] = await modRes.json();
+        const modItems: ModItem[] = modsData
+          .filter((m) => m.game_id === workshop.id)
+          .map((m) => ({ id: m.ID, title: m.title }));
+        setMods(modItems);
+        setFilteredMods(modItems);
+
+        const userGames: any[] = await userGameRes.json();
+        setUserGameIds(userGames.map((ug) => ug.game_id));
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchMods();
+  }, [workshop.id]);
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
@@ -139,7 +148,7 @@ const WorkshopDetail: React.FC = () => {
         {/* Content */}
         <Content style={{ padding: "20px" }}>
           <Title level={3} style={{ color: "black" }}>
-            {workshop.title} – {workshop.items} items
+            {workshop.title} – {mods.length} items
           </Title>
           <Text style={{ color: "black" }}>
             Showing 1–{filteredMods.length} of {mods.length} entries
