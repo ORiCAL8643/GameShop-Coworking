@@ -64,23 +64,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   const handleAddToCart = async (g: Game) => {
     try {
       const price = g.discounted_price ?? g.base_price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: price,
-            qty: 1,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
-      }
-      navigate("/category/Payment");
       // 1) ตรวจสอบว่ามี orderId ใน localStorage หรือไม่
       let orderId = localStorage.getItem('orderId');
 
@@ -116,10 +99,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
       // 4) เพิ่มสินค้าเข้า order_items ของออเดอร์
       await axios.post(`${base_url}/order-items`, {
         order_id: Number(orderId),
-        unit_price: g.base_price,
+        unit_price: price,
         qty: 1,
         line_discount: 0,
-        line_total: g.base_price,
+        line_total: price,
         game_key_id: g.key_id,
       });
 
@@ -127,7 +110,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
       const current = await axios.get(`${base_url}/orders/${orderId}`);
       const currentTotal = current.data.total_amount || 0;
       await axios.put(`${base_url}/orders/${orderId}`, {
-        total_amount: currentTotal + g.base_price,
+        total_amount: currentTotal + price,
       });
 
       // นำผู้ใช้ไปหน้า Payment พร้อมเลขออเดอร์
