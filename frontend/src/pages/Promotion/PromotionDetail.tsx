@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { Layout, Typography, Card, Tag, List, Button, Empty, Image } from "antd";
 import Sidebar from "../../components/Sidebar";
 import type { Promotion } from "../../interfaces/Promotion";
@@ -14,6 +14,7 @@ export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   const [games, setGames] = useState<Game[]>([]);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const load = async () => {
@@ -80,7 +81,7 @@ export default function PromotionDetail() {
               dataSource={games}
               locale={{ emptyText: <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text> }}
               renderItem={(g) => (
-                <List.Item actions={[<Button key="buy">ไปหน้าซื้อ</Button>]}> 
+                <List.Item actions={[<Button key="buy" onClick={() => navigate(`/game/${g.ID}`)}>ไปหน้าซื้อ</Button>]}> 
                   <List.Item.Meta
                     title={<Text style={{ color: "white" }}>{g.game_name}</Text>}
                     description={<Text style={{ color: "#aaa" }}>Game ID: {g.ID}</Text>}
