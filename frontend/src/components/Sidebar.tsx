@@ -61,7 +61,7 @@ const items: GroupItem[] = [
     children: [
         { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
         { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
-        { key: '/Admin/RolePage', label: 'Report', icon:<PlusOutlined />},
+        { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
     ],
   },
 ];
