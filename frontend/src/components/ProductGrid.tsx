@@ -1,6 +1,6 @@
 import { Row, Col } from "antd";
-import AddProductCard from "./AddProductCard";
-import { Link, useNavigate } from "react-router-dom";
+//import AddProductCard from "./AddProductCard";
+import { useNavigate } from "react-router-dom";
 import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -132,11 +132,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
           </Col>
         );
       })}
-      <Col xs={24} sm={12} md={8} lg={6}>
-        <Link to={"/information/Add"}>
-          <AddProductCard />
-        </Link>
-      </Col>
     </Row>
   );
 };
