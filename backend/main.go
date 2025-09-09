@@ -34,6 +34,7 @@ func main() {
 		// ===== Games =====
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
+		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
 		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
 		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
@@ -109,18 +110,21 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
+		//request routes
+		router.POST("/new-request", controllers.CreateRequest)
+		router.GET("/request", controllers.FindRequest)
+
 		// ===== Orders =====
 		router.POST("/orders", controllers.CreateOrder)
 		router.GET("/orders", controllers.FindOrders)
 		router.GET("/orders/:id", controllers.FindOrderByID)
 		router.PUT("/orders/:id", controllers.UpdateOrder)
 		router.DELETE("/orders/:id", controllers.DeleteOrder)
-                // ===== Order Items =====
-                router.POST("/order-items", controllers.CreateOrderItem)
-                router.GET("/order-items", controllers.FindOrderItems)
-                router.PUT("/order-items/:id", controllers.UpdateOrderItem)
-                router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
-
+		// ===== Order Items =====
+		router.POST("/order-items", controllers.CreateOrderItem)
+		router.GET("/order-items", controllers.FindOrderItems)
+		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
 		// ===== Payments =====
 		router.POST("/payments", controllers.CreatePayment)

@@ -39,6 +39,7 @@ func Login(c *gin.Context) {
 		secret = "secret"
 	}
 
+	exp := time.Now().Add(72 * time.Hour).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.ID,
 		"exp": time.Now().Add(72 * time.Hour).Unix(),
@@ -50,5 +51,11 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "login successful", "token": tokenString})
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "login successful",
+		"id":       user.ID,
+		"username": user.Username,
+		"token":    tokenString,
+		"exp":      exp,
+	})
 }
