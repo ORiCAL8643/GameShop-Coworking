@@ -65,7 +65,7 @@ export default function PromotionDetail() {
               <Tag>
                 {dayjs(promotion.start_date).format("YYYY-MM-DD")} → {dayjs(promotion.end_date).format("YYYY-MM-DD")}
               </Tag>
-              {promotion.status ? <Tag color="green">Active</Tag> : <Tag>Inactive</Tag>}
+              <Tag color={promotion.status ? 'green' : undefined}>{promotion.status ? 'ใช้งาน' : 'ปิดใช้งาน'}</Tag>
             </div>
             {promotion.description && (
               <div style={{ color: "#ccc", marginTop: 8 }}>{promotion.description}</div>
