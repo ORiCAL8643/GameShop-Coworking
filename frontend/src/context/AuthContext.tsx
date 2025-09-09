@@ -13,7 +13,6 @@ const AuthContext = createContext<AuthContextType>({
   id: null,
   token: null,
   username: null,
-  userId: null,
   login: () => {},
   logout: () => {},
 });
@@ -29,15 +28,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setId(newId);
     setToken(newToken);
     setUsername(name);
-    try {
-      const payload = JSON.parse(atob(newToken.split('.')[1]));
-      const id = typeof payload.sub === 'number' ? payload.sub : Number(payload.sub);
-      setUserId(id);
-      localStorage.setItem('userId', String(id));
-    } catch {
-      setUserId(null);
-      localStorage.removeItem('userId');
-    }
     localStorage.setItem('token', newToken);
     localStorage.setItem('username', name);
     localStorage.setItem('userid', String(newId));
@@ -47,7 +37,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setId(null);
     setToken(null);
     setUsername(null);
-    setUserId(null);
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userid');
