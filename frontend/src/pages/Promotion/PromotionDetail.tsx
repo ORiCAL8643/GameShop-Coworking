@@ -4,7 +4,7 @@ import { Layout, Typography, Card, Tag, List, Button, Empty } from "antd";
 import Sidebar from "../../components/Sidebar";
 import type { Promotion } from "../../interfaces/Promotion";
 import type { Game } from "../../interfaces/Game";
-import { getPromotion, listGames } from "../../services/promotions";
+import { getPromotion } from "../../services/promotions";
 import dayjs from "dayjs";
 
 const { Content } = Layout;
@@ -19,13 +19,10 @@ export default function PromotionDetail() {
     const load = async () => {
       if (!id) return;
       try {
-        const data = await getPromotion(Number(id));
+        const data = await getPromotion(Number(id), true);
         setPromotion(data);
         if (data.games) {
           setGames(data.games);
-        } else {
-          const all = await listGames();
-          setGames(all);
         }
       } catch {
         setPromotion(null);
