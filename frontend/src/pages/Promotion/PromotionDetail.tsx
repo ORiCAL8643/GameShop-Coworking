@@ -64,10 +64,22 @@ export default function PromotionDetail() {
     <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
       
       <Content style={{ padding: 24, background: "#141414" }}>
+        {promotion.promo_image && (
+          <Image
+            src={resolveImgUrl(promotion.promo_image)}
+            alt={promotion.title}
+            preview={false}
+            style={{
+              width: "100%",
+              height: 220,
+              objectFit: "cover",
+              display: "block",
+              borderRadius: 0,
+              marginBottom: 16,
+            }}
+          />
+        )}
         <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          {promotion.promo_image && (
-            <Image src={resolveImgUrl(promotion.promo_image)} alt={promotion.title} preview={false} style={{ width: '100%', height: 220, objectFit: 'cover', borderRadius: 10, marginBottom: 16 }} />
-          )}
 
           <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10, marginBottom: 16 }}>
             <Title level={3} style={{ color: "white", margin: 0 }}>
