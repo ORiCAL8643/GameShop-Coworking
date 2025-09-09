@@ -10,16 +10,16 @@ import {
   message,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import type { UploadFile } from "antd/es/upload/interface";
+import { useAuth } from "../../context/AuthContext";
 import { createReport } from "../../services/Report";
 
 export default function ReportPage() {
   const [form] = Form.useForm();
-  const [fileList, setFileList] = useState<any[]>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  // 🔧 ปรับให้ตรงกับข้อมูลจริงใน DB ของคุณ
-  //   - ต้องมี user id และ game id ที่มีอยู่จริง ไม่งั้น backend จะ 404
-  const DEFAULT_USER_ID = 1;
   const DEFAULT_GAME_ID = 1;
 
   const PAGE_BG =
@@ -27,16 +27,27 @@ export default function ReportPage() {
   const PURPLE = "#9254de";
   const PURPLE_LIGHT = "#b388ff";
 
-  const handleSubmit = async (values: any) => {
+  interface FormValues {
+    title: string;
+    description: string;
+    category?: string;
+  }
+
+  const handleSubmit = async (values: FormValues) => {
     try {
-      const files: File[] = (fileList || [])
-        .map((f: any) => f?.originFileObj)
-        .filter(Boolean);
+      if (!userId) {
+        message.error("กรุณาเข้าสู่ระบบก่อนส่งคำร้อง");
+        return;
+      }
+
+      const files = fileList
+        .map((f) => f.originFileObj)
+        .filter((f): f is File => Boolean(f));
 
       await createReport({
         title: values.title,
         description: values.description,
-        user_id: DEFAULT_USER_ID,
+        user_id: userId,
         game_id: DEFAULT_GAME_ID,
         status: "open",
         files,
@@ -48,15 +59,14 @@ export default function ReportPage() {
 
       // ไปหน้า success พร้อมส่งหัวข้อไปแสดง
       navigate("/report/success", { state: { title: values.title } });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as {
+        response?: { data?: { error?: string } };
+        message?: string;
+      };
       const apiMsg =
-        e?.response?.data?.error ||
-        e?.message ||
-        "เกิดข้อผิดพลาดในการส่งรายงาน";
+        err?.response?.data?.error || err?.message || "เกิดข้อผิดพลาดในการส่งรายงาน";
       message.error(apiMsg);
-      // แนะนำสาเหตุพบบ่อย:
-      // - user_id / game_id ไม่มีใน DB → สร้าง/ใช้ id ที่มีจริง
-      // - backend ไม่ได้รันที่พอร์ตเดียวกับ VITE_API_BASE_URL
     }
   };
 
@@ -199,7 +209,8 @@ export default function ReportPage() {
               listType="picture-card"
               fileList={fileList}
               onPreview={(file) => {
-                window.open((file as any).url || (file as any).thumbUrl, "_blank");
+                const src = file.url || file.thumbUrl;
+                if (src) window.open(src, "_blank");
               }}
               onChange={({ fileList: fl }) => setFileList(fl)}
               onRemove={(file) => {

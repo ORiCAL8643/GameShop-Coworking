@@ -63,6 +63,8 @@ func SetupDatabase() {
 		&entity.Categories{},
 		&entity.MinimumSpec{},
 		&entity.Request{},
+		&entity.ProblemReport{},
+		&entity.ProblemAttachment{},
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}
