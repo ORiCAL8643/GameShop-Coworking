@@ -78,22 +78,51 @@ func getOrCreateRole(title, desc string) (entity.Role, error) {
 	return r, nil
 }
 
-// หา/สร้าง permission ตาม Title (ใช้ Title เป็น slug key)
-func ensurePermission(title, desc string) (entity.Permission, error) {
+// หา/สร้าง permission ตาม key (slug)
+// หากมีข้อมูลเดิมที่ใช้ title เป็น key จะอัปเดตให้เป็นฟอร์แมตใหม่
+func ensurePermission(key, title, desc string) (entity.Permission, error) {
 	var p entity.Permission
-	if err := db.Where("title = ?", title).First(&p).Error; err != nil {
+
+	// ลองค้นหาจาก key ก่อน (ฟอร์แมตใหม่)
+	if err := db.Where("key = ?", key).First(&p).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			p = entity.Permission{Title: title, Description: desc}
-			if err := db.Create(&p).Error; err != nil {
+			// รองรับฟอร์แมตเก่า: ใช้ title เป็น key
+			if err := db.Where("title = ?", key).First(&p).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					p = entity.Permission{Key: key, Title: title, Description: desc}
+					if err := db.Create(&p).Error; err != nil {
+						return p, err
+					}
+					return p, nil
+				}
+				return p, err
+			}
+
+			updates := map[string]interface{}{"key": key}
+			if p.Title == key {
+				updates["title"] = title
+			}
+			if p.Description == "" && desc != "" {
+				updates["description"] = desc
+			}
+			if err := db.Model(&p).Updates(updates).Error; err != nil {
 				return p, err
 			}
 			return p, nil
 		}
 		return p, err
 	}
-	// อัปเดต description ถ้าเดิมว่าง
+
+	// อัปเดต title/description หากยังว่าง
+	updates := map[string]interface{}{}
+	if p.Title == "" && title != "" {
+		updates["title"] = title
+	}
 	if p.Description == "" && desc != "" {
-		db.Model(&p).Update("description", desc)
+		updates["description"] = desc
+	}
+	if len(updates) > 0 {
+		db.Model(&p).Updates(updates)
 	}
 	return p, nil
 }
@@ -234,58 +263,59 @@ func fixUserUniqBeforeMigrate() error {
 // ---------- Permissions seeding ----------
 
 func seedPermissionsAndGrantAdmin(adminID uint) {
-	// รายการสิทธิ์ (ใช้ Permission.Title เป็น slug key)
+	// รายการสิทธิ์
 	perms := []struct {
+		Key   string
 		Title string
 		Desc  string
 	}{
 		// Requests
-		{"requests.read", "อ่านรายการรีเควส"},
-		{"requests.manage", "จัดการรีเควส"},
+		{"requests.read", "อ่านรายการรีเควส", ""},
+		{"requests.manage", "จัดการรีเควส", ""},
 
 		// Games
-		{"games.read", "อ่านข้อมูลเกม"},
-		{"games.manage", "จัดการเกม (เพิ่ม/แก้ไข/ลบ)"},
+		{"games.read", "อ่านข้อมูลเกม", ""},
+		{"games.manage", "จัดการเกม (เพิ่ม/แก้ไข/ลบ)", ""},
 
 		// Workshop
-		{"workshop.read", "เข้าถึง Workshop"},
-		{"workshop.create", "อัปโหลด/สร้างม็อด"},
-		{"workshop.moderate", "กลั่นกรอง Workshop"},
+		{"workshop.read", "เข้าถึง Workshop", ""},
+		{"workshop.create", "อัปโหลด/สร้างม็อด", ""},
+		{"workshop.moderate", "กลั่นกรอง Workshop", ""},
 
 		// Roles & Users
-		{"roles.read", "ดูบทบาท"},
-		{"roles.manage", "จัดการบทบาทและสิทธิ์"},
-		{"users.manage", "จัดการผู้ใช้"},
+		{"roles.read", "ดูบทบาท", ""},
+		{"roles.manage", "จัดการบทบาทและสิทธิ์", ""},
+		{"users.manage", "จัดการผู้ใช้", ""},
 
 		// Payments
-		{"payments.read", "ดูการชำระเงิน"},
-		{"payments.manage", "จัดการการชำระเงิน"},
+		{"payments.read", "ดูการชำระเงิน", ""},
+		{"payments.manage", "จัดการการชำระเงิน", ""},
 
 		// Community / Reviews
-		{"community.read", "อ่านกระทู้/คอมเมนต์"},
-		{"community.moderate", "โมเดอเรตคอมมูนิตี้"},
-		{"reviews.read", "ดูรีวิว"},
-		{"reviews.moderate", "ตรวจสอบรีวิว"},
+		{"community.read", "อ่านกระทู้/คอมเมนต์", ""},
+		{"community.moderate", "โมเดอเรตคอมมูนิตี้", ""},
+		{"reviews.read", "ดูรีวิว", ""},
+		{"reviews.moderate", "ตรวจสอบรีวิว", ""},
 
 		// Promotions / Orders / Analytics / Refunds / Reports
-		{"promotions.read", "ดูโปรโมชัน"},
-		{"promotions.manage", "จัดการโปรโมชัน"},
-		{"orders.manage", "จัดการคำสั่งซื้อ"},
-		{"analytics.read", "ดู Analytics"},
-		{"refunds.read", "ดูคำร้องคืนเงิน"},
-		{"refunds.manage", "จัดการคืนเงิน"},
-		{"reports.read", "ดูรายงานปัญหา"},
-		{"reports.manage", "จัดการรายงานปัญหา"},
+		{"promotions.read", "ดูโปรโมชัน", ""},
+		{"promotions.manage", "จัดการโปรโมชัน", ""},
+		{"orders.manage", "จัดการคำสั่งซื้อ", ""},
+		{"analytics.read", "ดู Analytics", ""},
+		{"refunds.read", "ดูคำร้องคืนเงิน", ""},
+		{"refunds.manage", "จัดการคืนเงิน", ""},
+		{"reports.read", "ดูรายงานปัญหา", ""},
+		{"reports.manage", "จัดการรายงานปัญหา", ""},
 	}
 
 	for _, it := range perms {
-		p, err := ensurePermission(it.Title, it.Desc)
+		p, err := ensurePermission(it.Key, it.Title, it.Desc)
 		if err != nil {
-			log.Println("seed permission error:", it.Title, err)
+			log.Println("seed permission error:", it.Key, err)
 			continue
 		}
 		if err := ensureRoleHasPermission(adminID, p.ID); err != nil {
-			log.Println("grant admin perm error:", it.Title, err)
+			log.Println("grant admin perm error:", it.Key, err)
 		}
 	}
 }

@@ -12,7 +12,7 @@ import (
 func GetPermissions(c *gin.Context) {
 	var permissions []entity.Permission
 	if err := configs.DB().Find(&permissions).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, permissions)
