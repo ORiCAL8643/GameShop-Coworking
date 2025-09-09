@@ -71,10 +71,10 @@ export default function PromotionDetail() {
             preview={false}
             style={{
               width: "100%",
-              height: 220,
+              height: 300,
               objectFit: "cover",
               display: "block",
-              borderRadius: 0,
+              borderRadius: 20,
               marginBottom: 16,
             }}
           />
