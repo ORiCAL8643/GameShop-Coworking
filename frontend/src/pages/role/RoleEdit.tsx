@@ -132,7 +132,7 @@ const RoleEdit: React.FC = () => {
   };
 
   return (
-    <div style={{ background: "#141414", minHeight: "100vh", display: "flex" }}>
+    <div style={{ background: "#141414", minHeight: "100vh", display: "flex", flex:1 }}>
       {/* Role List */}
       <div
         style={{

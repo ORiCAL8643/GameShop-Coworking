@@ -127,8 +127,8 @@ const RoleManagement: React.FC = () => {
   ];
 
   return (
-    <div style={{ background: "#141414", minHeight: "100vh" }}>
-      <div style={{ padding: "16px", maxWidth: "600px" }}>
+    <div style={{ background: "#141414", minHeight: "100vh" ,flex: 1 , display: "flex"}}>
+      <div style={{ padding: "16px", flex: 1}}>
         <Title level={3} style={{ color: "white" }}>
           บทบาท
         </Title>
