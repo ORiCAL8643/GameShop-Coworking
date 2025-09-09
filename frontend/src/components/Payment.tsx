@@ -1,5 +1,6 @@
 // src/pages/PaymentPage.tsx
 import { useMemo, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Row,
   Col,
@@ -38,11 +39,13 @@ const formatTHB = (n: number) =>
 
 const PaymentPage = () => {
   const [items, setItems] = useState<CartItem[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [order, setOrder] = useState<any | null>(null);
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const orderIdParam = localStorage.getItem("orderId");
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!orderIdParam) return;
@@ -53,6 +56,7 @@ const PaymentPage = () => {
         const data = await res.json();
         setOrder(data);
         const mapped: CartItem[] =
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           data.order_items?.map((it: any) => ({
             id: it.id,
             title: it.key_game.game.game_name,
@@ -182,6 +186,7 @@ const PaymentPage = () => {
                 color: THEME_PRIMARY,
                 background: "transparent",
               }}
+              onClick={() => navigate("/")}
             >
               ดำเนินการเลือกซื้อต่อไป
             </Button>
