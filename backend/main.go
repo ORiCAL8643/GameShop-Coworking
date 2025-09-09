@@ -10,15 +10,14 @@ import (
 const PORT = "8088"
 
 func main() {
-	// DB
 	configs.ConnectionDB()
 	configs.SetupDatabase()
 
-	r := gin.Default()
-	r.Static("/uploads", "./uploads")
-	r.Use(CORSMiddleware())
+	// ใช้ New แล้วผูก middleware เอง เพื่อลดโอกาสซ้ำซ้อน
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery(), CORSMiddleware())
 
-	// เสิร์ฟไฟล์แนบ (reports, etc.)
+	// ✅ ประกาศ static สำหรับไฟล์อัพโหลด "ครั้งเดียว" ที่นี่
 	r.Static("/uploads", "./uploads")
 
 	// health check
@@ -36,12 +35,9 @@ func main() {
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 
 		// ===== Games =====
-		router.POST("/new-game", controllers.CreateGame)
-		router.GET("/game", controllers.FindGames)
-		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		/*router.GET("/games/:id", controllers.FindGameByID)
-		router.PUT("/games/:id", controllers.UpdateGame)
-		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
+		router.POST("/games", controllers.CreateGame)
+		router.GET("/games", controllers.FindGames)
+		router.GET("/game", controllers.FindGames) // alias เก่า
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -110,41 +106,16 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
-		// ===== Problem Reports =====
+				// ===== Problem Reports =====
 		router.POST("/reports", controllers.CreateReport)
 		router.GET("/reports", controllers.FindReports)
 		router.GET("/reports/:id", controllers.GetReportByID)
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
-
-		//request routes
-		router.POST("/new-request", controllers.CreateRequest)
-		router.GET("/request", controllers.FindRequest)
-
-		// ===== Orders =====
-		router.POST("/orders", controllers.CreateOrder)
-		router.GET("/orders", controllers.FindOrders)
-		router.GET("/orders/:id", controllers.FindOrderByID)
-		router.PUT("/orders/:id", controllers.UpdateOrder)
-		router.DELETE("/orders/:id", controllers.DeleteOrder)
-		// ===== Order Items =====
-		router.POST("/order-items", controllers.CreateOrderItem)
-		router.GET("/order-items", controllers.FindOrderItems)
-		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
-		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
-
-		// ===== Payments =====
-		router.POST("/payments", controllers.CreatePayment)
-		router.GET("/payments", controllers.FindPayments)
-		router.PATCH("/payments/:id", controllers.UpdatePayment)
-		router.DELETE("/payments/:id", controllers.DeletePayment)
-		router.POST("/payments/:id/approve", controllers.ApprovePayment)
-		router.POST("/payments/:id/reject", controllers.RejectPayment)
+		router.POST("/reports/:id/reply", controllers.ReplyReport) // ✅ เพิ่มตรงนี้
 
 	}
 
-	// Run the server
-	// แก้สเปซตรง "localhost:" ให้ถูกต้อง
 	r.Run("localhost:" + PORT)
 }
 
@@ -153,7 +124,8 @@ func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Headers",
+			"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)

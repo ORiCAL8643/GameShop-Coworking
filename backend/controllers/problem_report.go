@@ -1,4 +1,3 @@
-// controllers/problem_report.go
 package controllers
 
 import (
@@ -78,19 +77,24 @@ func CreateReport(c *gin.Context) {
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
+
+				// ✅ path จริงที่ใช้เซฟ
 				dst := filepath.Join(dir, name)
+
+				// ✅ path ที่เก็บใน DB (relative URL)
+				relPath := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
+
 				if err := c.SaveUploadedFile(f, dst); err != nil {
 					continue
 				}
 				_ = db.Create(&entity.ProblemAttachment{
-					FilePath: dst,
+					FilePath: relPath,
 					ReportID: report.ID,
 				}).Error
 			}
 		}
 	}
 
-	// ✅ preload User + Attachments ก่อนตอบกลับ
 	_ = db.Preload("User").Preload("Attachments").First(&report, report.ID).Error
 	c.JSON(http.StatusCreated, report)
 }
@@ -147,7 +151,6 @@ func FindReports(c *gin.Context) {
 		return
 	}
 
-	// 👉 ถ้าหน้าเว็บอยากได้ array ตรงๆ ก็ส่ง items กลับอย่างเดียวก็ได้
 	c.JSON(http.StatusOK, items)
 }
 
@@ -236,4 +239,60 @@ func DeleteReport(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// ✅ POST /reports/:id/reply
+func ReplyReport(c *gin.Context) {
+	db := configs.DB()
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	var rp entity.ProblemReport
+	if err := db.First(&rp, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	text := strings.TrimSpace(c.PostForm("text"))
+
+	// ✅ บันทึกไฟล์แนบ (ถ้ามี)
+	if form, _ := c.MultipartForm(); form != nil {
+		files := form.File["attachments"]
+		if len(files) > 0 {
+			dir := filepath.Join("uploads", "replies", time.Now().Format("20060102"))
+			_ = os.MkdirAll(dir, 0o755)
+			for _, f := range files {
+				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
+
+				dst := filepath.Join(dir, name)
+				relPath := filepath.ToSlash(filepath.Join("uploads", "replies", time.Now().Format("20060102"), name))
+
+				if err := c.SaveUploadedFile(f, dst); err != nil {
+					continue
+				}
+				_ = db.Create(&entity.ProblemAttachment{
+					FilePath: relPath,
+					ReportID: rp.ID,
+				}).Error
+			}
+		}
+	}
+
+	// ✅ mark ว่าแก้ไขแล้ว
+	if text != "" {
+		// (คุณจะเลือกเก็บ text เป็น Notification หรือ Log ก็ได้)
+	}
+	rp.Status = "resolved"
+	rp.ResolvedAt = time.Now()
+
+	if err := db.Save(&rp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
+	c.JSON(http.StatusOK, rp)
 }

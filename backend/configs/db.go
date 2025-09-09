@@ -1,4 +1,3 @@
-// configs/database.go
 package configs
 
 import (
@@ -28,13 +27,18 @@ func ConnectionDB() {
 		DisableForeignKeyConstraintWhenMigrating: true,
 	}
 
-	database, err := gorm.Open(sqlite.Open(dbPath), gormCfg)
+	// ✅ ใส่ busy_timeout 5 วิ กัน database locked
+	database, err := gorm.Open(sqlite.Open(dbPath+"?_busy_timeout=5000"), gormCfg)
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
 	}
 	db = database
 
-	// เปิดใช้ FK runtime (แค่ตอนใช้งาน ไม่เกี่ยวกับตอน migrate)
+	// ✅ เปิด WAL mode เพื่อให้เขียนพร้อมกันได้มากขึ้น
+	db.Exec("PRAGMA journal_mode=WAL;")
+	db.Exec("PRAGMA synchronous=NORMAL;")
+
+	// ✅ เปิดใช้ FK runtime (แค่ตอนใช้งาน ไม่เกี่ยวกับตอน migrate)
 	db.Exec("PRAGMA foreign_keys = ON")
 }
 
@@ -44,7 +48,6 @@ func SetupDatabase() {
 	}
 
 	// ✅ ไม่แตะตารางของทีมอื่น — migrate เฉพาะของเราเท่านั้น
-	//    ถ้าตาราง users/games/categories ของทีมมีอยู่แล้ว เราแค่อ้างอิงใช้งานได้เลย
 	if err := db.AutoMigrate(
 		&entity.User{},
 		&entity.Game{},
@@ -65,6 +68,8 @@ func SetupDatabase() {
 		&entity.Request{},
 		&entity.Promotion{},
 		&entity.Promotion_Game{},
+		&entity.ProblemReport{},
+		&entity.ProblemAttachment{},
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}
@@ -73,7 +78,6 @@ func SetupDatabase() {
 }
 
 func seedIfNeeded() {
-	// ผู้ใช้: ถ้าไม่มีค่อย seed (กรณีโปรเจ็กต์หลักสร้างไว้แล้ว โค้ดนี้จะข้ามเอง)
 	var userCount int64
 	if err := db.Model(&entity.User{}).Count(&userCount).Error; err == nil && userCount == 0 {
 		pw, _ := bcrypt.GenerateFromPassword([]byte("123456"), 12)
@@ -99,7 +103,7 @@ func seedIfNeeded() {
 		_ = db.Create(&u2).Error
 	}
 
-	// Categories: สร้างเฉพาะเมื่อมีตารางและยังไม่มีข้อมูล — กัน error ถ้าทีมอื่นยังไม่สร้างตารางนี้
+	// Categories: seed เฉพาะเมื่อมีตารางและยังไม่มีข้อมูล
 	if db.Migrator().HasTable(&entity.Categories{}) {
 		var catCount int64
 		_ = db.Model(&entity.Categories{}).Count(&catCount).Error
