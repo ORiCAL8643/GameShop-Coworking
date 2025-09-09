@@ -15,6 +15,7 @@ func main() {
 	configs.SetupDatabase()
 
 	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 	r.Use(CORSMiddleware())
 
 	// เสิร์ฟไฟล์แนบ (reports, etc.)
