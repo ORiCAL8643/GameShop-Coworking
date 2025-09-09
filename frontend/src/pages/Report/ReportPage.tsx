@@ -1,21 +1,31 @@
-// src/pages/Report/ReportPage.tsx
 import { useState } from "react";
-import { Card, Form, Input, Button, Select, Upload, message } from "antd";
+import { useNavigate } from "react-router-dom";
+import {
+  Card,
+  Form,
+  Input,
+  Button,
+  Select,
+  Upload,
+  message,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { createReport } from "../../services/Report";
 
 export default function ReportPage() {
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<any[]>([]);
+  const navigate = useNavigate();
 
-  // 🎨 โทนดาร์ก + ม่วง
-  const PAGE_BG = "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
+  // 🔧 ปรับให้ตรงกับข้อมูลจริงใน DB ของคุณ
+  //   - ต้องมี user id และ game id ที่มีอยู่จริง ไม่งั้น backend จะ 404
+  const DEFAULT_USER_ID = 1;
+  const DEFAULT_GAME_ID = 1;
+
+  const PAGE_BG =
+    "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
   const PURPLE = "#9254de";
   const PURPLE_LIGHT = "#b388ff";
-
-  // TODO: เปลี่ยนให้ดึงจาก auth/สถานะจริงในโปรเจ็กต์
-  const MOCK_USER_ID = 1;
-   const MOCK_GAME_ID: number | undefined = undefined; // ← ยังไม่ผูกเกม
 
   const handleSubmit = async (values: any) => {
     try {
@@ -26,18 +36,27 @@ export default function ReportPage() {
       await createReport({
         title: values.title,
         description: values.description,
-        user_id: MOCK_USER_ID,
-        game_id: MOCK_GAME_ID,
-        status: values.category || "open",
+        user_id: DEFAULT_USER_ID,
+        game_id: DEFAULT_GAME_ID,
+        status: "open",
         files,
       });
 
       message.success("ส่งรายงานปัญหาเรียบร้อย!");
       form.resetFields();
       setFileList([]);
-    } catch (err: any) {
-      console.error(err);
-      message.error(err?.response?.data?.error || "ส่งรายงานไม่สำเร็จ");
+
+      // ไปหน้า success พร้อมส่งหัวข้อไปแสดง
+      navigate("/report/success", { state: { title: values.title } });
+    } catch (e: any) {
+      const apiMsg =
+        e?.response?.data?.error ||
+        e?.message ||
+        "เกิดข้อผิดพลาดในการส่งรายงาน";
+      message.error(apiMsg);
+      // แนะนำสาเหตุพบบ่อย:
+      // - user_id / game_id ไม่มีใน DB → สร้าง/ใช้ id ที่มีจริง
+      // - backend ไม่ได้รันที่พอร์ตเดียวกับ VITE_API_BASE_URL
     }
   };
 
@@ -73,7 +92,6 @@ export default function ReportPage() {
             height:2px; width:100%; margin-top:8px;
             background: linear-gradient(90deg, ${PURPLE}, transparent); opacity:.85; border-radius:999px;
           }
-
           .report-page .ant-input,
           .report-page textarea.ant-input,
           .report-page .ant-select-selector {
@@ -87,7 +105,6 @@ export default function ReportPage() {
           .report-page .ant-select-arrow { color: #e6dbff !important; }
           .report-page .ant-input::placeholder,
           .report-page textarea.ant-input::placeholder { color: #cfc5ff !important; }
-
           .report-page .ant-input:hover,
           .report-page .ant-input:focus,
           .report-page textarea.ant-input:hover,
@@ -97,15 +114,12 @@ export default function ReportPage() {
             border-color: ${PURPLE} !important;
             box-shadow: 0 0 0 2px rgba(146,84,222,.28) !important;
           }
-
           .report-page .report-select .ant-select-item {
-            background: #0f0f17;
-            color: #eae6ff;
+            background: #0f0f17; color: #eae6ff;
           }
           .report-page .report-select .ant-select-item-option-active {
             background: rgba(146,84,222,.25);
           }
-
           .report-page .ant-upload.ant-upload-select-picture-card {
             background: #0f0f17 !important;
             border: 1px dashed ${PURPLE} !important;
@@ -117,11 +131,9 @@ export default function ReportPage() {
             background: #141322 !important;
             border-color: rgba(146,84,222,.35) !important;
           }
-
           .report-page .ant-form-item-label > label {
             color: #e9e1ff !important; font-weight: 600;
           }
-
           .report-page .purple-btn {
             background: linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%);
             border: none; color: #fff;
@@ -147,7 +159,7 @@ export default function ReportPage() {
             rules={[{ required: true, message: "กรุณาเลือกหมวดปัญหา" }]}
           >
             <Select placeholder="เลือกหมวดปัญหา" popupClassName="report-select">
-              <Select.Option value="open">⚙️ ปัญหาทางเทคนิค</Select.Option>
+              <Select.Option value="technical">⚙️ ปัญหาทางเทคนิค</Select.Option>
               <Select.Option value="billing">💳 ปัญหาการเรียกเก็บเงิน</Select.Option>
               <Select.Option value="login">🔐 เข้าสู่ระบบ/ยืนยันตัวตน</Select.Option>
               <Select.Option value="ui">🖥️ หน้าตา/การใช้งาน (UI/UX)</Select.Option>
@@ -183,7 +195,7 @@ export default function ReportPage() {
             getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
           >
             <Upload
-              name="attachments"
+              name="attachments" // ✅ ชื่อตรงกับ backend
               listType="picture-card"
               fileList={fileList}
               onPreview={(file) => {

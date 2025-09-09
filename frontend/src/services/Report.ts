@@ -1,38 +1,28 @@
-// src/services/report.ts
 import api from "../lib/api";
 
-export type CreateReportPayload = {
+export type CreateReportInput = {
   title: string;
   description: string;
   user_id: number | string;
-  game_id?: number | string;        // ← ออปชัน
-  status?: string;
+  game_id: number | string;
+  status?: string; // optional: "open"|"resolved"|...
   files?: File[];
 };
 
-export async function createReport(payload: CreateReportPayload) {
+export async function createReport(input: CreateReportInput) {
   const fd = new FormData();
-  fd.append("title", payload.title);
-  fd.append("description", payload.description);
-  fd.append("user_id", String(payload.user_id));
-  if (payload.game_id !== undefined && payload.game_id !== null) {
-    fd.append("game_id", String(payload.game_id));
-  }
-  if (payload.status) fd.append("status", payload.status);
-  (payload.files || []).forEach((f) => fd.append("attachments", f));
+  fd.append("title", input.title);
+  fd.append("description", input.description);
+  fd.append("user_id", String(input.user_id));
+  fd.append("game_id", String(input.game_id));
+  if (input.status) fd.append("status", input.status);
+
+  (input.files || []).forEach((f) => {
+    fd.append("attachments", f); // backend รองรับชื่อ "attachments" และ "file"
+  });
 
   const { data } = await api.post("/reports", fd, {
     headers: { "Content-Type": "multipart/form-data" },
   });
-  return data;
-}
-
-export async function listReports(params?: {
-  user_id?: number;
-  game_id?: number;
-  page?: number;
-  limit?: number;
-}) {
-  const { data } = await api.get("/reports", { params });
   return data;
 }
