@@ -109,6 +109,13 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
+		// ===== Problem Reports =====
+		router.POST("/reports", controllers.CreateReport)
+		router.GET("/reports", controllers.FindReports)
+		router.GET("/reports/:id", controllers.GetReportByID)
+		router.PUT("/reports/:id", controllers.UpdateReport)
+		router.DELETE("/reports/:id", controllers.DeleteReport)
+
 		//request routes
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)

@@ -1,4 +1,5 @@
 import api from "../lib/api";
+import type { ProblemReport } from "../interfaces/problem_report";
 
 export type CreateReportInput = {
   title: string;
@@ -25,4 +26,14 @@ export async function createReport(input: CreateReportInput) {
     headers: { "Content-Type": "multipart/form-data" },
   });
   return data;
+}
+
+export async function fetchReports(): Promise<ProblemReport[]> {
+  const { data } = await api.get("/reports");
+  return (data.items ?? data) as ProblemReport[];
+}
+
+export async function resolveReport(id: number) {
+  const { data } = await api.put(`/reports/${id}`, { resolve: true });
+  return data as ProblemReport;
 }

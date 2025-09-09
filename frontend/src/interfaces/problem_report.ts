@@ -1,4 +1,6 @@
 import type { ProblemAttachment } from "./problem_attachment";
+import type { User } from "./User";
+import type { Game } from "./Game";
 
 export interface ProblemReport {
   ID: number;
@@ -10,6 +12,9 @@ export interface ProblemReport {
 
   UserID: number;
   GameID: number;
+
+  User?: User;
+  Game?: Game;
 
   Attachments?: ProblemAttachment[]; // optional เพื่อให้โหลดเฉพาะตอนต้องการ
 }

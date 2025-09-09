@@ -91,7 +91,7 @@ func CreateReport(c *gin.Context) {
 		}
 	}
 
-	_ = db.Preload("Attachments").First(&report, report.ID).Error
+	_ = db.Preload("Attachments").Preload("User").Preload("Game").First(&report, report.ID).Error
 	c.JSON(http.StatusCreated, report)
 }
 
@@ -138,7 +138,7 @@ func FindReports(c *gin.Context) {
 	_ = q.Count(&total).Error
 
 	var items []entity.ProblemReport
-	if err := q.Preload("Attachments").
+	if err := q.Preload("Attachments").Preload("User").Preload("Game").
 		Order("created_at DESC").
 		Offset(offset).Limit(limit).
 		Find(&items).Error; err != nil {
@@ -160,7 +160,7 @@ func GetReportByID(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	var rp entity.ProblemReport
-	if err := db.Preload("Attachments").First(&rp, id).Error; err != nil {
+	if err := db.Preload("Attachments").Preload("User").Preload("Game").First(&rp, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 			return
@@ -226,7 +226,7 @@ func UpdateReport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = db.Preload("Attachments").First(&rp, rp.ID).Error
+	_ = db.Preload("Attachments").Preload("User").Preload("Game").First(&rp, rp.ID).Error
 	c.JSON(http.StatusOK, rp)
 }
 

@@ -2,6 +2,10 @@
 import { useState, useEffect } from "react";
 import { Card, Button, Typography, Tag, Input, Upload, message, Modal } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import { fetchReports, resolveReport } from "../../services/Report";
+import { createNotification } from "../../services/Notification";
+import type { ProblemReport } from "../../interfaces/problem_report";
+import type { UploadFile } from "antd/es/upload/interface";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -13,15 +17,6 @@ interface RefundRequest {
   game: string;
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
-}
-
-interface ProblemReport {
-  id: number;
-  user: string;
-  category: string;
-  title: string;
-  description: string;
-  resolved: boolean;
 }
 
 interface AdminPageProps {
@@ -39,29 +34,20 @@ export default function AdminPage({
 }: AdminPageProps) {
   const [problems, setProblems] = useState<ProblemReport[]>([]);
   const [activeTab, setActiveTab] = useState<"refunds" | "problems">("refunds");
-  const [replies, setReplies] = useState<Record<number, { text: string; fileList: any[] }>>({});
+  const [replies, setReplies] = useState<Record<number, { text: string; fileList: UploadFile[] }>>({});
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
   useEffect(() => {
-    setProblems([
-      {
-        id: 1,
-        user: "Charlie",
-        category: "Login Issue",
-        title: "Can't login",
-        description: "Tried multiple times but login fails.",
-        resolved: false,
-      },
-      {
-        id: 2,
-        user: "Diana",
-        category: "Payment",
-        title: "Card declined",
-        description: "Even though balance is enough.",
-        resolved: true,
-      },
-    ]);
+    const load = async () => {
+      try {
+        const data = await fetchReports();
+        setProblems(data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
   }, []);
 
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
@@ -73,27 +59,46 @@ export default function AdminPage({
     addRefundUpdate(`Refund #${id} ${action.toLowerCase()}`);
   };
 
-  const handleSendReply = (id: number) => {
-    const reply = replies[id];
+  const handleSendReply = async (rep: ProblemReport) => {
+    const reply = replies[rep.ID];
     if (!reply || (!reply.text && reply.fileList.length === 0)) {
       message.warning("กรุณาพิมพ์ข้อความหรือติดไฟล์อย่างน้อย 1 อย่าง");
       return;
     }
-    message.success("ส่งคำตอบกลับไปยังลูกค้าเรียบร้อย!");
-    addNotification(`Problem report #${id} has a reply`);
-    setReplies((prev) => ({ ...prev, [id]: { text: "", fileList: [] } }));
+    try {
+      await createNotification({
+        title: `ตอบกลับคำร้อง #${rep.ID}`,
+        message: reply.text,
+        type: "report",
+        user_id: rep.UserID,
+      });
+      message.success("ส่งคำตอบกลับไปยังลูกค้าเรียบร้อย!");
+      await resolveReport(rep.ID);
+      setProblems((prev) =>
+        prev.map((p) => (p.ID === rep.ID ? { ...p, Status: "resolved" } : p))
+      );
+      addNotification(`Problem report #${rep.ID} has a reply`);
+    } catch (e) {
+      console.error(e);
+      message.error("ส่งคำตอบไม่สำเร็จ");
+    }
+    setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
   };
 
-  const handleResolveProblem = (id: number) => {
-    setProblems((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, resolved: true } : p))
-    );
-    message.success(`Problem report #${id} marked as resolved`);
+  const handleResolveProblem = async (id: number) => {
+    try {
+      const updated = await resolveReport(id);
+      setProblems((prev) => prev.map((p) => (p.ID === id ? updated : p)));
+      message.success(`Problem report #${id} marked as resolved`);
+    } catch (e) {
+      console.error(e);
+      message.error("ไม่สามารถอัปเดตสถานะได้");
+    }
   };
 
-  const handlePreview = (file: any) => {
-    setPreviewImage(file.thumbUrl || file.url || "");
-    setPreviewOpen(true);
+  const handlePreview = (file: UploadFile) => {
+      setPreviewImage(file.thumbUrl || file.url || "");
+      setPreviewOpen(true);
   };
 
   const cardStyle = {
@@ -263,32 +268,31 @@ export default function AdminPage({
           }}
         >
           {problems.map((rep) => (
-            <Card key={rep.id} style={cardStyle}>
-              <p style={textStyle}>User: {rep.user}</p>
-              <p style={textStyle}>Category: {rep.category}</p>
-              <p style={textStyle}>Title: {rep.title}</p>
-              <p style={textStyle}>Description: {rep.description}</p>
+            <Card key={rep.ID} style={cardStyle}>
+              <p style={textStyle}>User: {rep.User?.username ?? rep.UserID}</p>
+              <p style={textStyle}>Title: {rep.Title}</p>
+              <p style={textStyle}>Description: {rep.Description}</p>
               <p style={textStyle}>
                 Status:{" "}
-                {rep.resolved ? (
+                {rep.Status === "resolved" ? (
                   <Tag color="#52c41a">✅ Resolved</Tag>
                 ) : (
                   <Tag color="#f0a6ff">⏳ Pending</Tag>
                 )}
               </p>
 
-              {!rep.resolved && (
+              {rep.Status !== "resolved" && (
                 <div style={{ marginTop: "20px" }}>
                   <TextArea
                     rows={3}
                     placeholder="พิมพ์ข้อความตอบกลับลูกค้า..."
-                    value={replies[rep.id]?.text || ""}
+                    value={replies[rep.ID]?.text || ""}
                     onChange={(e) =>
                       setReplies((prev) => ({
                         ...prev,
-                        [rep.id]: {
+                        [rep.ID]: {
                           text: e.target.value,
-                          fileList: prev[rep.id]?.fileList || [],
+                          fileList: prev[rep.ID]?.fileList || [],
                         },
                       }))
                     }
@@ -303,13 +307,13 @@ export default function AdminPage({
                     }}
                   />
                   <Upload
-                    fileList={replies[rep.id]?.fileList || []}
+                    fileList={replies[rep.ID]?.fileList || []}
                     beforeUpload={() => false}
-                    onChange={({ fileList }) =>
+                    onChange={({ fileList }: { fileList: UploadFile[] }) =>
                       setReplies((prev) => ({
                         ...prev,
-                        [rep.id]: {
-                          text: prev[rep.id]?.text || "",
+                        [rep.ID]: {
+                          text: prev[rep.ID]?.text || "",
                           fileList,
                         },
                       }))
@@ -318,8 +322,8 @@ export default function AdminPage({
                     listType="picture-card"
                     multiple
                   >
-                    {(!replies[rep.id] ||
-                      replies[rep.id].fileList.length < 5) && (
+                    {(!replies[rep.ID] ||
+                      replies[rep.ID].fileList.length < 5) && (
                       <div style={{ color: "#aaa" }}>
                         <UploadOutlined /> อัปโหลด
                       </div>
@@ -329,7 +333,7 @@ export default function AdminPage({
                     style={{ display: "flex", gap: "15px", marginTop: 12 }}
                   >
                     <Button
-                      onClick={() => handleSendReply(rep.id)}
+                      onClick={() => handleSendReply(rep)}
                       style={{
                         flex: 1,
                         background:
@@ -343,7 +347,7 @@ export default function AdminPage({
                       📩 Send Reply
                     </Button>
                     <Button
-                      onClick={() => handleResolveProblem(rep.id)}
+                      onClick={() => handleResolveProblem(rep.ID)}
                       style={{
                         flex: 1,
                         background:
