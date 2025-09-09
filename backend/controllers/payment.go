@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -81,6 +82,82 @@ func DeletePayment(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
+}
+
+type addGamesRequest struct {
+	PaymentID uint   `json:"payment_id" binding:"required"`
+	GameIDs   []uint `json:"game_ids" binding:"required"`
+}
+
+func AddGamesToPayment(c *gin.Context) {
+	var payload addGamesRequest
+	if err := c.ShouldBindJSON(&payload); err != nil || len(payload.GameIDs) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
+		return
+	}
+	db := configs.DB()
+	var payment entity.Payment
+	if tx := db.First(&payment, payload.PaymentID); tx.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "payment_id not found"})
+		return
+	}
+	totalAdded := 0.0
+	now := time.Now()
+	var created []entity.OrderItem
+	for _, gid := range payload.GameIDs {
+		var key entity.KeyGame
+		if tx := db.Where("game_id = ? AND order_item_id IS NULL", gid).First(&key); tx.RowsAffected == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no available key for game"})
+			return
+		}
+		var game entity.Game
+		if tx := db.First(&game, gid); tx.RowsAffected == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+			return
+		}
+		price := float64(game.BasePrice)
+		discount := 0.0
+		var promos []entity.Promotion
+		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
+			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", gid, now, now).
+			Find(&promos)
+		for _, p := range promos {
+			var d float64
+			if p.DiscountType == entity.DiscountPercent {
+				d = price * float64(p.DiscountValue) / 100
+			} else if p.DiscountType == entity.DiscountAmount {
+				d = float64(p.DiscountValue)
+			}
+			if d > discount {
+				discount = d
+			}
+		}
+		if discount > price {
+			discount = price
+		}
+		lineTotal := price - discount
+		item := entity.OrderItem{
+			UnitPrice:    price,
+			QTY:          1,
+			LineDiscount: math.Round(discount*100) / 100,
+			LineTotal:    math.Round(lineTotal*100) / 100,
+			OrderID:      payment.OrderID,
+			GameKeyID:    &key.ID,
+		}
+		if err := db.Create(&item).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		db.Model(&key).Update("order_item_id", item.ID)
+		created = append(created, item)
+		totalAdded += item.LineTotal
+	}
+	payment.Amount += math.Round(totalAdded*100) / 100
+	if err := db.Save(&payment).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"payment": payment, "order_items": created})
 }
 
 func authorizeAdmin(c *gin.Context) (*entity.User, error) {

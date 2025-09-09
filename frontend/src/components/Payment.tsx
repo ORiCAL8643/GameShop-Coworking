@@ -161,9 +161,6 @@ const PaymentPage = () => {
                       {it.title}
                     </Typography.Title>
                     <Space size="small" wrap>
-                      <Tag color="default" style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}>
-                        สำหรับบัญชีของฉัน
-                      </Tag>
                       {it.note && (
                         <Tag color="purple" style={{ backgroundColor: `${THEME_PRIMARY}22`, color: THEME_PRIMARY, borderColor: THEME_PRIMARY }}>
                           {it.note}
