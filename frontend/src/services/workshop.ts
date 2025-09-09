@@ -49,6 +49,14 @@ export async function getMod(id: number): Promise<Mod> {
   return handleResponse<Mod>(res);
 }
 
+export async function createMod(formData: FormData): Promise<Mod> {
+  const res = await fetch(`${API_URL}/mods`, {
+    method: "POST",
+    body: formData,
+  });
+  return handleResponse<Mod>(res);
+}
+
 export async function listComments(threadId: number): Promise<Comment[]> {
   const url = new URL(`${API_URL}/comments`);
   url.searchParams.set("thread_id", String(threadId));

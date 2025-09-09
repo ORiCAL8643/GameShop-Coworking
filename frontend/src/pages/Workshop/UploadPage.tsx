@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Typography, Card, Input, Button, Upload, message } from "antd";
-//import Navbar from "../components/Navbar";
+import { Typography, Card, Input, Button, Upload, message, Form } from "antd";
 import { UploadOutlined, FileTextOutlined, PictureOutlined, InboxOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
-import { getGame } from "../../services/workshop";
+import { getGame, createMod, listUserGames } from "../../services/workshop";
+import { useAuth } from "../../context/AuthContext";
 import type { Game } from "../../interfaces";
 
 const { Title } = Typography;
@@ -13,12 +13,22 @@ const Workshop = () => {
   const [searchParams] = useSearchParams();
   const gameId = searchParams.get("gameId");
   const [game, setGame] = useState<Game | null>(null);
+  const { id: userId } = useAuth();
+  const [userGameId, setUserGameId] = useState<number | null>(null);
 
   useEffect(() => {
     if (gameId) {
       getGame(Number(gameId)).then(setGame).catch(console.error);
     }
-  }, [gameId]);
+    if (userId) {
+      listUserGames(userId)
+        .then((rows) => {
+          const ug = rows.find((r) => r.game_id === Number(gameId));
+          if (ug) setUserGameId(ug.ID);
+        })
+        .catch(console.error);
+    }
+  }, [gameId, userId]);
 
   // State
   const [modTitle, setModTitle] = useState("");
@@ -41,22 +51,29 @@ const Workshop = () => {
     return false; // prevent auto upload
   };
 
-  const handleUpload = () => {
-    if (!modTitle || !modFile) {
-      message.error("กรุณาใส่ชื่อม็อดและเลือกไฟล์ม็อดก่อนอัปโหลด");
+  const handleUpload = async () => {
+    if (!modTitle || !modFile || !gameId || !userGameId) {
+      message.error("กรุณาใส่ข้อมูลให้ครบและเลือกไฟล์ม็อดก่อนอัปโหลด");
       return;
     }
-    console.log("Title:", modTitle);
-    console.log("Description:", modDescription);
-    console.log("File:", modFile);
-    console.log("Image:", modImage);
-
-    message.success("อัปโหลดเรียบร้อยแล้ว!");
-    setModTitle("");
-    setModDescription("");
-    setModFile(null);
-    setModImage(null);
-    setImagePreview("");
+    const formData = new FormData();
+    formData.append("title", modTitle);
+    formData.append("description", modDescription);
+    formData.append("game_id", String(gameId));
+    formData.append("user_game_id", String(userGameId));
+    formData.append("file", modFile);
+    if (modImage) formData.append("image", modImage);
+    try {
+      await createMod(formData);
+      message.success("อัปโหลดเรียบร้อยแล้ว!");
+      setModTitle("");
+      setModDescription("");
+      setModFile(null);
+      setModImage(null);
+      setImagePreview("");
+    } catch (err: any) {
+      message.error(err.message);
+    }
   };
 
   return (
@@ -67,22 +84,35 @@ const Workshop = () => {
           {game ? `Upload Mods for ${game.game_name}` : "Upload Game Mods"}
         </Title>
 
-        {/* ชื่อม็อด */}
+        {/* รายละเอียดม็อด */}
         <Card
           title={
             <span style={{ color: "white" }}>
-              <FileTextOutlined /> Give your mods a title
+              <FileTextOutlined /> Mod Information
             </span>
           }
           style={{ background: "#1f1f1f", marginBottom: "24px", borderRadius: 8, borderColor: "#404040" }}
           headStyle={{ color: "white", borderBottomColor: "#404040" }}
         >
-          <Input
-            placeholder="Your mods title"
-            value={modTitle}
-            onChange={(e) => setModTitle(e.target.value)}
-            style={{ background: "#2d2d2d", color: "white", borderColor: "#595959" }}
-          />
+          <Form layout="vertical">
+            <Form.Item label={<span style={{ color: "white" }}>Title</span>}>
+              <Input
+                placeholder="Your mods title"
+                value={modTitle}
+                onChange={(e) => setModTitle(e.target.value)}
+                style={{ background: "#2d2d2d", color: "white", borderColor: "#595959" }}
+              />
+            </Form.Item>
+            <Form.Item label={<span style={{ color: "white" }}>Description</span>}>
+              <Input.TextArea
+                rows={4}
+                placeholder="Use this space to describe your mods or what was involved in making it."
+                value={modDescription}
+                onChange={(e) => setModDescription(e.target.value)}
+                style={{ background: "#2d2d2d", color: "white", borderColor: "#595959" }}
+              />
+            </Form.Item>
+          </Form>
         </Card>
 
         {/* เลือกไฟล์ม็อด */}
@@ -95,7 +125,11 @@ const Workshop = () => {
           style={{ background: "#1f1f1f", marginBottom: "24px", borderRadius: 8, borderColor: "#404040" }}
           headStyle={{ color: "white", borderBottomColor: "#404040" }}
         >
-          <Dragger beforeUpload={handleModFile} showUploadList={false}>
+          <Dragger
+            beforeUpload={handleModFile}
+            showUploadList={false}
+            style={{ background: "#2d2d2d", height: 150 }}
+          >
             <p className="ant-upload-drag-icon">
               <InboxOutlined style={{ color: "#9254de" }} />
             </p>
@@ -115,7 +149,12 @@ const Workshop = () => {
           style={{ background: "#1f1f1f", marginBottom: "24px", borderRadius: 8, borderColor: "#404040" }}
           headStyle={{ color: "white", borderBottomColor: "#404040" }}
         >
-          <Dragger beforeUpload={handleModImage} showUploadList={false} accept="image/*">
+          <Dragger
+            beforeUpload={handleModImage}
+            showUploadList={false}
+            accept="image/*"
+            style={{ background: "#2d2d2d", height: 150 }}
+          >
             <p className="ant-upload-drag-icon">
               <InboxOutlined style={{ color: "#52c41a" }} />
             </p>
@@ -129,25 +168,6 @@ const Workshop = () => {
               style={{ marginTop: 12, maxHeight: 200, borderRadius: 6 }}
             />
           )}
-        </Card>
-
-        {/* คำอธิบาย */}
-        <Card
-          title={
-            <span style={{ color: "white" }}>
-              <FileTextOutlined /> Add a description
-            </span>
-          }
-          style={{ background: "#1f1f1f", marginBottom: "24px", borderRadius: 8, borderColor: "#404040" }}
-          headStyle={{ color: "white", borderBottomColor: "#404040" }}
-        >
-          <Input.TextArea
-            rows={4}
-            placeholder="Use this space to describe your mods or what was involved in making it."
-            value={modDescription}
-            onChange={(e) => setModDescription(e.target.value)}
-            style={{ background: "#2d2d2d", color: "white", borderColor: "#595959" }}
-          />
         </Card>
 
         {/* ปุ่มอัปโหลด */}

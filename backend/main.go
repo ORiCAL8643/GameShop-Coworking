@@ -156,6 +156,27 @@ func main() {
 		router.POST("/payments/:id/approve", controllers.ApprovePayment)
 		router.POST("/payments/:id/reject", controllers.RejectPayment)
 
+		// ===== Mods =====
+		router.GET("/mods", controllers.GetMods)
+		router.GET("/mods/:id", controllers.GetModById)
+		router.POST("/mods", controllers.CreateMod)
+		router.PATCH("/mods/:id", controllers.UpdateMod)
+		router.DELETE("/mods/:id", controllers.DeleteMod)
+
+		// ===== Mod Ratings =====
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
+		router.PATCH("/modratings/:id", controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+
+		// ===== Mod Tags =====
+		router.GET("/modtags", controllers.GetModTags)
+		router.GET("/modtags/:id", controllers.GetModTagById)
+		router.POST("/modtags", controllers.CreateModTag)
+		router.PATCH("/modtags/:id", controllers.UpdateModTag)
+		router.DELETE("/modtags/:id", controllers.DeleteModTag)
+
 	}
 
 	// Run the server
