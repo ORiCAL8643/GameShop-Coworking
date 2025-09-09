@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Layout, Typography, Card, Tag, List, Button, Empty, Image } from "antd";
+import { Layout, Typography, Card, Tag, List, Button, Empty } from "antd";
 import Sidebar from "../../components/Sidebar";
 import type { Promotion } from "../../interfaces/Promotion";
 import type { Game } from "../../interfaces/Game";
@@ -65,10 +65,9 @@ export default function PromotionDetail() {
       <Sidebar />
       <Content style={{ padding: 24, background: "#141414" }}>
         {promotion.promo_image && (
-          <Image
+          <img
             src={resolveImgUrl(promotion.promo_image)}
             alt={promotion.title}
-            preview={false}
             style={{
               width: "100%",
               height: 220,
