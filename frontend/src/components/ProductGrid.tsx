@@ -7,7 +7,11 @@ import axios from "axios";
 
 const base_url = "http://localhost:8088";
 
-const ProductGrid = () => {
+interface ProductGridProps {
+  userId: number | null;
+}
+
+const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   interface Game {
     ID: number;
     game_name: string;
@@ -82,9 +86,10 @@ const ProductGrid = () => {
     }
   };
 
+  const approveGames = game.filter(game => game.status === "approve");
   return (
     <Row gutter={[16, 16]}>
-      {game?.map((c) => {
+      {approveGames?.map((c) => {
         const hasDiscount =
           c.discounted_price !== undefined &&
           c.discounted_price < c.base_price;

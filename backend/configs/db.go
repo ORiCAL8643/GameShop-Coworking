@@ -54,10 +54,13 @@ func SetupDatabase() {
 		&entity.Attachment{},
 		&entity.Notification{},
 		&entity.Order{},
+		&entity.OrderItem{},
 		&entity.Payment{},
 		&entity.PaymentSlip{},
+		&entity.PaymentReview{},
 		&entity.Categories{},
 		&entity.MinimumSpec{},
+		&entity.Request{},
 		&entity.Promotion{},
 		&entity.Promotion_Game{},
 	); err != nil {

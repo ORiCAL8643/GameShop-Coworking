@@ -90,7 +90,11 @@ func FindGames(c *gin.Context) {
 	now := time.Now()
 	if err := configs.DB().
 		Preload("Categories").
+<<<<<<< HEAD
 		Preload("Promotions", "status = ? AND start_date <= ? AND end_date >= ?", true, now, now).
+=======
+		Preload("Requests").
+>>>>>>> main
 		Find(&games).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -141,5 +145,22 @@ func CreateGame(c *gin.Context) {
 		return
 	}
 
+	c.JSON(http.StatusOK, games)
+}
+func UpdateGamebyID(c *gin.Context) {
+	var games entity.Game
+	id := c.Param("id")
+
+	if err := configs.DB().First(&games, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	if err := c.ShouldBindJSON(&games); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	configs.DB().Save(&games)
 	c.JSON(http.StatusOK, games)
 }
