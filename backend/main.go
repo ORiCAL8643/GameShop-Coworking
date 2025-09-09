@@ -16,6 +16,7 @@ func main() {
 	configs.SetupDatabase()
 
 	r := gin.Default()
+	r.Static("/uploads", "./uploads")
 	r.Use(CORSMiddleware())
 
 	// health check ง่าย ๆ

@@ -12,18 +12,15 @@ import WorkshopMain from "../pages/Workshop/MainPage.tsx";
 import WorkshopDetail from "../pages/Workshop/WorkshopDetail.tsx";
 import ModDetail from "../pages/Workshop/ModDetail.tsx";
 import Workshop from "../pages/Workshop/UploadPage.tsx";
-
+import RoleManagement from "../pages/role/RoleManagement.tsx";
 // 🟣 Import เพิ่ม
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
-
-// 🟣 Import Role pages
-import RoleManagement from "../pages/role/RoleManagement.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
-
+import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -82,6 +79,8 @@ const router = createBrowserRouter([
       { path: "/upload", element: <Workshop /> },
 
       { path: "/promotion", element: <PromotionManager /> },
+      { path: "/promotion/:id", element: <PromotionDetail /> },
+
 
       // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
@@ -103,12 +102,13 @@ const router = createBrowserRouter([
             ),
           },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+          { path: "/Admin/RolePage", element: <RoleManagement />},
         ],
       },
-
-      // 🟣 Roles
-      { path: "/roles", element: <RoleManagement /> },
-      { path: "/roles/:id", element: <RoleEdit /> },
+      {
+        path: "/roles/:id" ,
+        element: <RoleEdit/>
+      }
     ],
   },
 ]);

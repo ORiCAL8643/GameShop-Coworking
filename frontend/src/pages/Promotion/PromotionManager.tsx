@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Layout, Card, Form, Input, InputNumber, DatePicker, Switch,
-  Button, Space, Table, Tag, Popconfirm, message, Typography, Select,
+  Button, Space, Table, Tag, Popconfirm, message, Typography, Select, Upload
 } from "antd";
+import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
-import type {
-  Promotion,
-  CreatePromotionRequest,
-  UpdatePromotionRequest,
-  DiscountType,
-} from "../../interfaces/Promotion";
+import type { Promotion, DiscountType } from "../../interfaces/Promotion";
+import {
+  listPromotions,
+  listGames,
+  createPromotion,
+  updatePromotion,
+  deletePromotion,
+} from "../../services/promotions";
+import { useAuth } from "../../context/AuthContext";
 
 type GameLite = { id: string; title: string };
 
@@ -25,7 +29,6 @@ type FormValues = {
   status: boolean;
   dateRange: [Dayjs, Dayjs];
   gameIds: string[];
-  promo_image?: string;
 };
 
 export default function PromotionManager() {
@@ -33,6 +36,8 @@ export default function PromotionManager() {
   const [data, setData] = useState<Promotion[]>([]);
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [promoFile, setPromoFile] = useState<File | null>(null);
+  const { userId: currentUserId, token } = useAuth();
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 
@@ -41,11 +46,11 @@ export default function PromotionManager() {
     title: p.title,
     description: p.description,
     discount_type: p.discount_type,
-    discount_value: p.discount_value ?? p.discountPercent ?? 0,
-    start_date: p.start_date ?? p.startDate,
-    end_date: p.end_date ?? p.endDate,
-    status: p.status ?? p.active,
-    promo_image: p.promo_image ?? p.imageUrl,
+    discount_value: p.discount_value,
+    start_date: p.start_date,
+    end_date: p.end_date,
+    status: p.status,
+    promo_image: p.promo_image,
     user_id: p.user_id,
     user: p.user,
     games: p.games,
@@ -54,19 +59,17 @@ export default function PromotionManager() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [gRes, pRes] = await Promise.all([
-          fetch("http://localhost:8088/games"),
-          fetch("http://localhost:8088/promotions?with=games"),
+        const [gameRows, promoRows] = await Promise.all([
+          listGames(),
+          listPromotions(true),
         ]);
-        const gameJson = await gRes.json();
-        const promoJson = await pRes.json();
         setGames(
-          gameJson.map((g: any) => ({
-            id: String(g.id ?? g.ID),
-            title: g.title ?? g.game_name,
+          gameRows.map(g => ({
+            id: String(g.ID),
+            title: g.game_name,
           })),
         );
-        setData(promoJson.map((p: any) => normalizePromo(p)));
+        setData(promoRows.map(p => normalizePromo(p)));
       } catch {
         message.error("โหลดข้อมูลล้มเหลว");
       }
@@ -82,32 +85,33 @@ export default function PromotionManager() {
   const onSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const body: CreatePromotionRequest | UpdatePromotionRequest = {
-        title: values.title,
-        description: values.description,
-        discount_type: values.discount_type,
-        discount_value: values.discount_value,
-        start_date: values.dateRange[0].toISOString(),
-        end_date: values.dateRange[1].toISOString(),
-        status: values.status,
-        promo_image: values.promo_image,
-        game_ids: values.gameIds.map(id => Number(id)),
-      };
-      const res = await fetch(
-        `http://localhost:8088/promotions${isEdit ? `/${editingId}` : ""}`,
-        {
-          method: isEdit ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        },
-      );
-      if (!res.ok) throw new Error("api error");
-      const saved = normalizePromo(await res.json());
+      const body = new FormData();
+      body.append("title", values.title);
+      if (values.description) body.append("description", values.description);
+      body.append("discount_type", values.discount_type);
+      body.append("discount_value", String(values.discount_value));
+      body.append("start_date", values.dateRange[0].toISOString());
+      body.append("end_date", values.dateRange[1].toISOString());
+      body.append("status", String(values.status));
+      values.gameIds.forEach(id => body.append("game_ids", id));
+      if (currentUserId != null) {
+        body.append("user_id", String(currentUserId));
+      }
+      if (promoFile) {
+        body.append("promo_image", promoFile);
+      }
+      const saved = await (isEdit
+        ? updatePromotion(editingId!, body, token || undefined)
+        : createPromotion(body, token || undefined));
+      const normalized = normalizePromo(saved);
       setData(prev => (
-        isEdit ? prev.map(p => (p.ID === saved.ID ? saved : p)) : [...prev, saved]
+        isEdit
+          ? prev.map(p => (p.ID === normalized.ID ? normalized : p))
+          : [...prev, normalized]
       ));
       message.success(isEdit ? "อัปเดตแล้ว" : "สร้างแล้ว");
       form.resetFields();
+      setPromoFile(null);
       setEditingId(null);
     } catch {
       message.error("บันทึกไม่สำเร็จ");
@@ -116,10 +120,7 @@ export default function PromotionManager() {
 
   const onDelete = async (id: number) => {
     try {
-      const res = await fetch(`http://localhost:8088/promotions/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("api error");
+      await deletePromotion(id, token || undefined);
       setData(prev => prev.filter(p => p.ID !== id));
       message.success("ลบแล้ว");
     } catch {
@@ -188,8 +189,8 @@ export default function PromotionManager() {
                 dateRange: [dayjs(r.start_date), dayjs(r.end_date)],
                 status: r.status,
                 gameIds: r.games?.map((g: any) => String(g.ID)) || [],
-                promo_image: r.promo_image,
               });
+              setPromoFile(null);
             }}
           >
             แก้ไข
@@ -210,7 +211,6 @@ export default function PromotionManager() {
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
-     
       <Content style={{ padding: 24, background: "#141414" }}>
         <div style={{ maxWidth: 1200, margin: "0 auto" }}>
           <Title level={2} style={{ color: "white" }}>Promotion Manager</Title>
@@ -288,8 +288,12 @@ export default function PromotionManager() {
                 />
               </Form.Item>
 
-              <Form.Item name="promo_image" label={<span style={{ color: "#ccc" }}>รูปภาพ (URL)</span>}>
-                <Input placeholder="เช่น https://…" />
+              <Form.Item label={<span style={{ color: "#ccc" }}>รูปภาพ</span>}>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={e => setPromoFile(e.target.files?.[0] || null)}
+                />
               </Form.Item>
 
               <Space>
