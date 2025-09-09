@@ -70,15 +70,15 @@ export default function PromotionDetail() {
             alt={promotion.title}
             style={{
               width: "100%",
-              height: 300,
+              height: 500,
               objectFit: "cover",
               display: "block",
-              borderRadius: 20,
-              marginBottom: 16,
+              borderRadius: 50,
+              marginBottom: 40,
             }}
           />
         )}
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <div style={{ maxWidth: 2000, margin: "0 auto" }}>
 
           <Card style={{ background: "#1f1f1f", color: "white", borderRadius: 10, marginBottom: 16 }}>
             <Title level={3} style={{ color: "white", margin: 0 }}>
