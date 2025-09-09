@@ -15,6 +15,16 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
 		return
 	}
+	uid, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	if body.UserID != 0 && body.UserID != uid {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user_id mismatch"})
+		return
+	}
+	body.UserID = uid
 	// ตรวจ User
 	var user entity.User
 	if tx := configs.DB().First(&user, body.UserID); tx.RowsAffected == 0 {

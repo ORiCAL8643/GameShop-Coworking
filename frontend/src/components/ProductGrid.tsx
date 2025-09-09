@@ -4,12 +4,14 @@ import { useNavigate } from "react-router-dom";
 import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { useAuth } from "../context/AuthContext";
 
 const base_url = "http://localhost:8088";
 
-const ProductGrid: React.FC = () => {
-  const { id } = useAuth();
+interface ProductGridProps {
+  userId?: number;
+}
+
+const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   interface Game {
     ID: number;
     game_name: string;
@@ -59,24 +61,24 @@ const ProductGrid: React.FC = () => {
     GetGame();
   }, []);
 
-  const handleAddToCart = async (g: Game) => {
-    if (!id) return; // ต้องเข้าสู่ระบบก่อนสั่งซื้อ
-    try {
-      const stored = localStorage.getItem("orderId");
-      if (!stored) {
-        // สร้างออร์เดอร์ใหม่พร้อมรายการแรก
-        const res = await axios.post(`${base_url}/orders`, {
-          user_id: id,
-          total_amount: g.base_price,
-          order_status: "PENDING",
-          order_items: [
-            {
-              unit_price: g.base_price,
-              qty: 1,
-              game_key_id: g.key_id,
-            },
-          ],
-        });
+    const handleAddToCart = async (g: Game) => {
+      if (!userId) return; // ต้องเข้าสู่ระบบก่อนสั่งซื้อ
+      try {
+        const stored = localStorage.getItem("orderId");
+        if (!stored) {
+          // สร้างออร์เดอร์ใหม่พร้อมรายการแรก
+          const res = await axios.post(`${base_url}/orders`, {
+            user_id: userId,
+            total_amount: g.base_price,
+            order_status: "PENDING",
+            order_items: [
+              {
+                unit_price: g.base_price,
+                qty: 1,
+                game_key_id: g.key_id,
+              },
+            ],
+          });
         const newId = res.data.ID || res.data.id;
         if (newId) {
           localStorage.setItem("orderId", String(newId));
