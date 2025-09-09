@@ -369,6 +369,8 @@ func SetupDatabase() {
 		&entity.Categories{},
 		&entity.MinimumSpec{},
 		&entity.Request{},
+		&entity.Mod{},
+		&entity.ModRating{},
 	); err != nil {
 		log.Fatal("auto migrate (others) failed: ", err)
 	}

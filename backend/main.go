@@ -157,11 +157,6 @@ func main() {
 		router.POST("/payments/:id/reject", controllers.RejectPayment)
 
 	}
-		// ===== Order Items =====
-		router.POST("/order-items", controllers.CreateOrderItem)
-		router.GET("/order-items", controllers.FindOrderItems)
-		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
-		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
 	// Run the server
 	// แก้สเปซตรง "localhost:" ให้ถูกต้อง
