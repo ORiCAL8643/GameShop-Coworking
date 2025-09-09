@@ -1,4 +1,3 @@
-// src/pages/AdminPage.tsx
 import { useState, useEffect } from "react";
 import { Card, Button, Typography, Tag, Input, Upload, message, Modal } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
@@ -41,13 +40,17 @@ export default function AdminPage({
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchReports();
-        setProblems(data);
+        const items = await fetchReports();
+        setProblems(items);
       } catch (e) {
         console.error(e);
       }
     };
     load();
+
+    // ถ้าอยาก auto-refresh ทุก 10 วินาที เปิดคอมเมนต์บรรทัดล่าง
+    // const timer = setInterval(load, 10000);
+    // return () => clearInterval(timer);
   }, []);
 
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
@@ -70,13 +73,15 @@ export default function AdminPage({
         title: `ตอบกลับคำร้อง #${rep.ID}`,
         message: reply.text,
         type: "report",
-        user_id: rep.UserID,
+        user_id: rep.user_id, // ใช้ฟิลด์ normalized
       });
+
       message.success("ส่งคำตอบกลับไปยังลูกค้าเรียบร้อย!");
-      await resolveReport(rep.ID);
-      setProblems((prev) =>
-        prev.map((p) => (p.ID === rep.ID ? { ...p, Status: "resolved" } : p))
-      );
+
+      // mark resolved
+      const updated = await resolveReport(rep.ID);
+      setProblems((prev) => prev.map((p) => (p.ID === rep.ID ? updated : p)));
+
       addNotification(`Problem report #${rep.ID} has a reply`);
     } catch (e) {
       console.error(e);
@@ -97,8 +102,8 @@ export default function AdminPage({
   };
 
   const handlePreview = (file: UploadFile) => {
-      setPreviewImage(file.thumbUrl || file.url || "");
-      setPreviewOpen(true);
+    setPreviewImage(file.thumbUrl || file.url || "");
+    setPreviewOpen(true);
   };
 
   const cardStyle = {
@@ -125,7 +130,7 @@ export default function AdminPage({
         padding: "50px",
         color: "#fff",
         fontFamily: "'Poppins', sans-serif",
-        flex:1
+        flex: 1,
       }}
     >
       <Title
@@ -171,9 +176,7 @@ export default function AdminPage({
                 transition: "0.3s",
               }}
             >
-              {tab === "refunds"
-                ? "💸 Refund Requests"
-                : "⚡ Problem Reports"}
+              {tab === "refunds" ? "💸 Refund Requests" : "⚡ Problem Reports"}
             </Button>
           );
         })}
@@ -227,8 +230,7 @@ export default function AdminPage({
                     onClick={() => handleRefundAction(req.id, "Approved")}
                     style={{
                       flex: 1,
-                      background:
-                        "linear-gradient(90deg, #52c41a, #389e0d)",
+                      background: "linear-gradient(90deg, #52c41a, #389e0d)",
                       color: "white",
                       fontWeight: "bold",
                       borderRadius: 12,
@@ -241,8 +243,7 @@ export default function AdminPage({
                     onClick={() => handleRefundAction(req.id, "Rejected")}
                     style={{
                       flex: 1,
-                      background:
-                        "linear-gradient(90deg, #f5222d, #cf1322)",
+                      background: "linear-gradient(90deg, #f5222d, #cf1322)",
                       color: "white",
                       fontWeight: "bold",
                       borderRadius: 12,
@@ -269,19 +270,19 @@ export default function AdminPage({
         >
           {problems.map((rep) => (
             <Card key={rep.ID} style={cardStyle}>
-              <p style={textStyle}>User: {rep.User?.username ?? rep.UserID}</p>
-              <p style={textStyle}>Title: {rep.Title}</p>
-              <p style={textStyle}>Description: {rep.Description}</p>
+              <p style={textStyle}>User: {rep.user?.username ?? rep.user_id}</p>
+              <p style={textStyle}>Title: {rep.title}</p>
+              <p style={textStyle}>Description: {rep.description}</p>
               <p style={textStyle}>
                 Status:{" "}
-                {rep.Status === "resolved" ? (
+                {rep.status === "resolved" ? (
                   <Tag color="#52c41a">✅ Resolved</Tag>
                 ) : (
                   <Tag color="#f0a6ff">⏳ Pending</Tag>
                 )}
               </p>
 
-              {rep.Status !== "resolved" && (
+              {rep.status !== "resolved" && (
                 <div style={{ marginTop: "20px" }}>
                   <TextArea
                     rows={3}
@@ -322,22 +323,18 @@ export default function AdminPage({
                     listType="picture-card"
                     multiple
                   >
-                    {(!replies[rep.ID] ||
-                      replies[rep.ID].fileList.length < 5) && (
+                    {(!replies[rep.ID] || replies[rep.ID].fileList.length < 5) && (
                       <div style={{ color: "#aaa" }}>
                         <UploadOutlined /> อัปโหลด
                       </div>
                     )}
                   </Upload>
-                  <div
-                    style={{ display: "flex", gap: "15px", marginTop: 12 }}
-                  >
+                  <div style={{ display: "flex", gap: "15px", marginTop: 12 }}>
                     <Button
                       onClick={() => handleSendReply(rep)}
                       style={{
                         flex: 1,
-                        background:
-                          "linear-gradient(90deg, #52c41a, #389e0d)",
+                        background: "linear-gradient(90deg, #52c41a, #389e0d)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
@@ -350,8 +347,7 @@ export default function AdminPage({
                       onClick={() => handleResolveProblem(rep.ID)}
                       style={{
                         flex: 1,
-                        background:
-                          "linear-gradient(90deg, #f759ab, #9254de)",
+                        background: "linear-gradient(90deg, #f759ab, #9254de)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
@@ -374,11 +370,7 @@ export default function AdminPage({
         onCancel={() => setPreviewOpen(false)}
         destroyOnClose
       >
-        <img
-          alt="preview"
-          style={{ width: "100%", borderRadius: 12 }}
-          src={previewImage}
-        />
+        <img alt="preview" style={{ width: "100%", borderRadius: 12 }} src={previewImage} />
       </Modal>
     </div>
   );

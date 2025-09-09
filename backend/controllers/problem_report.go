@@ -17,9 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// POST /reports  (multipart/form-data)
-// fields: title, description, status?, user_id, game_id
-// files:  attachments[]  (รองรับชื่อ "file" ด้วย)
+// POST /reports (multipart/form-data)
 func CreateReport(c *gin.Context) {
 	db := configs.DB()
 
@@ -29,16 +27,15 @@ func CreateReport(c *gin.Context) {
 	if status == "" {
 		status = "open"
 	}
-
 	userID, _ := strconv.Atoi(c.PostForm("user_id"))
-	gameID, _ := strconv.Atoi(c.PostForm("game_id")) // ❗ไม่เช็คใน DB เพื่อไม่แตะตารางเพื่อน
+	gameID, _ := strconv.Atoi(c.PostForm("game_id"))
 
-	// validate ขั้นต่ำ
-	if title == "" || desc == "" || userID <= 0 {
+	if title == "" || desc == "" || userID <= 0 || gameID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 		return
 	}
-	// ✅ เช็คเฉพาะ user (ตารางของเรา) — ถ้าอยากตัดออกด้วย ก็ตัดบล็อกนี้ได้เช่นกัน
+
+	// ตรวจ FK user / game
 	var u entity.User
 	if err := db.First(&u, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -48,24 +45,30 @@ func CreateReport(c *gin.Context) {
 		}
 		return
 	}
-	// ❌ ไม่เช็ค game เพื่อไม่ไปยุ่งของเพื่อน: รับ gameID ตามที่ส่งมาได้เลย
+	var g entity.Game
+	if err := db.First(&g, gameID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		}
+		return
+	}
 
 	report := entity.ProblemReport{
 		Title:       title,
 		Description: desc,
 		Status:      status,
 		UserID:      uint(userID),
-		GameID:      uint(gameID), // อนุญาตให้เป็นเลขอะไรก็ได้
-		// ResolvedAt = zero time (ยังไม่ปิดงาน)
+		GameID:      uint(gameID),
 	}
 	if err := db.Create(&report).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// แนบไฟล์ (รองรับทั้ง "attachments" และ "file")
-	form, _ := c.MultipartForm()
-	if form != nil {
+	// แนบไฟล์
+	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
 		if len(files) == 0 {
 			files = form.File["file"]
@@ -73,25 +76,22 @@ func CreateReport(c *gin.Context) {
 		if len(files) > 0 {
 			dir := filepath.Join("uploads", "reports", time.Now().Format("20060102"))
 			_ = os.MkdirAll(dir, 0o755)
-
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
 				dst := filepath.Join(dir, name)
-
 				if err := c.SaveUploadedFile(f, dst); err != nil {
-					// ข้ามไฟล์ที่เซฟไม่สำเร็จ
 					continue
 				}
-				att := entity.ProblemAttachment{
+				_ = db.Create(&entity.ProblemAttachment{
 					FilePath: dst,
 					ReportID: report.ID,
-				}
-				_ = db.Create(&att).Error
+				}).Error
 			}
 		}
 	}
 
-	_ = db.Preload("Attachments").Preload("User").Preload("Game").First(&report, report.ID).Error
+	// ✅ preload User + Attachments ก่อนตอบกลับ
+	_ = db.Preload("User").Preload("Attachments").First(&report, report.ID).Error
 	c.JSON(http.StatusCreated, report)
 }
 
@@ -124,6 +124,7 @@ func FindReports(c *gin.Context) {
 			limit = n
 		}
 	}
+
 	offset := (page - 1) * limit
 
 	q := db.Model(&entity.ProblemReport{})
@@ -138,7 +139,7 @@ func FindReports(c *gin.Context) {
 	_ = q.Count(&total).Error
 
 	var items []entity.ProblemReport
-	if err := q.Preload("Attachments").Preload("User").Preload("Game").
+	if err := q.Preload("User").Preload("Attachments").
 		Order("created_at DESC").
 		Offset(offset).Limit(limit).
 		Find(&items).Error; err != nil {
@@ -146,12 +147,8 @@ func FindReports(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"items": items,
-		"page":  page,
-		"limit": limit,
-		"total": total,
-	})
+	// 👉 ถ้าหน้าเว็บอยากได้ array ตรงๆ ก็ส่ง items กลับอย่างเดียวก็ได้
+	c.JSON(http.StatusOK, items)
 }
 
 // GET /reports/:id
@@ -160,7 +157,7 @@ func GetReportByID(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	var rp entity.ProblemReport
-	if err := db.Preload("Attachments").Preload("User").Preload("Game").First(&rp, id).Error; err != nil {
+	if err := db.Preload("User").Preload("Attachments").First(&rp, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 			return
@@ -175,7 +172,7 @@ type updateReportInput struct {
 	Title       *string `json:"title,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Status      *string `json:"status,omitempty"`
-	Resolve     *bool   `json:"resolve,omitempty"` // true = ปิดงาน (ResolvedAt = now)
+	Resolve     *bool   `json:"resolve,omitempty"`
 }
 
 // PUT /reports/:id
@@ -215,7 +212,7 @@ func UpdateReport(c *gin.Context) {
 				rp.Status = "resolved"
 			}
 		} else {
-			rp.ResolvedAt = time.Time{} // clear
+			rp.ResolvedAt = time.Time{}
 			if rp.Status == "resolved" {
 				rp.Status = "open"
 			}
@@ -226,7 +223,7 @@ func UpdateReport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = db.Preload("Attachments").Preload("User").Preload("Game").First(&rp, rp.ID).Error
+	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
 	c.JSON(http.StatusOK, rp)
 }
 
@@ -234,7 +231,6 @@ func UpdateReport(c *gin.Context) {
 func DeleteReport(c *gin.Context) {
 	db := configs.DB()
 	id, _ := strconv.Atoi(c.Param("id"))
-
 	if err := db.Delete(&entity.ProblemReport{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

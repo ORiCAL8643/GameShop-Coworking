@@ -2,44 +2,26 @@ import type { ProblemAttachment } from "./problem_attachment";
 import type { User } from "./User";
 import type { Game } from "./Game";
 
+/**
+ * รูปแบบที่ service จะ normalize ให้เสมอ:
+ *  - ID: number (พิมพ์ใหญ่ เพราะมาจาก gorm.Model)
+ *  - ที่เหลือเป็นตัวพิมพ์เล็กตาม json ของ backend
+ */
 export interface ProblemReport {
   ID: number;
-  Title: string;
-  Description: string;
-  CreatedAt?: string;    // ใช้ ? เพราะอาจยังไม่ได้เซ็ต
-  ResolvedAt?: string;   // ใช้ ? เพราะอาจยังไม่ได้แก้ปัญหา
-  Status: string;
 
-  UserID: number;
-  GameID: number;
+  title: string;
+  description: string;
+  status: string;
 
-  User?: User;
-  Game?: Game;
+  created_at?: string;
+  resolved_at?: string;
 
-  Attachments?: ProblemAttachment[]; // optional เพื่อให้โหลดเฉพาะตอนต้องการ
-}
+  user_id: number;
+  game_id: number;
 
-// สำหรับสร้างใหม่ผ่าน API
-export interface CreateProblemReportRequest {
-  Title: string;
-  Description: string;
-  CreatedAt?: string;
-  Status: string;
-  UserID: number;
-  GameID: number;
-}
+  user?: User;
+  game?: Game;
 
-// สำหรับ backward compatibility หรือการใช้งานเก่า
-export interface ProblemReportInterface {
-  ID: number;
-  Title: string;
-  Description: string;
-  CreatedAt?: string;
-  ResolvedAt?: string;
-  Status: string;
-
-  UserID: number;
-  GameID: number;
-
-  Attachments?: ProblemAttachment[];
+  attachments?: ProblemAttachment[];
 }
