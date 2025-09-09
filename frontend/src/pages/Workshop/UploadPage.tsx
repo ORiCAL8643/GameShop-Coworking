@@ -1,29 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Typography, Card, Input, Button, Upload, message } from "antd";
 //import Navbar from "../components/Navbar";
 import { UploadOutlined, FileTextOutlined, PictureOutlined, InboxOutlined } from "@ant-design/icons";
 import { useSearchParams } from "react-router-dom";
+import { getGame } from "../../services/workshop";
+import type { Game } from "../../interfaces";
 
 const { Title } = Typography;
 const { Dragger } = Upload;
 
-interface WorkshopItem {
-  id: string;
-  title: string;
-  items: number;
-  image?: string;
-}
-
-// mock ข้อมูลเกมที่ user มี
-const userGames: WorkshopItem[] = [
-  { id: "1", title: "Counter Strike", items: 6 },
-  { id: "2", title: "Half-Life", items: 3 },
-];
-
 const Workshop = () => {
   const [searchParams] = useSearchParams();
   const gameId = searchParams.get("gameId");
-  const game = userGames.find((g) => g.id === gameId);
+  const [game, setGame] = useState<Game | null>(null);
+
+  useEffect(() => {
+    if (gameId) {
+      getGame(Number(gameId)).then(setGame).catch(console.error);
+    }
+  }, [gameId]);
 
   // State
   const [modTitle, setModTitle] = useState("");
@@ -69,7 +64,7 @@ const Workshop = () => {
       
       <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
         <Title level={2} style={{ color: "white" }}>
-          {game ? `Upload Mods for ${game.title}` : "Upload Game Mods"}
+          {game ? `Upload Mods for ${game.game_name}` : "Upload Game Mods"}
         </Title>
 
         {/* ชื่อม็อด */}

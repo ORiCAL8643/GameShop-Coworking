@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Layout,
   Typography,
@@ -10,56 +10,48 @@ import {
   List,
   Button,
   message,
-  Select,
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
+import { getGame, listMods, listUserGames } from "../../services/workshop";
+import type { Game, Mod } from "../../interfaces";
+import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider, Header } = Layout;
 const { Title, Text } = Typography;
 const { Search } = Input;
-const { Option } = Select;
-
-interface WorkshopItem {
-  id: string;
-  title: string;
-  items: number;
-  image?: string;
-}
-
-interface ModItem {
-  id: string;
-  title: string;
-  author: string;
-  downloads?: number;
-  visitors?: number;
-}
 
 const WorkshopDetail: React.FC = () => {
-  const location = useLocation();
+  const { id } = useParams();
   const navigate = useNavigate();
-  const workshop = location.state as WorkshopItem;
-
-  // mock data mods
-  const mods: ModItem[] = [
-    { id: "m1", title: "Weapons Course", author: "Asmisint", downloads: 120, visitors: 900 },
-    { id: "m2", title: "CS:CTF Double Cross", author: "CS:CTF", downloads: 80, visitors: 400 },
-    { id: "m3", title: "CS:CTF 2Fort", author: "CS:CTF", downloads: 200, visitors: 1200 },
-    { id: "m4", title: "Mocha", author: "Bevster", downloads: 50, visitors: 100 },
-    { id: "m5", title: "CS:CTF Turbine", author: "CS:CTF", downloads: 150, visitors: 800 },
-    { id: "m6", title: "1v1_the_desert_pit", author: "MMArezech_", downloads: 70, visitors: 300 },
-  ];
-
-  // state สำหรับ search และ sort
+  const { id: userId } = useAuth();
+  const [game, setGame] = useState<Game | null>(null);
+  const [mods, setMods] = useState<Mod[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [sortBy, setSortBy] = useState<string>("downloads");
-  const [filteredMods, setFilteredMods] = useState<ModItem[]>([]);
+  const [filteredMods, setFilteredMods] = useState<Mod[]>([]);
+  const [userGames, setUserGames] = useState<number[]>([]);
 
-  // mock: เกมที่ user มี
-  const userGames = ["1", "3", "6"];
+  useEffect(() => {
+    if (id) {
+      const gameId = Number(id);
+      getGame(gameId).then(setGame).catch(console.error);
+      listMods(gameId).then((ms) => {
+        setMods(ms);
+        setFilteredMods(ms);
+      });
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (userId) {
+      listUserGames(userId)
+        .then((rows) => setUserGames(rows.map((r) => r.game_id)))
+        .catch(console.error);
+    }
+  }, [userId]);
 
   const handleUpload = () => {
-    if (userGames.includes(workshop.id)) {
-      navigate(`/upload?gameId=${workshop.id}`);
+    if (game && userGames.includes(game.ID)) {
+      navigate(`/upload?gameId=${game.ID}`);
     } else {
       message.error("คุณไม่มีเกมนี้ ไม่สามารถอัปโหลดม็อดได้");
     }
@@ -67,35 +59,15 @@ const WorkshopDetail: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    filterAndSort(value, sortBy);
-  };
-
-  const handleSortChange = (value: string) => {
-    setSortBy(value);
-    filterAndSort(searchText, value);
-  };
-
-  // ฟังก์ชันรวม search + sort
-  const filterAndSort = (search: string, sort: string) => {
-    let result = mods.filter(
-      (m) =>
-        m.title.toLowerCase().includes(search.toLowerCase()) ||
-        m.author.toLowerCase().includes(search.toLowerCase())
+    const result = mods.filter((m) =>
+      m.title.toLowerCase().includes(value.toLowerCase())
     );
-
-    if (sort === "downloads") {
-      result = [...result].sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
-    } else if (sort === "visitors") {
-      result = [...result].sort((a, b) => (b.visitors || 0) - (a.visitors || 0));
-    }
-
     setFilteredMods(result);
   };
 
-  // sort ค่า default ตอน mount
   useEffect(() => {
-    filterAndSort("", "downloads");
-  }, []);
+    setFilteredMods(mods);
+  }, [mods]);
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
@@ -110,10 +82,10 @@ const WorkshopDetail: React.FC = () => {
           alignItems: "center",
         }}
       >
-        {workshop.image ? (
+        {game?.img_src ? (
           <img
-            src={workshop.image}
-            alt={workshop.title}
+            src={game.img_src}
+            alt={game.game_name}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
@@ -130,7 +102,7 @@ const WorkshopDetail: React.FC = () => {
             }}
           >
             <PictureOutlined style={{ fontSize: 40, marginRight: 10 }} />
-            Banner for {workshop.title}
+            Banner for {game?.game_name || ""}
           </div>
         )}
       </Header>
@@ -139,10 +111,10 @@ const WorkshopDetail: React.FC = () => {
         {/* Content */}
         <Content style={{ padding: "20px" }}>
           <Title level={3} style={{ color: "black" }}>
-            {workshop.title} – {workshop.items} items
+            {game?.game_name}
           </Title>
           <Text style={{ color: "black" }}>
-            Showing 1–{filteredMods.length} of {mods.length} entries
+            Showing {filteredMods.length} mods
           </Text>
 
           {/* Search + Sort */}
@@ -164,25 +136,12 @@ const WorkshopDetail: React.FC = () => {
               onChange={(e) => handleSearch(e.target.value)}
               onSearch={handleSearch}
             />
-
-            {/* Label + Dropdown */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <Text style={{ color: "black" }}>Sort by:</Text>
-              <Select
-                style={{ width: 180 }}
-                value={sortBy}
-                onChange={handleSortChange}
-              >
-                <Option value="downloads">Most Downloads</Option>
-                <Option value="visitors">Most Visitors</Option>
-              </Select>
-            </div>
           </div>
 
           {/* Grid Mods */}
           <Row gutter={[16, 16]}>
             {filteredMods.map((mod) => (
-              <Col xs={24} sm={12} md={8} lg={6} key={mod.id}>
+              <Col xs={24} sm={12} md={8} lg={6} key={mod.ID}>
                 <Card
                   hoverable
                   style={{ background: "#1f1f1f", borderRadius: 8 }}
@@ -201,13 +160,9 @@ const WorkshopDetail: React.FC = () => {
                       <PictureOutlined />
                     </div>
                   }
-                  onClick={() => navigate(`/mod/${mod.id}`, { state: mod })}
+                  onClick={() => navigate(`/mod/${mod.ID}`)}
                 >
                   <Text style={{ color: "white" }}>{mod.title}</Text>
-                  <br />
-                  <Text type="secondary" style={{ color: "#aaa" }}>
-                    by {mod.author}
-                  </Text>
                 </Card>
               </Col>
             ))}

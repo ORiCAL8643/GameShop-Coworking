@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
     Layout,
     Typography,
@@ -19,90 +19,73 @@ import {
 
 // import รูปจาก src/assets
 import defaultModImage from "../../assets/header.jpg";
+import { getMod, listComments, createComment, listModRatings, createModRating } from "../../services/workshop";
+import type { Mod, Comment } from "../../interfaces";
+import { useAuth } from "../../context/AuthContext";
 
 const { Content, Header } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
 
-interface ModItem {
-    id: string;
-    title: string;
-    author: string;
-    image?: string;
-    description?: string;
-    date?: string;
-    downloads?: number; // ถ้าจะเก็บรวม
-    views?: number; // จำนวนผู้เข้าชม (Unique Visitors)
-    subscribers?: number; // จำนวน Subscribers
-}
-
-interface CommentItem {
-    author: string;
-    content: string;
-    datetime: string;
-}
-
 const ModDetail: React.FC = () => {
-    const location = useLocation();
+    const { id } = useParams();
     const navigate = useNavigate();
-    const mod = location.state as ModItem;
+    const { id: userId } = useAuth();
 
-    const [comments, setComments] = useState<CommentItem[]>([
-        {
-            author: "Player1",
-            content: "This mod is awesome! 🔥",
-            datetime: "2025-09-05 12:30",
-        },
-        {
-            author: "Player2",
-            content: "Can you update for the latest version?",
-            datetime: "2025-09-05 13:10",
-        },
-    ]);
-
+    const [mod, setMod] = useState<Mod | null>(null);
+    const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState("");
+    const [rating, setRating] = useState<number>(0);
+    const [averageRating, setAverageRating] = useState<number>(0);
+    const [ratingCount, setRatingCount] = useState<number>(0);
 
-    // ⭐ Rating states
-    const [rating, setRating] = useState<number>(0); // คะแนนที่ user ให้
-    const [averageRating, setAverageRating] = useState<number>(4.2); // mock ค่าเฉลี่ย
-    const [ratingCount, setRatingCount] = useState<number>(125); // mock จำนวนโหวต
-
-    // mock fetch จาก API
     useEffect(() => {
-        const fetchRating = async () => {
-            // TODO: แก้เป็น fetch("/api/mods/:id/rating")
-            const data = { avg: 4.2, count: 125 };
-            setAverageRating(data.avg);
-            setRatingCount(data.count);
-        };
-        fetchRating();
-    }, []);
+        if (id) {
+            const modId = Number(id);
+            getMod(modId).then(setMod).catch(console.error);
+            listComments(modId).then(setComments).catch(console.error);
+            listModRatings(modId)
+                .then((rs) => {
+                    if (rs.length > 0) {
+                        const sum = rs.reduce((s, r) => s + r.rating, 0);
+                        setAverageRating(sum / rs.length);
+                        setRatingCount(rs.length);
+                    }
+                })
+                .catch(console.error);
+        }
+    }, [id]);
 
-    const handleAddComment = () => {
-        if (!newComment.trim()) return;
-
-        const newItem: CommentItem = {
-            author: "You",
+    const handleAddComment = async () => {
+        if (!newComment.trim() || !mod || !userId) return;
+        const payload = {
             content: newComment,
-            datetime: new Date().toLocaleString(),
+            user_id: userId,
+            thread_id: mod.ID,
         };
-
-        setComments([newItem, ...comments]);
-        setNewComment("");
+        try {
+            const c = await createComment(payload);
+            setComments([c, ...comments]);
+            setNewComment("");
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     const handleRateChange = async (value: number) => {
+        if (!mod || !userId) return;
         setRating(value);
-
-        // TODO: ส่งค่าไป backend
-        // fetch(`/api/mods/${mod.id}/rate`, { method: "POST", body: JSON.stringify({ value }) })
-        console.log("User rated:", value);
-
-        // mock update ค่าเฉลี่ย
-        const newCount = ratingCount + 1;
-        const newAvg = (averageRating * ratingCount + value) / newCount;
-        setRatingCount(newCount);
-        setAverageRating(newAvg);
+        try {
+            await createModRating({ rating: value, user_id: userId, mod_id: mod.ID });
+            const ratings = await listModRatings(mod.ID);
+            if (ratings.length > 0) {
+                const sum = ratings.reduce((s, r) => s + r.rating, 0);
+                setAverageRating(sum / ratings.length);
+                setRatingCount(ratings.length);
+            }
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     if (!mod) {
@@ -138,7 +121,7 @@ const ModDetail: React.FC = () => {
                 }}
             >
                 <img
-                    src={mod.image || defaultModImage}
+                    src={defaultModImage}
                     alt={mod.title}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
@@ -153,8 +136,9 @@ const ModDetail: React.FC = () => {
                             {mod.title}
                         </Title>
                         <Space>
-                            <Button type="primary">Download</Button>
-                            
+                            <Button type="primary" href={mod.file_path} target="_blank">
+                                Download
+                            </Button>
                         </Space>
 
                         <Divider style={{ borderColor: "#333" }} />
@@ -195,14 +179,11 @@ const ModDetail: React.FC = () => {
                                         bodyStyle={{ padding: "10px" }}
                                     >
                                         <Text strong style={{ color: "#4dabf7" }}>
-                                            {item.author}
+                                            {item.user?.username || "Anonymous"}
                                         </Text>
                                         <Paragraph style={{ color: "white", margin: "5px 0" }}>
                                             {item.content}
                                         </Paragraph>
-                                        <Text type="secondary" style={{ color: "#D3D3D3", fontSize: "12px" }}>
-                                            {item.datetime}
-                                        </Text>
                                     </Card>
                                 </List.Item>
                             )}
@@ -219,10 +200,10 @@ const ModDetail: React.FC = () => {
                             }}
                         >
                             <Title level={5} style={{ color: "white" }}>
-                                <UserOutlined /> Creator: {mod.author}
+                                <UserOutlined /> Mod ID: {mod.ID}
                             </Title>
                             <Title level={5} style={{ color: "white" }}>
-                                <CalendarOutlined /> Uploaded: {mod.date || "2025-09-05"}
+                                <CalendarOutlined /> Uploaded: {mod.upload_date}
                             </Title>
 
                             <Divider style={{ borderColor: "#333" }} />
@@ -230,14 +211,9 @@ const ModDetail: React.FC = () => {
                             {/* Stats */}
                             <div style={{ marginBottom: "10px" }}>
                                 <Text strong style={{ color: "#4dabf7" }}>
-                                    {mod.views?.toLocaleString() || 0}
+                                    {ratingCount}
                                 </Text>{" "}
-                                <Text style={{ color: "white" }}>Unique Visitors</Text>
-                                <br />
-                                <Text strong style={{ color: "#4dabf7" }}>
-                                    {mod.subscribers?.toLocaleString() || 0}
-                                </Text>{" "}
-                                <Text style={{ color: "white" }}>Current Downloads</Text>
+                                <Text style={{ color: "white" }}>Ratings</Text>
                             </div>
 
                             <Divider style={{ borderColor: "#D" }} />

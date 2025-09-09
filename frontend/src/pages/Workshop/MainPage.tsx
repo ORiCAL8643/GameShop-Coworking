@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Row,
@@ -11,42 +11,37 @@ import {
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { listGames, listUserGames } from "../../services/workshop";
+import type { Game } from "../../interfaces";
+import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider } = Layout;
 const { Text } = Typography;
 const { Search } = Input;
 
-interface WorkshopItem {
-  id: string;
-  title: string;
-  items: number;
-  image?: string;
-}
-
 const WorkshopMain: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [activeMenu, setActiveMenu] = useState("all"); // 👈 เก็บเมนูปัจจุบัน
+  const [activeMenu, setActiveMenu] = useState("all");
+  const [games, setGames] = useState<Game[]>([]);
+  const [yourGames, setYourGames] = useState<number[]>([]);
   const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  const workshops: WorkshopItem[] = [
-    { id: "1", title: "Magneta Box", items: 9, image: "" },
-    { id: "2", title: "Carbrix", items: 2, image: "" },
-    { id: "3", title: "New Day", items: 81, image: "" },
-    { id: "4", title: "Exospace", items: 6, image: "" },
-    { id: "5", title: "Your Boy", items: 6, image: "" },
-    { id: "6", title: "Nijima", items: 20, image: "" },
-    { id: "7", title: "Centoo Rescue", items: 8, image: "" },
-    { id: "8", title: "Tamako", items: 6, image: "" },
-  ];
+  useEffect(() => {
+    listGames().then(setGames).catch(console.error);
+    if (userId) {
+      listUserGames(userId)
+        .then((rows) => setYourGames(rows.map((r) => r.game_id)))
+        .catch(console.error);
+    }
+  }, [userId]);
 
-  // สมมุติว่าเกมที่ผู้ใช้มีจริง ๆ คือ id 1,3,5
-  const yourGamesIds = ["1", "3", "5"];
-
-  // filter ข้อมูล
-  const filtered = workshops.filter((w) => {
-    const matchesSearch = w.title.toLowerCase().includes(search.toLowerCase());
+  const filtered = games.filter((g) => {
+    const matchesSearch = g.game_name
+      .toLowerCase()
+      .includes(search.toLowerCase());
     if (activeMenu === "your-games") {
-      return yourGamesIds.includes(w.id) && matchesSearch;
+      return yourGames.includes(g.ID) && matchesSearch;
     }
     return matchesSearch;
   });
@@ -69,17 +64,17 @@ const WorkshopMain: React.FC = () => {
         </div>
 
         <Row gutter={[16, 16]}>
-          {filtered.map((w) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={w.id}>
+          {filtered.map((g) => (
+            <Col xs={24} sm={12} md={8} lg={6} key={g.ID}>
               <Card
                 hoverable
-                onClick={() => navigate(`/workshop/${w.id}`, { state: w })}
+                onClick={() => navigate(`/workshop/${g.ID}`)}
                 style={{ background: "#1f1f1f", borderRadius: 8 }}
                 cover={
-                  w.image ? (
+                  g.img_src ? (
                     <img
-                      alt={w.title}
-                      src={w.image}
+                      alt={g.game_name}
+                      src={g.img_src}
                       style={{ height: 120, objectFit: "cover" }}
                     />
                   ) : (
@@ -99,11 +94,7 @@ const WorkshopMain: React.FC = () => {
                   )
                 }
               >
-                <Text style={{ color: "white" }}>{w.title}</Text>
-                <br />
-                <Text type="secondary" style={{ color: "#aaa" }}>
-                  {w.items} items
-                </Text>
+                <Text style={{ color: "white" }}>{g.game_name}</Text>
               </Card>
             </Col>
           ))}

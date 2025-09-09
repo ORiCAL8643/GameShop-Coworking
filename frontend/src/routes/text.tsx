@@ -72,8 +72,8 @@ const router = createBrowserRouter([
       },
 
       { path: "/workshop", element: <WorkshopMain /> },
-      { path: "/workshop/:title", element: <WorkshopDetail /> },
-      { path: "/mod/:title", element: <ModDetail /> },
+      { path: "/workshop/:id", element: <WorkshopDetail /> },
+      { path: "/mod/:id", element: <ModDetail /> },
       { path: "/upload", element: <Workshop /> },
 
       { path: "/promotion", element: <PromotionManager /> },
