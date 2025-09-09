@@ -12,13 +12,14 @@ import WorkshopMain from "../pages/Workshop/MainPage.tsx";
 import WorkshopDetail from "../pages/Workshop/WorkshopDetail.tsx";
 import ModDetail from "../pages/Workshop/ModDetail.tsx";
 import Workshop from "../pages/Workshop/UploadPage.tsx";
-
+import RoleManagement from "../pages/role/RoleManagement.tsx";
 // 🟣 Import เพิ่ม
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
+import RoleEdit from "../pages/role/RoleEdit.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -93,8 +94,13 @@ const router = createBrowserRouter([
             addRefundUpdate={addRefundUpdate}
           /> },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+          { path: "/Admin/RolePage", element: <RoleManagement />},
         ],
       },
+      {
+        path: "/roles/:id" ,
+        element: <RoleEdit/>
+      }
     ],
   },
 ]);
