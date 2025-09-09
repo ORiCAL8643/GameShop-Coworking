@@ -1,7 +1,6 @@
-import { Row, Col } from "antd";
+import { Row, Col, Card, Button, message } from "antd";
 //import AddProductCard from "./AddProductCard";
 import { useNavigate } from "react-router-dom";
-import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -62,27 +61,30 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   }, []);
 
   const handleAddToCart = async (g: Game) => {
+    if (!userId) {
+      message.error("กรุณาเข้าสู่ระบบก่อนสั่งซื้อ");
+      return;
+    }
     try {
-      const price = g.discounted_price ?? g.base_price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: price,
-            qty: 1,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
+      let orderId = localStorage.getItem("orderId");
+      if (!orderId) {
+        const orderRes = await axios.post(`${base_url}/orders`, {
+          user_id: userId,
+          order_status: "PENDING",
+        });
+        orderId = String(orderRes.data.ID || orderRes.data.id);
+        localStorage.setItem("orderId", orderId);
       }
+      await axios.post(`${base_url}/order_items`, {
+        order_id: Number(orderId),
+        unit_price: g.base_price,
+        qty: 1,
+        game_key_id: g.key_id,
+      });
       navigate("/category/Payment");
     } catch (err) {
       console.error("add to cart error", err);
+      message.error("ไม่สามารถเพิ่มเกมเข้าตะกร้าได้");
     }
   };
 
