@@ -45,7 +45,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     return `${base_url}/${clean}`;
   };
 
-  const [game, Setgame] = useState<Game[] | null>(null);
+  const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
 
   async function GetGame() {
@@ -86,7 +86,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     }
   };
 
-  const approveGames = game.filter(game => game.status === "approve");
+  const approveGames = game.filter((g) => g.status === "approve");
   return (
     <Row gutter={[16, 16]}>
       {approveGames?.map((c) => {
