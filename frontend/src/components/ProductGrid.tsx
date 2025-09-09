@@ -91,7 +91,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
         }
       } else {
         // เพิ่มรายการเข้าออร์เดอร์เดิม
-        await axios.post(`${base_url}/order_items`, {
+        await axios.post(`${base_url}/order-items`, {
           order_id: Number(stored),
           game_key_id: g.key_id,
           qty: 1,
