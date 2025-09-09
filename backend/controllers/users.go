@@ -84,7 +84,7 @@ func FindUsers(c *gin.Context) {
 // GET /users/:id
 func FindUserByID(c *gin.Context) {
 	var user entity.User
-	if tx := configs.DB().First(&user, c.Param("id")); tx.RowsAffected == 0 {
+	if tx := configs.DB().Preload("Requests").First(&user, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
 		return
 	}

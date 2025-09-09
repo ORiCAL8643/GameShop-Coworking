@@ -12,4 +12,7 @@ type Request struct {
 	Date      time.Time `json:"release_date" gorm:"autoCreateTime"`
 	UserRefer uint      `json:"user" gorm:"not null;index:idx_user_game,unique"`
 	GameRefer uint      `json:"game" gorm:"not null;index:idx_user_game,unique"`
+
+	User User `json:"user_obj" gorm:"foreignKey:UserRefer;references:ID"` // BelongsTo
+	Game Game `json:"game_obj" gorm:"foreignKey:GameRefer;references:ID"` // BelongsTo
 }

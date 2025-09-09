@@ -32,7 +32,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         return;
       }
 
-      login(result.token, values.username);
+      login(result.id, result.token, result.username ?? values.username);
       const notification = {
         ID: Date.now(),
         title: 'ระบบ',
@@ -45,6 +45,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
       onClose();
     } catch (error) {
       Modal.error({ title: 'เกิดข้อผิดพลาด', content: 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์' });
+      console.log('เกิดข้อผิดพลาดไม่สามารถเชื่อมต่อเซิร์ฟเวอร์',error);
     }
   };
 
@@ -60,13 +61,24 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
+      
       if (!res.ok) {
         throw new Error('Signup failed');
       }
+       // สมัครสำเร็จ → ล็อกอินด้วย username/password เดิม
+      const loginRes = await fetch('http://localhost:8088/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: values.username, password: values.password }),
+      });
+      const loginData = await loginRes.json();
 
-      const data = await res.json();
-      login(data.token, values.username);
+      if (!loginRes.ok) {
+        Modal.error({ title: 'เข้าสู่ระบบหลังสมัครไม่สำเร็จ', content: loginData?.error || 'Login failed' });
+        return;
+      }
+
+      login(loginData.id, loginData.token, loginData.username ?? values.username);
       onClose();
     } catch (error) {
       console.error(error);

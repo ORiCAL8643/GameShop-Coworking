@@ -1,71 +1,79 @@
-import { Card, Table, Tag, Space, Typography } from "antd";
+import { Card, Table, Typography, Select, Button } from "antd";
+import { Col, Row } from 'antd';
 import type { ColumnsType } from "antd/es/table";
+import axios from "axios";
+import { useState, useEffect } from "react";
+import type { Request } from "../interfaces/Request";
+import type { Game } from '../interfaces';
+const base_url = 'http://localhost:8088'
+const { Title} = Typography;
 
-const { Title, Text } = Typography;
-
-type RequestStatus = "pending" | "approved" | "rejected";
 type Row = {
   id: number;
   game_name: string;
-  category: string;
-  requester: string;
-  requested_at: string; // แสดงเป็นข้อความพอ
-  status: RequestStatus;
-  cover_url?: string;
+  reason: string;
+  user: string;
+  date: string; // แสดงเป็นข้อความพอ
 };
-
-const STATUS: Record<RequestStatus, { label: string; color: string }> = {
-  pending:  { label: "รอตรวจสอบ", color: "gold" },
-  approved: { label: "อนุมัติ",    color: "green" },
-  rejected: { label: "ปฏิเสธ",     color: "red" },
-};
-
-const data: Row[] = [
-  { id: 101, game_name: "100% Orange Juice", category: "Party", requester: "alice@example.com", requested_at: "04/09/2025 13:20", status: "pending"/*, cover_url: "https://i.imgur.com/1.jpg" */},
-  { id: 102, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 103, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-  { id: 104, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 105, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-  { id: 106, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 107, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-  { id: 108, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 109, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-  { id: 110, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 111, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-  { id: 112, game_name: "Deep FPS",          category: "FPS",   requester: "bob@example.com",   requested_at: "03/09/2025 18:05", status: "approved" },
-  { id: 113, game_name: "Cozy Horror",       category: "Horror",requester: "cara@example.com",  requested_at: "01/09/2025 09:40", status: "rejected" },
-];
 
 const columns: ColumnsType<Row> = [
   {
     title: "เกม",
     dataIndex: "game_name",
-    render: (_, r) => (
-      <Space align="start">
-        {r.cover_url ? (
-          <img src={r.cover_url} alt={r.game_name}
-               style={{ width: 72, height: 44, objectFit: "cover", borderRadius: 8 }} />
-        ) : (
-          <div style={{ width: 72, height: 44, borderRadius: 8, background: "rgba(255,255,255,.06)" }} />
-        )}
-        <div>
-          <div style={{ fontWeight: 600 }}>{r.game_name}</div>
-          <Text type="secondary">{r.category}</Text>
-        </div>
-      </Space>
-    ),
   },
-  { title: "ผู้รีเควส", dataIndex: "requester", width: 180, ellipsis: true },
-  { title: "วันที่รีเควส", dataIndex: "requested_at", width: 160 },
+  { title: "ผู้รีเควส", dataIndex: "user", width: 180, ellipsis: true }, //dataindex อ้างอิงจาก datasource
+  { title: "วันที่รีเควส", dataIndex: "date", width: 160 },
   {
-    title: "สถานะ",
-    dataIndex: "status",
+    title: "เหตุผล",
+    dataIndex: "reason",
     width: 120,
-    render: (st: RequestStatus) => <Tag color={STATUS[st].color}>{STATUS[st].label}</Tag>,
   },
 ];
 
 export default function Requestinfo() {
+  const[Requestinfo, SetRequestinfo] = useState<Request[]>([])
+  const[game, Setgame] = useState<Game[]>([])
+  const[gameid,SetgameID] = useState<number | null>(null);
+
+  async function UpdateGame(id: number, data: { status?: string }) {
+  try {
+    const response = await axios.put(`${base_url}/update-game/${id}`, data);
+    console.log("อัปเดตสำเร็จ:", response.data);
+    return response.data;
+  } catch (err) {
+    console.error("update error:", err);
+  }
+}
+
+  async function GetRequest() {
+        try {
+        const response = await axios.get(`${base_url}/request`)
+        SetRequestinfo(response.data)
+        console.log(response.data)
+        } catch(err) {
+        console.log('get game error',err)
+        }  
+}
+    useEffect(() =>{
+        GetRequest()
+    }, []) //เข้าหน้า info ฟังก์จะเรียกใช้ทันที
+
+    async function GetGame() {
+        try {
+        const response = await axios.get(`${base_url}/game`)
+        Setgame(response.data)
+        console.log(response.data)
+        } catch(err) {
+        console.log('get game error',err)
+        }  
+}
+    useEffect(() =>{
+        GetGame()
+    }, [])
+
+    const pendingGames = game.filter(game => game.status === "pending");
+
+
   return (
     <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
@@ -76,11 +84,22 @@ export default function Requestinfo() {
         <Table<Row>
           rowKey="id"
           columns={columns}
-          dataSource={data}
+          dataSource={Requestinfo.map(c => ({
+              id: c.ID,
+              game_name: c.game_obj.game_name,
+              reason: c.reason,
+              user: c.user_obj.username,
+              date: c.release_date,
+}))}
           pagination={{ pageSize: 8, showSizeChanger: false }}
           bordered style={{ background:'#707070ff', borderRadius: 10}}
         />
       </Card>
+      <Title level={3} style={{ color: 'white' }}>เลือกเกมขายในหน้าร้านค้า</Title> {/* title ต้อง import Typography*/}
+      <Row>
+        <Select placeholder="กรุณาเลือกเกม" style={{ width: 500}} options={pendingGames.map(c => ({ value: c.ID, label: c.game_name }))} value={gameid ?? undefined} onChange={(val, option) => {console.log("onChange val:", val);console.log("onChange option:", option);SetgameID(val);}}/>
+        <Col offset={1}><Button type="primary" onClick={() => {UpdateGame(gameid,{ status: "approve"})}}>ยืนยัน</Button></Col>
+      </Row>
     </div>
   );
 }
