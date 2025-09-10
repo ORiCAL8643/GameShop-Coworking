@@ -18,7 +18,6 @@ export interface Order {
 }
 
 export interface CreateOrderRequest {
-  total_amount: number;
   order_status: string;
   user_id: number;
   order_create?: string; // ถ้าไม่ส่ง backend จะใส่ให้
@@ -26,7 +25,6 @@ export interface CreateOrderRequest {
 
 export interface UpdateOrderRequest {
   ID: number;
-  total_amount?: number;
   order_status?: string;
   order_create?: string;
 }

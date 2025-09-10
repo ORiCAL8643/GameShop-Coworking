@@ -32,6 +32,12 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	total, err := updateOrderTotal(body.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	body.TotalAmount = total
 	c.JSON(http.StatusCreated, body)
 }
 
@@ -108,6 +114,10 @@ func UpdateOrder(c *gin.Context) {
 	}
 	if err := db.Model(&row).Updates(payload).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if _, err := updateOrderTotal(row.ID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
