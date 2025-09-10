@@ -59,7 +59,7 @@ const Add = () => {
       message.error("อัปโหลดล้มเหลว");
     }
   };
-
+    
     /*
     const handleChange = ({ fileList }: { fileList: UploadFile[] }) => {
     if (fileList.length > 0) {
@@ -69,7 +69,7 @@ const Add = () => {
         setImageurl(url);
       }
     } else {
-      setImageurl(""); // ถ้าลบไฟล์ออกก็เคลียร์ state
+      setImageurl(""); // ถ้าลบไฟล์ออกก็เคลียร์ 
     }
   };*/
    /* const handleChange = ({ fileList }: { fileList: UploadFile[] }) => {
