@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -33,6 +34,111 @@ func CreatePayment(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, body)
+}
+
+// CreatePaymentWithGames สร้างออร์เดอร์และชำระเงินจากรายการเกมที่ส่งมา
+func CreatePaymentWithGames(c *gin.Context) {
+	var req struct {
+		UserID uint `json:"user_id" binding:"required"`
+		Games  []struct {
+			GameID   uint `json:"game_id" binding:"required"`
+			Quantity int  `json:"quantity"`
+		} `json:"games" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
+		return
+	}
+	db := configs.DB()
+
+	// ตรวจ User
+	var user entity.User
+	if tx := db.First(&user, req.UserID); tx.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
+		return
+	}
+
+	now := time.Now()
+	order := entity.Order{
+		UserID:      req.UserID,
+		OrderCreate: now,
+		OrderStatus: "PENDING",
+	}
+	if err := db.Create(&order).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	total := 0.0
+
+	for _, g := range req.Games {
+		qty := g.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+		var game entity.Game
+		if tx := db.First(&game, g.GameID); tx.RowsAffected == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+			return
+		}
+
+		unitPrice := float64(game.BasePrice)
+		discount := 0.0
+
+		var promos []entity.Promotion
+		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
+			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", g.GameID, now, now).
+			Find(&promos)
+		for _, p := range promos {
+			var d float64
+			if p.DiscountType == entity.DiscountPercent {
+				d = unitPrice * float64(p.DiscountValue) / 100
+			} else if p.DiscountType == entity.DiscountAmount {
+				d = float64(p.DiscountValue)
+			}
+			if d > discount {
+				discount = d
+			}
+		}
+		if discount > unitPrice {
+			discount = unitPrice
+		}
+		lineDiscount := discount * float64(qty)
+		lineTotal := (unitPrice - discount) * float64(qty)
+		lineDiscount = math.Round(lineDiscount*100) / 100
+		lineTotal = math.Round(lineTotal*100) / 100
+		total += lineTotal
+
+		item := entity.OrderItem{
+			UnitPrice:    unitPrice,
+			QTY:          qty,
+			LineDiscount: lineDiscount,
+			LineTotal:    lineTotal,
+			OrderID:      order.ID,
+		}
+		if err := db.Create(&item).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	total = math.Round(total*100) / 100
+	db.Model(&order).Update("total_amount", total)
+
+	payment := entity.Payment{
+		OrderID:     order.ID,
+		PaymentDate: now,
+		Status:      "PENDING",
+		Amount:      total,
+	}
+	if err := db.Create(&payment).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	db.Preload("OrderItems").First(&order, order.ID)
+
+	c.JSON(http.StatusCreated, gin.H{"order": order, "payment": payment})
 }
 
 func FindPayments(c *gin.Context) {
