@@ -23,5 +23,8 @@ export interface ProblemReport {
   user?: User;
   game?: Game;
 
+  // ✅ ข้อความตอบกลับจากแอดมิน
+  reply?: string;
+
   attachments?: ProblemAttachment[];
 }
