@@ -24,7 +24,14 @@ interface RawNotification {
 
 export async function fetchNotifications(userId: number): Promise<Notification[]> {
   const { data } = await api.get("/notifications", { params: { user_id: userId } });
-  const list = data as RawNotification[];
+
+  // Some endpoints in the project wrap lists inside an `items` property while
+  // others return the array directly.  When the shape wasn't an array the
+  // previous implementation treated the response object as an empty list, so no
+  // notifications appeared in the bell UI.  Normalise the shape before mapping
+  // to our `Notification` type.
+  const list = (Array.isArray(data) ? data : data?.items || []) as RawNotification[];
+
   return list.map((n) => ({
     ID: n.ID ?? 0,
     title: n.title ?? n.Title ?? "",
