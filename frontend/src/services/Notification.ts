@@ -38,26 +38,17 @@ export async function createNotification(payload: {
   user_id: number;
 }): Promise<Notification | null> {
   try {
-<<<<<<< HEAD
-    const res = await api.post("/notifications", payload);
-    return res.data;
-=======
     console.log("🔔 Sending notification:", payload);
     const res = await api.post("/notifications", payload);
     console.log("✅ Notification created:", res.data);
     return res.data as Notification;
->>>>>>> b4fc498d4f127ee60f13568594114a4cd6eb72d1
   } catch (err) {
     console.error("❌ createNotification error:", err);
     return null;
   }
 }
 
-<<<<<<< HEAD
-// ✅ อ่านแล้ว (เดี่ยว)
-=======
 // ทำเป็นอ่านแล้ว (เฉพาะรายการ)
->>>>>>> b4fc498d4f127ee60f13568594114a4cd6eb72d1
 export async function markNotificationRead(id: number): Promise<void> {
   await api.put(`/notifications/${id}/read`);
 }

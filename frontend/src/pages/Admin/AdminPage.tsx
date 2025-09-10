@@ -11,9 +11,9 @@ import {
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { fetchReports, resolveReport, replyReport } from "../../services/Report";
-import { createNotification } from "../../services/Notification";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
+import { createNotification } from "../../services/Notification";
 
 const { Title } = Typography;
 const { TextArea } = Input;
