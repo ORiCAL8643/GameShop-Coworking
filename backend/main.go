@@ -167,6 +167,8 @@ func main() {
 		// -------- Payments --------
 		// POST /payments (multipart: order_id, file)
 		router.POST("/payments", controllers.CreatePayment)
+		router.PATCH("/payments/:id", controllers.UpdatePayment) // 👈 เพิ่มบรรทัดนี้
+		router.GET("/payments", controllers.FindPayments)
 		// GET /payments จัดอยู่ในกลุ่ม withUserQuery ด้านบนแล้ว (เพื่อเติม user_id อัตโนมัติได้ ถ้าคุณเลือกส่ง header)
 		// ไม่รองรับ PATCH/DELETE payment โดยตรง
 		router.POST("/payments/:id/approve", controllers.ApprovePayment)

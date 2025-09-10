@@ -11,19 +11,21 @@ const THEME_PRIMARY = "#9b59b6";
 const BG_DARK = "#1e1e2f";
 const CARD_DARK = "#171923";
 const BORDER = "#2b2f3a";
-const TEXT_MAIN = "#110f0fff";   // ขาวชัด
-const TEXT_SUB = "#a9afc3";    // เทาอ่อนอ่านง่าย
+const TEXT_MAIN = "#e8e8f3";
+const TEXT_SUB = "#a9afc3";
 
 type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED";
 type ReviewablePayment = {
-  id: string;              // internal payment id
-  order_no: string;        // e.g. ORD-20240901-0001
-  user_name: string;       // buyer name
-  amount: number;          // THB
-  slip_url: string;        // image url
-  uploaded_at: string;     // ISO / display string
+  id: number;
+  order_no: string;
+  user_name: string;
+  amount: number;
+  slip_url: string;
+  uploaded_at: string;
   status: PaymentStatus;
-  reject_reason?: string;
+  reject_reason?: string | null;
+  order_id: number;
+  order_status: string;
 };
 
 const formatTHB = (n: number) =>
@@ -35,37 +37,39 @@ export default function AdminPaymentReviewPage() {
   const { modal, message } = App.useApp();
   const [rows, setRows] = useState<ReviewablePayment[]>([]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: string }>({ open: false });
+  const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: number }>({ open: false });
   const [rejectText, setRejectText] = useState("");
 
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("PENDING");
   const [keyword, setKeyword] = useState("");
 
+  const fetchPayments = async (st: PaymentStatus | "ALL") => {
+    try {
+      const qs = st === "ALL" ? "" : `?status=${st}`;
+      const res = await axios.get<ReviewablePayment[]>(`${BASE_URL}/payments${qs}`);
+      setRows(res.data);
+    } catch {
+      message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
+    }
+  };
+
   useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const res = await axios.get<ReviewablePayment[]>(`${BASE_URL}/payments?status=PENDING`);
-        setRows(res.data);
-      } catch {
-        message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
-      }
-    };
-    fetchPayments();
-  }, [message]);
+    fetchPayments(statusFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter]);
 
   const data = useMemo(() => {
     return rows.filter(r => {
-      const m1 = statusFilter === "ALL" ? true : r.status === statusFilter;
       const kw = keyword.trim().toLowerCase();
-      const m2 =
+      return (
         !kw ||
         r.order_no.toLowerCase().includes(kw) ||
-        r.user_name.toLowerCase().includes(kw);
-      return m1 && m2;
+        (r.user_name || "").toLowerCase().includes(kw)
+      );
     });
-  }, [rows, statusFilter, keyword]);
+  }, [rows, keyword]);
 
-  const approve = (id: string) => {
+  const approve = (id: number) => {
     modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
       icon: <ExclamationCircleOutlined />,
@@ -74,8 +78,10 @@ export default function AdminPaymentReviewPage() {
       okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
       onOk: async () => {
         try {
-          await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" });
-          setRows(prev => prev.map(p => (p.id === id ? { ...p, status: "APPROVED" } : p)));
+          await axios.post(`${BASE_URL}/payments/${id}/approve`);
+          setRows(prev =>
+            prev.map(p => (p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "FULFILLED" } : p)),
+          );
           message.success("อนุมัติการชำระเงินแล้ว");
         } catch {
           message.error("ไม่สามารถอนุมัติได้");
@@ -84,7 +90,7 @@ export default function AdminPaymentReviewPage() {
     });
   };
 
-  const reject = (id: string) => {
+  const reject = (id: number) => {
     setRejectOpen({ open: true, id });
     setRejectText("");
   };
@@ -93,13 +99,12 @@ export default function AdminPaymentReviewPage() {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
-      await axios.patch(`${BASE_URL}/payments/${id}`, {
-        status: "REJECTED",
+      await axios.post(`${BASE_URL}/payments/${id}/reject`, {
         reject_reason: rejectText.trim(),
       });
       setRows(prev =>
         prev.map(p =>
-          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim() } : p,
+          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim(), order_status: "CANCELLED" } : p,
         ),
       );
       message.success("ปฏิเสธการชำระเงินแล้ว");
@@ -143,6 +148,7 @@ export default function AdminPaymentReviewPage() {
               borderColor: BORDER,
             }}
           />
+          <Button onClick={() => fetchPayments(statusFilter)}>รีเฟรช</Button>
         </Space>
       </Card>
 
@@ -150,8 +156,7 @@ export default function AdminPaymentReviewPage() {
         <Table
           rowKey="id"
           dataSource={data}
-          pagination={{ pageSize: 6, showSizeChanger: false }}
-          style={{ color: TEXT_MAIN }}
+          pagination={{ pageSize: 8, showSizeChanger: false }}
           columns={[
             {
               title: "ออเดอร์",
@@ -160,7 +165,7 @@ export default function AdminPaymentReviewPage() {
                 <Space direction="vertical" size={0}>
                   <Typography.Text style={{ color: TEXT_MAIN }}>{v}</Typography.Text>
                   <Typography.Text style={{ color: TEXT_SUB, fontSize: 12 }}>
-                    โดย {r.user_name}
+                    โดย {r.user_name || "-"}
                   </Typography.Text>
                 </Space>
               ),
@@ -170,7 +175,7 @@ export default function AdminPaymentReviewPage() {
               dataIndex: "amount",
               align: "right" as const,
               render: (n: number) => (
-                <Typography.Text style={{ color: "#111010ff", fontWeight: 600 }}>
+                <Typography.Text style={{ color: "#fff", fontWeight: 600 }}>
                   {formatTHB(n)}
                 </Typography.Text>
               ),
