@@ -2,17 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ReviewsAPI, type Review } from "../services/reviews";
 import { Button, Form, Input, List, Modal, Popconfirm, Rate, message } from "antd";
 import { Heart, Pencil, Trash2, Plus } from "lucide-react";
-
-// เชื่อม Auth ถ้ามี (fallback เป็น guest)
-function useAuth() {
-  try {
-    // @ts-ignore - เผื่อโปรเจกต์ยังไม่มี hook นี้
-    const mod = require("@/hooks/useAuth");
-    return mod.useAuth?.() || { user: null };
-  } catch {
-    return { user: null } as { user: { id: number; username?: string } | null };
-  }
-}
+import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
   gameId: number;
@@ -21,8 +11,8 @@ export type ReviewSectionProps = {
 };
 
 const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = true, className }) => {
-  const { user } = useAuth();
-  const userId = (user as any)?.id ?? (user as any)?.ID ?? null;
+  const { id, username } = useAuth();
+  const userId = id;
 
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<Review[]>([]);
@@ -166,7 +156,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 <div>
                   {item.review_text && <p className="text-sm text-gray-800 mb-1">{item.review_text}</p>}
                   <p className="text-xs text-gray-500">
-                    โดย {item.user?.username || `User#${item.user_id}`} · ID #{item.ID}
+                    โดย {item.user?.username || (item.user_id === userId && username) || `User#${item.user_id}`} · ID #{item.ID}
                   </p>
                 </div>
               }
