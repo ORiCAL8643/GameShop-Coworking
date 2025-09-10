@@ -294,6 +294,25 @@ export default function AdminPage({
                 </div>
               )}
 
+              {/* Admin reply message */}
+              {rep.reply && (
+                <div style={{ marginTop: 15 }}>
+                  <p style={{ ...textStyle, marginBottom: 8 }}>
+                    📨 Admin Reply:
+                  </p>
+                  <div
+                    style={{
+                      background: "#141322",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {rep.reply}
+                  </div>
+                </div>
+              )}
+
               {/* Reply form */}
               {rep.status !== "resolved" && (
                 <div style={{ marginTop: "20px" }}>
