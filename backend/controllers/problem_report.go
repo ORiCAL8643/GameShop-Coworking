@@ -281,12 +281,19 @@ func ReplyReport(c *gin.Context) {
 		}
 	}
 
-	// ✅ mark ว่าแก้ไขแล้ว
-	if text != "" {
-		// (คุณจะเลือกเก็บ text เป็น Notification หรือ Log ก็ได้)
-	}
-	rp.Status = "resolved"
-	rp.ResolvedAt = time.Now()
+       // ✅ mark ว่าแก้ไขแล้ว
+       if text != "" {
+               // ส่งการแจ้งเตือนไปยังเจ้าของ report ว่ามีการตอบกลับ
+               _ = db.Create(&entity.Notification{
+                       Title:   fmt.Sprintf("ตอบกลับปัญหา #%d", rp.ID),
+                       Message: text,
+                       Type:    "report",
+                       UserID:  rp.UserID,
+               }).Error
+       }
+
+       rp.Status = "resolved"
+       rp.ResolvedAt = time.Now()
 
 	if err := db.Save(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

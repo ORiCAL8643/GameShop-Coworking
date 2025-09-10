@@ -37,3 +37,8 @@ export async function markAllNotificationsRead(userId: number): Promise<void> {
   const unread = list.filter((n) => !n.is_read);
   await Promise.all(unread.map((n) => markNotificationRead(n.ID)));
 }
+
+// ลบแจ้งเตือนตาม id
+export async function deleteNotification(id: number): Promise<void> {
+  await api.delete(`/notifications/${id}`);
+}

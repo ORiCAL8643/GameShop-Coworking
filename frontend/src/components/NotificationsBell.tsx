@@ -1,8 +1,8 @@
 // src/components/NotificationBell.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Popover, List, Button, Typography } from "antd";
-import { BellOutlined } from "@ant-design/icons";
-import { fetchNotifications, markAllNotificationsRead } from "../services/Notification";
+import { BellOutlined, DeleteOutlined } from "@ant-design/icons";
+import { fetchNotifications, markAllNotificationsRead, markNotificationRead, deleteNotification } from "../services/Notification";
 import type { Notification } from "../interfaces/Notification";
 
 const { Text } = Typography;
@@ -36,13 +36,8 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     return () => clearInterval(t);
   }, [userId, pollMs]);
 
-  const onOpenChange = async (v: boolean) => {
+  const onOpenChange = (v: boolean) => {
     setOpen(v);
-    if (v && unreadCount > 0) {
-      await markAllNotificationsRead(userId);
-      // โหลดใหม่เพื่ออัปเดต badge = 0
-      await load();
-    }
   };
 
   const content = (
@@ -57,7 +52,26 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         dataSource={items}
         locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
         renderItem={(n) => (
-          <List.Item style={{ background: n.is_read ? "transparent" : "rgba(146,84,222,0.12)", borderRadius: 8, marginBottom: 6, padding: "10px 12px" }}>
+          <List.Item
+            style={{ background: n.is_read ? "transparent" : "rgba(146,84,222,0.12)", borderRadius: 8, marginBottom: 6, padding: "10px 12px", cursor: "pointer" }}
+            onClick={async () => {
+              if (!n.is_read) {
+                await markNotificationRead(n.ID);
+                await load();
+              }
+            }}
+            actions={[
+              <Button
+                type="text"
+                icon={<DeleteOutlined />}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await deleteNotification(n.ID);
+                  await load();
+                }}
+              />,
+            ]}
+          >
             <List.Item.Meta
               title={<Text strong>{n.title || "แจ้งเตือน"}</Text>}
               description={

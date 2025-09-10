@@ -1,44 +1,19 @@
 
 import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from '@ant-design/icons';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Input, Avatar, Space, Button } from 'antd';
 import { useAuth } from '../context/AuthContext';
 
 import { Link } from 'react-router-dom';
 import AuthModal from '../components/AuthModal';
 import NotificationsBell from '../components/NotificationsBell';
-import type { Notification } from '../interfaces/Notification';
-import { fetchNotifications } from '../services/Notification';
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
   const { token, username, logout, id: userId } = useAuth();
 
-  useEffect(() => {
-    if (!userId) {
-      setNotifications([]);
-      return;
-    }
-    const load = async () => {
-      try {
-        const data = await fetchNotifications(userId);
-        setNotifications(data);
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    load();
-    const t = setInterval(load, 10000);
-    return () => clearInterval(t);
-  }, [userId]);
-
-  const handleLoginSuccess: (n: Notification) => void = () => {
-    if (userId) {
-      fetchNotifications(userId)
-        .then(setNotifications)
-        .catch((e) => console.error(e));
-    }
+  const handleLoginSuccess = (_: any) => {
+    // หลังจากล็อกอินแล้ว NotificationBell จะโหลดข้อมูลเองจาก userId
   };
 
   return (
@@ -52,7 +27,7 @@ const Navbar = () => {
 
       {/* Icons */}
       <Space size="large">
-        <NotificationsBell notifications={notifications} />
+        <NotificationsBell userId={userId || 0} />
 
         {/* Refund Status Icon */}
         <Link to="/refund-status">
