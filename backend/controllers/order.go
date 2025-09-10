@@ -24,6 +24,14 @@ func CreateOrder(c *gin.Context) {
 	if body.OrderCreate.IsZero() {
 		body.OrderCreate = time.Now()
 	}
+	// ถ้ามีรายการสินค้า ให้คำนวณราคารวมจากยอดสุทธิของแต่ละรายการ
+	total := 0.0
+	for _, it := range body.OrderItems {
+		total += it.LineTotal
+	}
+	if total > 0 {
+		body.TotalAmount = total
+	}
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

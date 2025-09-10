@@ -1,7 +1,5 @@
-import { Row, Col } from "antd";
+import { Row, Col, Card, Button, message } from "antd";
 //import AddProductCard from "./AddProductCard";
-import { useNavigate } from "react-router-dom";
-import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -46,7 +44,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   };
 
   const [game, Setgame] = useState<Game[]>([]);
-  const navigate = useNavigate();
 
   async function GetGame() {
     try {
@@ -65,25 +62,37 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     try {
       const price = g.discounted_price ?? g.base_price;
       const discount = g.base_price - price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: g.base_price,
-            qty: 1,
-            line_discount: discount,
-            line_total: price,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
+      const existingOrderId = localStorage.getItem("orderId");
+
+      if (existingOrderId) {
+        await axios.post(`${base_url}/order-items`, {
+          unit_price: g.base_price,
+          qty: 1,
+          order_id: Number(existingOrderId),
+          game_key_id: g.key_id,
+          line_discount: discount,
+          line_total: price,
+        });
+      } else {
+        const res = await axios.post(`${base_url}/orders`, {
+          user_id: userId ?? 0,
+          order_status: "PENDING",
+          order_items: [
+            {
+              unit_price: g.base_price,
+              qty: 1,
+              line_discount: discount,
+              line_total: price,
+              game_key_id: g.key_id,
+            },
+          ],
+        });
+        const orderId = res.data.ID || res.data.id;
+        if (orderId) {
+          localStorage.setItem("orderId", String(orderId));
+        }
       }
-      navigate("/category/Payment");
+      message.success("เพิ่มเกมลงตะกร้าสำเร็จ");
     } catch (err) {
       console.error("add to cart error", err);
     }
