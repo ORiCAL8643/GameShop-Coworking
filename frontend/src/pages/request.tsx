@@ -24,8 +24,8 @@ const Request = () => {
             const response = await axios.post(`${base_url}/new-request`, {
                 reason: reason,
                 release_date: date,
-                user: id,
-                game: gameid,
+                user: id, 
+                game: gameid, 
         });
             console.log("เพิ่มรีเควสสำเร็จ:", response.data)
         } catch(err) {
