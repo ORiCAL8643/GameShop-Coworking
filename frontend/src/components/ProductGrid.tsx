@@ -27,6 +27,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     status: string;
     minimum_spec_id: number;
   }
+  type game = {
+  id: number;
+  game_name: string;
+  release_date?: string;
+  age_rating?: number | string;
+  categories: { title: string };
+};
 
   // แปลง img_src ให้เป็น absolute URL เสมอ
   const resolveImgUrl = (src?: string) => {
@@ -48,19 +55,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
   const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);   //usestate
+  const [selected, setSelected] = useState<Game | null>(null); //usestate
+  const open = !!selected;
 
-  const showModal = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleOk = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleCancel = () => {
-    setIsModalOpen(false);
-  };
+  const showModal = (item: Game) => setSelected(item);
+  const handleCancel = () => setSelected(null);
 
   async function GetGame() {
     try {
@@ -126,18 +125,18 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
                 </Col>
                 <Col >
                   <div>
-                    <Button onClick={showModal} type="text" shape="circle" size="small" style={{background: "#1f1f1f"}} icon={<MoreOutlined style={{fontSize:"18px" , color: "#fffcfcff"}}/>} />
-                      <Modal
-                        title= {c.game_name}
-                        closable={{ 'aria-label': 'Custom Close Button' }}
-                        open={isModalOpen}
-                        onOk={handleOk}
+                    <Button onClick={() => showModal(c)} type="text" shape="circle" size="small" style={{background: "#1f1f1f"}} icon={<MoreOutlined style={{fontSize:"18px" , color: "#fffcfcff"}}/>} />
+                    <Modal
+                        title={selected?.game_name}
+                        open={open}
                         onCancel={handleCancel}
-                      >
-                        <p>หมวดหมู่: {c.categories.title}</p>
-                        <p>วันวางขาย: {c.release_date}</p>
-                        <p>อายุขั้นต่ำ: {c.age_rating}</p>
-                      </Modal>
+                        onOk={handleCancel}
+                        okText="ปิด"
+                        closable>
+                          <p>หมวดหมู่: {selected?.categories.title}</p>
+                          <p>วันวางขาย: {selected?.release_date ?? "-"}</p>
+                          <p>อายุขั้นต่ำ: {selected?.age_rating ?? "-"}</p>
+                    </Modal>
                   </div>
                 </Col>
             </Row>
