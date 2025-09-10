@@ -38,9 +38,13 @@ func CreatePayment(c *gin.Context) {
 
 // CreatePaymentWithGames สร้างออร์เดอร์และชำระเงินจากรายการเกมที่ส่งมา
 func CreatePaymentWithGames(c *gin.Context) {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 	var req struct {
-		UserID uint `json:"user_id" binding:"required"`
-		Games  []struct {
+		Games []struct {
 			GameID   uint `json:"game_id" binding:"required"`
 			Quantity int  `json:"quantity"`
 		} `json:"games" binding:"required"`
@@ -51,16 +55,9 @@ func CreatePaymentWithGames(c *gin.Context) {
 	}
 	db := configs.DB()
 
-	// ตรวจ User
-	var user entity.User
-	if tx := db.First(&user, req.UserID); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
-		return
-	}
-
 	now := time.Now()
 	order := entity.Order{
-		UserID:      req.UserID,
+		UserID:      user.ID,
 		OrderCreate: now,
 		OrderStatus: "PENDING",
 	}
@@ -142,10 +139,22 @@ func CreatePaymentWithGames(c *gin.Context) {
 }
 
 func FindPayments(c *gin.Context) {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 	var rows []entity.Payment
-	db := configs.DB().Preload("Order").Preload("PaymentSlips")
+	db := configs.DB().Preload("Order").Preload("PaymentSlips").Joins("JOIN orders ON orders.id = payments.order_id")
 	orderID := c.Query("order_id")
 	status := c.Query("status")
+	if user.RoleID == 3 {
+		if uid := c.Query("user_id"); uid != "" {
+			db = db.Where("orders.user_id = ?", uid)
+		}
+	} else {
+		db = db.Where("orders.user_id = ?", user.ID)
+	}
 	if orderID != "" {
 		db = db.Where("order_id = ?", orderID)
 	}
