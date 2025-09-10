@@ -1,4 +1,4 @@
-// frontend/src/pages/Review/DevReviewsStandalone.tsx
+// frontend/src/pages/Review/Reviewpage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -31,7 +31,8 @@ function resolveImgUrl(img?: string) {
   return `${BASE}/${s.replace(/^\/+/, "")}`;
 }
 
-const DevReviewsStandalone: React.FC = () => {
+// Reviewpage fetches a game by id from the URL and renders its reviews.
+const Reviewpage: React.FC = () => {
   const { gameId } = useParams();
   const [loading, setLoading] = useState(true);
   const [game, setGame] = useState<{ id: number; name: string; img?: string } | null>(null);
@@ -97,4 +98,4 @@ const DevReviewsStandalone: React.FC = () => {
   );
 };
 
-export default DevReviewsStandalone;
+export default Reviewpage;

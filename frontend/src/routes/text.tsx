@@ -81,6 +81,7 @@ const router = createBrowserRouter([
 
       { path: "/promotion", element: <PromotionManager /> },
       { path: "/promotion/:id", element: <PromotionDetail /> },
+      // Review page for a specific game
       { path: "/reviews/:gameId", element: <Reviewpage /> },
 
 
