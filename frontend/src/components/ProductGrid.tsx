@@ -8,10 +8,11 @@ import axios from "axios";
 const base_url = "http://localhost:8088";
 
 interface ProductGridProps {
-  userId: number | null;
+  /** If provided, filter games to those belonging to the user */
+  id?: number | null;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ id }) => {
   interface Game {
     ID: number;
     game_name: string;
@@ -46,7 +47,9 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   };
 
   const [game, Setgame] = useState<Game[]>([]);
+  const [ownedIds, setOwnedIds] = useState<number[]>([]);
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   async function GetGame() {
     try {
@@ -60,6 +63,31 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   useEffect(() => {
     GetGame();
   }, []);
+
+  async function GetOrders() {
+    if (!token) return;
+    try {
+      const res = await axios.get(`${base_url}/orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const ids = new Set<number>();
+      (res.data || []).forEach((o: any) =>
+        o.order_items?.forEach((it: any) => {
+          const gid = it?.key_game?.game?.ID;
+          if (gid) ids.add(gid);
+        })
+      );
+      setOwnedIds(Array.from(ids));
+    } catch (err) {
+      console.log("get orders error", err);
+    }
+  }
+
+  useEffect(() => {
+    if (id != null) {
+      GetOrders();
+    }
+  }, [id, token]);
 
   interface CartStorageItem {
     game_id: number;
@@ -89,9 +117,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   };
 
   const approveGames = game.filter((g) => g.status === "approve");
+  const displayGames = id != null ? approveGames.filter((g) => ownedIds.includes(g.ID)) : approveGames;
   return (
     <Row gutter={[16, 16]}>
-      {approveGames?.map((c) => {
+      {displayGames?.map((c) => {
         const hasDiscount =
           c.discounted_price !== undefined &&
           c.discounted_price < c.base_price;
