@@ -201,7 +201,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                   <Space align="center" size={8}>
                     <Avatar icon={!initials && <UserOutlined />}>{initials || undefined}</Avatar>
                     <span className="font-medium">{item.review_title}</span>
-                    <Rate disabled allowHalf value={item.rating / 2} />
+                    <Rate disabled count={10} value={item.rating} />
                     <span className="text-xs text-gray-500">ให้ {item.rating}/10</span>
                   </Space>
                 }
@@ -239,8 +239,8 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
             <Input.TextArea rows={4} maxLength={2000} placeholder="เล่าประสบการณ์ จุดเด่น จุดที่ควรปรับ" />
           </Form.Item>
           <Form.Item label="คะแนน (0-10)" name="rating" rules={[{ required: true }]}>
-            <Rate allowHalf defaultValue={4} tooltips={["0","1","2","3","4","5","6","7","8","9","10"].map(x=>`${x}/10`)} />
-            <div className="text-xs text-gray-500 mt-1">* แสดงเป็น 0–10 (ดาวจะคิดครึ่ง = /2)</div>
+            <Rate count={10} tooltips={Array.from({ length: 10 }, (_, i) => `${i + 1}/10`)} />
+            <div className="text-xs text-gray-500 mt-1">* คะแนนเต็ม 10 ดาว</div>
           </Form.Item>
         </Form>
       </Modal>
