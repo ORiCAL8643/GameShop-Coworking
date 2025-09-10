@@ -48,8 +48,6 @@ func FindOrders(c *gin.Context) {
 		userID := c.Query("user_id")
 		if userID != "" {
 			db = db.Where("user_id = ?", userID)
-		} else {
-			db = db.Where("user_id = ?", user.ID)
 		}
 	} else {
 		db = db.Where("user_id = ?", user.ID)
