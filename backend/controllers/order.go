@@ -72,6 +72,12 @@ func FindOrders(c *gin.Context) {
 }
 
 func FindOrderByID(c *gin.Context) {
+	uid, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	var row entity.Order
 	if tx := configs.DB().
 		Preload("User").
@@ -82,6 +88,19 @@ func FindOrderByID(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
 		return
 	}
+
+	if row.UserID != uid {
+		var user entity.User
+		if err := configs.DB().First(&user, uid).Error; err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+			return
+		}
+		if user.RoleID != 3 {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusOK, row)
 }
 
