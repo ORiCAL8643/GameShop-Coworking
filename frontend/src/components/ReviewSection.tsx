@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ReviewsAPI, type Review } from "../services/reviews";
-import { Button, Form, Input, List, Modal, Popconfirm, Rate, message } from "antd";
+import { Avatar, Button, Form, Input, List, Modal, Popconfirm, Rate, Space, message } from "antd";
 import { Heart, Pencil, Trash2, Plus } from "lucide-react";
+import { UserOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
@@ -27,8 +28,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
     try {
       const list = await ReviewsAPI.listByGame(gameId);
       setItems(list.sort((a, b) => (b.ID ?? 0) - (a.ID ?? 0)));
-    } catch (err: any) {
-      message.error(err?.message || "โหลดรีวิวไม่สำเร็จ");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      message.error(msg || "โหลดรีวิวไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
@@ -82,8 +84,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       setShowForm(false);
       setEditing(null);
       form.resetFields();
-    } catch (err: any) {
-      message.error(err?.message || "บันทึกรีวิวไม่สำเร็จ");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      message.error(msg || "บันทึกรีวิวไม่สำเร็จ");
     }
   }
 
@@ -92,8 +95,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       await ReviewsAPI.remove(id);
       setItems(prev => prev.filter(it => it.ID !== id));
       message.success("ลบรีวิวแล้ว");
-    } catch (err: any) {
-      message.error(err?.message || "ลบรีวิวไม่สำเร็จ");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      message.error(msg || "ลบรีวิวไม่สำเร็จ");
     }
   }
 
@@ -130,42 +134,46 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         locale={{ emptyText: "ยังไม่มีรีวิวสำหรับเกมนี้" }}
         className="space-y-4"
         split={false}
-        renderItem={(item) => (
-          <List.Item
-            className="bg-white p-4 rounded-md shadow"
-            actions={[
-              <Button key="like" onClick={() => handleToggleLike(item)} icon={<Heart size={16} />}>
-                {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
-              </Button>,
-              canEdit(item) && (
-                <Button key="edit" type="text" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
-              ),
-              canEdit(item) && (
-                <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
-                  <Button danger type="text" icon={<Trash2 size={16} />}>ลบ</Button>
-                </Popconfirm>
-              ),
-            ].filter(Boolean) as any}
-          >
-            <List.Item.Meta
-              title={
-                <div className="flex items-center gap-3">
-                  <span className="font-medium">{item.review_title}</span>
-                  <Rate disabled allowHalf value={item.rating / 2} />
-                  <span className="text-xs text-gray-500">ให้ {item.rating}/10</span>
-                </div>
-              }
-              description={
-                <div>
-                  {item.review_text && <p className="text-sm text-gray-800 mb-1">{item.review_text}</p>}
-                  <p className="text-xs text-gray-500">
-                    โดย {item.user?.username || (item.user_id === userId && username) || `User#${item.user_id}`} · ID #{item.ID}
-                  </p>
-                </div>
-              }
-            />
-          </List.Item>
-        )}
+        renderItem={(item) => {
+          const initials = (item.user?.username || (item.user_id === userId && username) || "").charAt(0).toUpperCase();
+          return (
+            <List.Item
+              className="bg-white p-4 rounded-md shadow"
+              actions={[
+                <Button key="like" onClick={() => handleToggleLike(item)} icon={<Heart size={16} />}>
+                  {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
+                </Button>,
+                canEdit(item) && (
+                  <Button key="edit" type="text" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
+                ),
+                canEdit(item) && (
+                  <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
+                    <Button danger type="text" icon={<Trash2 size={16} />}>ลบ</Button>
+                  </Popconfirm>
+                ),
+              ].filter(Boolean) as React.ReactNode[]}
+            >
+              <List.Item.Meta
+                title={
+                  <Space align="center" size={8}>
+                    <Avatar icon={!initials && <UserOutlined />}>{initials || undefined}</Avatar>
+                    <span className="font-medium">{item.review_title}</span>
+                    <Rate disabled allowHalf value={item.rating / 2} />
+                    <span className="text-xs text-gray-500">ให้ {item.rating}/10</span>
+                  </Space>
+                }
+                description={
+                  <div>
+                    {item.review_text && <p className="text-sm text-gray-800 mb-1">{item.review_text}</p>}
+                    <p className="text-xs text-gray-500">
+                      โดย {item.user?.username || (item.user_id === userId && username) || `User#${item.user_id}`} · ID #{item.ID}
+                    </p>
+                  </div>
+                }
+              />
+            </List.Item>
+          );
+        }}
       />
 
       <Modal
