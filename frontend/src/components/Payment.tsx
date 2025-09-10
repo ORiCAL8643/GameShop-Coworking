@@ -30,7 +30,8 @@ import qrPromptPay from "../assets/ktb-qr.png";
 interface CartItem {
   id: number;
   title: string;
-  price: number; // THB
+  /** line_total already reflects any discount from backend */
+  line_total: number; // THB
   note?: string;
 }
 
@@ -60,7 +61,7 @@ const PaymentPage = () => {
           data.order_items?.map((it: any) => ({
             id: it.id,
             title: it.key_game.game.game_name,
-            price: it.line_total,
+            line_total: it.line_total,
           })) || [];
         setItems(mapped);
       } catch (err) {
@@ -71,11 +72,18 @@ const PaymentPage = () => {
     load();
   }, [orderIdParam]);
 
-  // ใช้ราคารวมจาก backend (total_amount) เพื่อให้รวมส่วนลดแล้ว
-  const subtotal = useMemo(
-    () => order?.total_amount ?? items.reduce((s, it) => s + it.price, 0),
-    [order, items]
-  );
+  // ใช้ราคารวมจาก backend ที่รวมส่วนลดไว้แล้ว
+  const subtotal = useMemo(() => {
+    if (order?.total_amount !== undefined) return order.total_amount;
+    // เผื่อกรณี backend ไม่คำนวณ total_amount ส่งมาให้
+    return (
+      order?.order_items?.reduce(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sum: number, it: any) => sum + Number(it.line_total),
+        0
+      ) || items.reduce((s, it) => s + it.line_total, 0)
+    );
+  }, [order, items]);
   const fee = 0;
   // ✅ ตัดส่วนลดออก และอาศัย line_total ที่คำนวณฝั่ง backend
   const total = useMemo(() => subtotal + fee, [subtotal]);
@@ -174,7 +182,7 @@ const PaymentPage = () => {
                   </Col>
                   <Col>
                     <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
-                      {formatTHB(it.price)}
+                      {formatTHB(it.line_total)}
                     </Typography.Title>
                   </Col>
                 </Row>
