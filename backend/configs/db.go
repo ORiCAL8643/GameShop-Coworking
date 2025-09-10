@@ -42,10 +42,15 @@ func SetupDatabase() {
 		log.Fatal("database is not connected; call ConnectionDB() first")
 	}
 
+	// ปิดการตรวจสอบ foreign key ชั่วคราวระหว่างการ migrate
+	db.Exec("PRAGMA foreign_keys = OFF")
+
 	// สร้างตารางให้ครบ
 	if err := db.AutoMigrate(
 		&entity.User{},
 		&entity.Game{},
+		&entity.Order{},
+		&entity.OrderItem{},
 		&entity.KeyGame{},
 		&entity.Thread{},
 		&entity.UserGame{},
@@ -53,8 +58,6 @@ func SetupDatabase() {
 		&entity.Reaction{},
 		&entity.Attachment{},
 		&entity.Notification{},
-		&entity.Order{},
-		&entity.OrderItem{},
 		&entity.Payment{},
 		&entity.PaymentSlip{},
 		&entity.PaymentReview{},
@@ -66,6 +69,9 @@ func SetupDatabase() {
 	); err != nil {
 		log.Fatal("auto migrate failed: ", err)
 	}
+
+	// เปิดการตรวจสอบ foreign key กลับหลังจาก migrate เสร็จ
+	db.Exec("PRAGMA foreign_keys = ON")
 
 	seedIfNeeded()
 }
