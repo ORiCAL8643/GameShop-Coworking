@@ -1,29 +1,35 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type CartItem = {
-  id: number;        // game_id
+  id: number;        // game id
   title: string;
-  price: number;     // price per unit (แสดงผลเท่านั้น - backend จะคำนวณจริงอีกทีตอนสร้าง order)
+  price: number;     // snapshot per unit
   quantity: number;
   note?: string;
 };
 
 type CartContextType = {
   items: CartItem[];
-  addItem: (item: Omit<CartItem, "quantity"> & { quantity?: number }) => void;
-  removeItem: (id: number) => void;
+  addItem: (it: CartItem) => void;
   updateQty: (id: number, qty: number) => void;
+  removeItem: (id: number) => void;
   clearCart: () => void;
 };
 
-const CartContext = createContext<CartContextType | null>(null);
+const CartContext = createContext<CartContextType>({
+  items: [],
+  addItem: () => {},
+  updateQty: () => {},
+  removeItem: () => {},
+  clearCart: () => {},
+});
 
-const STORAGE_KEY = "cart";
+const LS_KEY = "cart";
 
 export const CartProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(LS_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch {
       return [];
@@ -31,40 +37,28 @@ export const CartProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   });
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(LS_KEY, JSON.stringify(items));
   }, [items]);
 
-  const addItem: CartContextType["addItem"] = (item) => {
+  const addItem = (it: CartItem) => {
     setItems((prev) => {
-      const found = prev.find((p) => p.id === item.id);
+      const found = prev.find((p) => p.id === it.id);
       if (found) {
-        return prev.map((p) =>
-          p.id === item.id ? { ...p, quantity: p.quantity + (item.quantity ?? 1) } : p
-        );
+        return prev.map((p) => (p.id === it.id ? { ...p, quantity: p.quantity + it.quantity } : p));
       }
-      return [...prev, { ...item, quantity: item.quantity ?? 1 }];
+      return [...prev, it];
     });
   };
 
-  const removeItem = (id: number) => setItems((prev) => prev.filter((p) => p.id !== id));
-
   const updateQty = (id: number, qty: number) =>
-    setItems((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, quantity: Math.max(1, qty) } : p))
-    );
+    setItems((prev) => prev.map((p) => (p.id === id ? { ...p, quantity: Math.max(1, qty) } : p)));
 
+  const removeItem = (id: number) => setItems((prev) => prev.filter((p) => p.id !== id));
   const clearCart = () => setItems([]);
 
-  const value = useMemo(
-    () => ({ items, addItem, removeItem, updateQty, clearCart }),
-    [items]
-  );
+  const api = useMemo(() => ({ items, addItem, updateQty, removeItem, clearCart }), [items]);
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return <CartContext.Provider value={api}>{children}</CartContext.Provider>;
 };
 
-export const useCart = () => {
-  const ctx = useContext(CartContext);
-  if (!ctx) throw new Error("useCart must be used within CartProvider");
-  return ctx;
-};
+export const useCart = () => useContext(CartContext);

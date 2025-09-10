@@ -27,21 +27,17 @@ export default function PaymentPage() {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { id: userId } = useAuth();
+  const { id: userId } = useAuth(); // ✅ ใช้ id จาก AuthContext แบบที่คุณต้องการ
 
-  const subtotal = useMemo(
-    () => items.reduce((s, it) => s + it.price * it.quantity, 0),
-    [items]
-  );
-  const fee = 0;
-  const total = useMemo(() => subtotal + fee, [subtotal]);
+  const subtotal = useMemo(() => items.reduce((s, it) => s + it.price * it.quantity, 0), [items]);
+  const total = useMemo(() => subtotal, [subtotal]);
 
-  const incQuantity = (id: number) =>
-    updateQty(id, (items.find((i) => i.id === id)?.quantity ?? 1) + 1);
+  const incQuantity = (gameId: number) =>
+    updateQty(gameId, (items.find(i => i.id === gameId)?.quantity ?? 1) + 1);
 
-  const decQuantity = (id: number) => {
-    const cur = items.find((i) => i.id === id)?.quantity ?? 1;
-    updateQty(id, Math.max(1, cur - 1));
+  const decQuantity = (gameId: number) => {
+    const cur = items.find(i => i.id === gameId)?.quantity ?? 1;
+    updateQty(gameId, Math.max(1, cur - 1));
   };
 
   const handleSubmitSlip = async () => {
@@ -61,29 +57,29 @@ export default function PaymentPage() {
     try {
       setSubmitting(true);
 
-      // 1) สร้างคำสั่งซื้อ (backend จะคำนวณราคาสุทธิ/โปรโมชันเอง)
+      // 1) สร้าง Order จากตะกร้า (server จะ snapshot ราคาจริง/โปรฯ เอง)
       const orderRes = await fetch(`${API}/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" }, // ❌ ไม่ใช้ authHeader()
         body: JSON.stringify({
-          user_id: userId,
+          user_id: userId, // ✅ ส่ง user_id ตามที่ backend ปัจจุบันรองรับ
           items: items.map((it) => ({ game_id: it.id, qty: it.quantity })),
         }),
       });
-      if (!orderRes.ok) throw new Error("สร้างคำสั่งซื้อไม่สำเร็จ");
+      if (!orderRes.ok) throw new Error("create order failed");
       const order = await orderRes.json();
       const orderId = order.ID ?? order.id;
-      if (!orderId) throw new Error("ไม่พบเลขคำสั่งซื้อ");
+      if (!orderId) throw new Error("missing order id");
 
-      // 2) อัปโหลดสลิป
+      // 2) อัปโหลดสลิป → /payments (multipart: order_id, file)
       const form = new FormData();
       form.append("order_id", String(orderId));
       form.append("file", files[0].originFileObj as File);
 
-      const payRes = await fetch(`${API}/payments`, { method: "POST", body: form });
-      if (!payRes.ok) throw new Error("อัปโหลดสลิปไม่สำเร็จ");
+      const payRes = await fetch(`${API}/payments`, { method: "POST", body: form }); // ❌ ไม่ใช้ authHeader()
+      if (!payRes.ok) throw new Error("upload slip failed");
 
-      // Success
+      // 3) แจ้งผู้ใช้ / เคลียร์ตะกร้า / ไปหน้าสถานะ
       message.success("ส่งการยืนยันสำเร็จ กรุณารอการอัปเดตสถานะ");
       setPayOpen(false);
       setFiles([]);
@@ -99,10 +95,7 @@ export default function PaymentPage() {
 
   return (
     <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1 }}>
-      <Typography.Title
-        level={2}
-        style={{ color: THEME_PRIMARY, textAlign: "center", marginBottom: 24 }}
-      >
+      <Typography.Title level={2} style={{ color: THEME_PRIMARY, textAlign: "center", marginBottom: 24 }}>
         YOUR GAME CART
       </Typography.Title>
 
@@ -113,6 +106,7 @@ export default function PaymentPage() {
               <Card
                 key={it.id}
                 hoverable
+                className="payment-item"
                 style={{ borderRadius: 14, background: CARD_DARK, borderColor: BORDER }}
                 bodyStyle={{ padding: 16 }}
               >
@@ -144,6 +138,7 @@ export default function PaymentPage() {
                       <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeItem(it.id)} />
                     </Space>
                   </Col>
+
                   <Col>
                     <Space direction="vertical" align="end" size={0}>
                       <Typography.Text style={{ color: TEXT_SUB }}>
@@ -161,12 +156,7 @@ export default function PaymentPage() {
             <Button
               type="default"
               size="large"
-              style={{
-                width: "100%",
-                borderColor: THEME_PRIMARY,
-                color: THEME_PRIMARY,
-                background: "transparent",
-              }}
+              style={{ width: "100%", borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}
               onClick={() => navigate("/home")}
             >
               ดำเนินการเลือกซื้อต่อไป
@@ -175,17 +165,13 @@ export default function PaymentPage() {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card
-            style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }}
-            bodyStyle={{ padding: 16 }}
-          >
+          <Card style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }} bodyStyle={{ padding: 16 }}>
             <Typography.Title level={4} style={{ marginTop: 4, color: TEXT_MAIN }}>
               สรุปการสั่งซื้อ
             </Typography.Title>
 
             <Space direction="vertical" style={{ width: "100%" }}>
               <Divider style={{ margin: "10px 0", borderColor: BORDER }} />
-
               <Row>
                 <Col flex="auto">
                   <strong style={{ color: TEXT_MAIN }}>ราคารวม</strong>
@@ -196,7 +182,6 @@ export default function PaymentPage() {
                   </Typography.Title>
                 </Col>
               </Row>
-
               <Typography.Paragraph style={{ marginTop: -4, color: TEXT_SUB }}>
                 *ราคาสุทธิจะถูกคำนวณอีกครั้งเมื่อสร้างคำสั่งซื้อ (อิงโปรโมชันขณะชำระ)
               </Typography.Paragraph>
@@ -205,14 +190,10 @@ export default function PaymentPage() {
                 <Button
                   type="primary"
                   size="large"
-                  style={{
-                    backgroundColor: THEME_PRIMARY,
-                    borderColor: THEME_PRIMARY,
-                    color: "#fff",
-                  }}
+                  block
+                  style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
                   onClick={() => setPayOpen(true)}
                   disabled={!items.length}
-                  block
                 >
                   ดำเนินการต่อไปยังการชำระเงิน
                 </Button>
@@ -221,11 +202,7 @@ export default function PaymentPage() {
                   size="large"
                   block
                   icon={<HistoryOutlined />}
-                  style={{
-                    borderColor: THEME_PRIMARY,
-                    color: THEME_PRIMARY,
-                    background: "transparent",
-                  }}
+                  style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}
                   onClick={() => navigate("/orders-status")}
                 >
                   ดูสถานะคำสั่งซื้อ
@@ -234,7 +211,7 @@ export default function PaymentPage() {
             </Space>
           </Card>
         </Col>
-      </Row> {/* ✅ ปิด Row ก่อนเริ่ม Modal */}
+      </Row>
 
       <Modal
         title={<span style={{ color: THEME_PRIMARY }}>ชำระเงินด้วยคิวอาร์โค้ด</span>}
@@ -250,12 +227,7 @@ export default function PaymentPage() {
               <img
                 src={qrPromptPay}
                 alt="PromptPay QR"
-                style={{
-                  width: 280,
-                  maxWidth: "100%",
-                  borderRadius: 12,
-                  boxShadow: "0 0 0 1px " + BORDER,
-                }}
+                style={{ width: 280, maxWidth: "100%", borderRadius: 12, boxShadow: "0 0 0 1px " + BORDER }}
               />
               <Typography.Paragraph style={{ marginTop: 12, color: TEXT_MAIN }}>
                 <strong>จำนวนเงินโดยประมาณ:</strong>{" "}

@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import { Row, Col, Card, Tag, Typography, Space, Button, message, Empty } from "antd";
 import { ReloadOutlined, HomeOutlined, ArrowLeftOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 const API = "http://localhost:8088";
 
@@ -25,16 +25,21 @@ const formatTHB = (n: number) =>
   `฿${(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function OrdersStatusPage() {
-  const { id: userId } = useAuth();
+  const { id } = useAuth();            // ✅ ใช้เฉพาะ id ตามที่คุณต้องการ
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Order[]>([]);
   const navigate = useNavigate();
 
   const fetchOrders = async () => {
-    if (!userId) return;
+    if (!id) {
+      message.warning("กรุณาเข้าสู่ระบบ");
+      return;
+    }
     setLoading(true);
     try {
-      const res = await fetch(`${API}/orders?user_id=${userId}`);
+      // ✅ กรองเฉพาะคำสั่งซื้อของผู้ใช้ที่ล็อกอินด้วย query user_id
+      // (สอดคล้องกับ main.go ที่รองรับ ?user_id= แล้ว)
+      const res = await fetch(`${API}/orders?user_id=${id}`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
@@ -46,15 +51,17 @@ export default function OrdersStatusPage() {
     }
   };
 
+  // ❌ ลบ fetch() ที่อยู่นอก useEffect ออก (เดิมอยู่ใต้ const { id } = useAuth();)
   useEffect(() => {
+    setRows([]);     // reset เมื่อเปลี่ยน user
     fetchOrders();
-  }, [userId]); // eslint-disable-line
+  }, [id]);          // เรียกใหม่เมื่อเปลี่ยนผู้ใช้
 
   const colorOf = (st: string) => {
     switch ((st || "").toUpperCase()) {
       case "WAITING_PAYMENT": return "default";
       case "UNDER_REVIEW":   return "processing";
-      case "PAID":
+      case "PAID":           return "success";
       case "FULFILLED":      return "success";
       case "CANCELLED":      return "error";
       default:               return "default";
@@ -78,47 +85,45 @@ export default function OrdersStatusPage() {
           สถานะคำสั่งซื้อของฉัน
         </Typography.Title>
 
-        <Space wrap>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>
-            ย้อนกลับ
-          </Button>
-          <Button icon={<HomeOutlined />} onClick={() => navigate("/home")}>
-            กลับหน้าหลัก
-          </Button>
-          <Button icon={<ReloadOutlined />} onClick={fetchOrders} loading={loading}>
-            รีเฟรช
-          </Button>
+        <Space>
+          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(-1)}>ย้อนกลับ</Button>
+          <Button icon={<HomeOutlined />} onClick={() => navigate("/home")}>กลับหน้าหลัก</Button>
+          <Button icon={<ReloadOutlined />} onClick={fetchOrders} loading={loading}>รีเฟรช</Button>
         </Space>
       </div>
 
       {/* Content */}
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {rows.length === 0 ? (
-          <Card style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 16 }} bodyStyle={{ padding: 24 }}>
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
-                   description={<span style={{ color: TEXT_SUB }}>ยังไม่มีคำสั่งซื้อ</span>} />
+          <Card style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 12 }}>
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={<span style={{ color: TEXT_SUB }}>ยังไม่มีคำสั่งซื้อ</span>}
+            />
           </Card>
         ) : (
           <Row gutter={[16, 16]}>
             {rows.map((o) => {
-              const id = o.ID ?? o.id!;
+              const oid = o.ID ?? o.id!;
               const status = (o.OrderStatus ?? o.order_status ?? "").toUpperCase();
               const total = o.TotalAmount ?? o.total_amount ?? 0;
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString() : "-";
 
               return (
-                <Col key={id} xs={24} sm={12} md={8} lg={6} xl={6}>
+                <Col key={oid} xs={24} sm={12} md={8} lg={6} xl={6}>
                   <Card
                     hoverable
                     style={{ height: "100%", background: CARD_DARK, borderColor: BORDER, borderRadius: 16 }}
                     bodyStyle={{ padding: 16 }}
-                    actions={[<span key="detail" style={{ color: THEME_PRIMARY, fontWeight: 600 }}>รายละเอียด</span>]}
+                    actions={[
+                      <span key="detail" style={{ color: THEME_PRIMARY, fontWeight: 600 }}>รายละเอียด</span>,
+                    ]}
                   >
                     <Space direction="vertical" size={8} style={{ width: "100%" }}>
                       <Space style={{ width: "100%", justifyContent: "space-between" }}>
                         <Typography.Text style={{ color: TEXT_MAIN, fontWeight: 600 }}>
-                          Order #{id}
+                          Order #{oid}
                         </Typography.Text>
                         <Tag color={colorOf(status)}>{status || "UNKNOWN"}</Tag>
                       </Space>
