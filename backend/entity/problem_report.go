@@ -2,23 +2,22 @@ package entity
 
 import (
 	"time"
-
 	"gorm.io/gorm"
 )
 
 type ProblemReport struct {
 	gorm.Model
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	Status      string    `json:"status"`      // e.g. "open", "resolved", "in_progress"
-	ResolvedAt  time.Time `json:"resolved_at"` // zero-time = ยังไม่ปิดงาน
+	Title       string `json:"title"`
+	Description string `json:"description"`
 
-	UserID uint `json:"user_id"`
-	GameID uint `json:"game_id"`
+	UserID uint  `json:"user_id"`
+	User   *User `gorm:"foreignKey:UserID" json:"user"`
 
-	// Preloadable relations
-	User *User `gorm:"foreignKey:UserID" json:"user"`
-	Game *Game `gorm:"foreignKey:GameID" json:"game"`
+	GameID uint  `json:"game_id"`
+	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
 
-	Attachments []ProblemAttachment `gorm:"foreignKey:ReportID" json:"attachments"`
+	Status     string    `json:"status" gorm:"default:open"`
+	ResolvedAt time.Time `json:"resolved_at"` // ✅ เพิ่มฟิลด์นี้
+
+	Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
 }

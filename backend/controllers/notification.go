@@ -1,4 +1,3 @@
-// controllers/notification.go
 package controllers
 
 import (
@@ -12,11 +11,11 @@ import (
 
 // POST /notifications
 func CreateNotification(c *gin.Context) {
-        var body entity.Notification
-        if err := c.ShouldBindJSON(&body); err != nil {
-                c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
-                return
-        }
+	var body entity.Notification
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
+		return
+	}
 
 	// ตรวจสอบว่ามี user_id นี้จริงไหม
 	var user entity.User
@@ -25,12 +24,12 @@ func CreateNotification(c *gin.Context) {
 		return
 	}
 
-       // default type ถ้าไม่ส่งมา
-       if body.Type == "" {
-               body.Type = "system"
-       }
-       // เริ่มต้นให้ยังไม่อ่าน
-       body.IsRead = false
+	// default type ถ้าไม่ส่งมา
+	if body.Type == "" {
+		body.Type = "system"
+	}
+	// เริ่มต้นให้ยังไม่อ่าน
+	body.IsRead = false
 
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -75,28 +74,42 @@ func FindNotificationByID(c *gin.Context) {
 	c.JSON(http.StatusOK, row)
 }
 
-// PUT /notifications/:id
-func UpdateNotification(c *gin.Context) {
-	var payload entity.Notification
-	if err := c.ShouldBindJSON(&payload); err != nil {
+// PUT /notifications/:id/read → อ่านแล้ว (เดี่ยว)
+func MarkNotificationRead(c *gin.Context) {
+	id := c.Param("id")
+	db := configs.DB()
+
+	if err := db.Model(&entity.Notification{}).
+		Where("id = ?", id).
+		Update("is_read", true).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	db := configs.DB()
 	var row entity.Notification
-	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "notification not found"})
+	_ = db.First(&row, id)
+	c.JSON(http.StatusOK, row)
+}
+
+// PUT /notifications/read-all → อ่านแล้วทั้งหมด
+func MarkAllNotificationsRead(c *gin.Context) {
+	var body struct {
+		UserID uint `json:"user_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.UserID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "must provide user_id"})
 		return
 	}
 
-       if err := db.Model(&row).Updates(payload).Error; err != nil {
-               c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-               return
-       }
+	db := configs.DB()
+	if err := db.Model(&entity.Notification{}).
+		Where("user_id = ? AND is_read = ?", body.UserID, false).
+		Update("is_read", true).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
-       _ = db.First(&row, row.ID)
-       c.JSON(http.StatusOK, row)
+	c.JSON(http.StatusOK, gin.H{"message": "marked all as read"})
 }
 
 // DELETE /notifications/:id

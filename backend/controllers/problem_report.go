@@ -78,10 +78,7 @@ func CreateReport(c *gin.Context) {
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
 
-				// ✅ path จริงที่ใช้เซฟ
 				dst := filepath.Join(dir, name)
-
-				// ✅ path ที่เก็บใน DB (relative URL)
 				relPath := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
 
 				if err := c.SaveUploadedFile(f, dst); err != nil {
@@ -258,7 +255,7 @@ func ReplyReport(c *gin.Context) {
 
 	text := strings.TrimSpace(c.PostForm("text"))
 
-	// ✅ บันทึกไฟล์แนบ (ถ้ามี)
+	// ✅ แนบไฟล์ถ้ามี
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
 		if len(files) > 0 {
@@ -281,17 +278,19 @@ func ReplyReport(c *gin.Context) {
 		}
 	}
 
-       // ✅ mark ว่าแก้ไขแล้ว
-       if text != "" {
-               _ = db.Create(&entity.Notification{
-                       Title:   "ตอบกลับการรายงาน",
-                       Message: text,
-                       Type:    "report_reply",
-                       UserID:  rp.UserID,
-               }).Error
-       }
-       rp.Status = "resolved"
-       rp.ResolvedAt = time.Now()
+	// ✅ ยิง Notification ให้เจ้าของ report
+	if text != "" {
+		_ = db.Create(&entity.Notification{
+			Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
+			Message: text,
+			Type:    "report_reply",
+			UserID:  rp.UserID,
+			IsRead:  false,
+		}).Error
+	}
+
+	rp.Status = "resolved"
+	rp.ResolvedAt = time.Now()
 
 	if err := db.Save(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

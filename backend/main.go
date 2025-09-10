@@ -75,11 +75,14 @@ func main() {
 		router.DELETE("/attachments/:id", controllers.DeleteAttachmentByID)
 
 		// ===== Notifications =====
-		router.POST("/notifications", controllers.CreateNotification)
-		router.GET("/notifications", controllers.FindNotifications)
-		router.GET("/notifications/:id", controllers.FindNotificationByID)
-		router.PUT("/notifications/:id", controllers.UpdateNotification)
-		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
+
+		r.POST("/notifications", controllers.CreateNotification)
+		r.GET("/notifications", controllers.FindNotifications)
+		r.GET("/notifications/:id", controllers.FindNotificationByID)
+		r.PUT("/notifications/:id/read", controllers.MarkNotificationRead)
+		r.PUT("/notifications/read-all", controllers.MarkAllNotificationsRead)
+		r.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
+
 
 		// ===== Promotions =====
 		router.POST("/promotions", controllers.CreatePromotion)
@@ -113,6 +116,9 @@ func main() {
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
 		router.POST("/reports/:id/reply", controllers.ReplyReport) // ✅ เพิ่มตรงนี้
+		
+
+
 
 	}
 
