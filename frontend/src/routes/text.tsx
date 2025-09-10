@@ -21,7 +21,7 @@ import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
 import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
-import DevReviewsStandalone from "../pages/Review/Reviewpage.tsx";
+import Reviewpage from "../pages/Review/Reviewpage.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -81,7 +81,7 @@ const router = createBrowserRouter([
 
       { path: "/promotion", element: <PromotionManager /> },
       { path: "/promotion/:id", element: <PromotionDetail /> },
-      { path: "/reviews/:gameId", element: <ReviewPage /> },
+      { path: "/reviews/:gameId", element: <Reviewpage /> },
 
 
       // 🟣 Refund
