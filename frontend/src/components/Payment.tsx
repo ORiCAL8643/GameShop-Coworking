@@ -37,6 +37,15 @@ interface CartItem {
   note?: string;
 }
 
+interface RawCartItem {
+  game_id?: number;
+  id?: number;
+  title: string;
+  price: number;
+  quantity?: number;
+  note?: string;
+}
+
 const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -44,8 +53,8 @@ const PaymentPage = () => {
   const [items, setItems] = useState<CartItem[]>(() => {
     const stored = localStorage.getItem("cart");
     return stored
-      ? JSON.parse(stored).map((it: any) => ({
-          id: it.game_id ?? it.id,
+      ? (JSON.parse(stored) as RawCartItem[]).map((it) => ({
+          id: it.game_id ?? it.id!,
           title: it.title,
           price: it.price,
           quantity: it.quantity ?? 1,
@@ -57,7 +66,7 @@ const PaymentPage = () => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { id: userId } = useAuth();
+  const { token } = useAuth();
 
   const updateItems = (next: CartItem[]) => {
     setItems(next);
@@ -108,9 +117,11 @@ const PaymentPage = () => {
       // 1) สร้างออร์เดอร์และการชำระเงินจากรายการสินค้า
       const res = await fetch("http://localhost:8088/payments/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
-          user_id: userId || 1,
           games: items.map((it) => ({
             game_id: it.id,
             quantity: it.quantity,
@@ -130,13 +141,17 @@ const PaymentPage = () => {
       const slipRes = await fetch("http://localhost:8088/payment_slips", {
         method: "POST",
         body: form,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       if (!slipRes.ok) throw new Error("upload slip failed");
 
       // 3) อัปเดตสถานะคำสั่งซื้อหลังส่งสลิปสำเร็จ
       await fetch(`http://localhost:8088/orders/${orderId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ order_status: "PAID" }),
       });
 
