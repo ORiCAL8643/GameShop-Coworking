@@ -133,7 +133,7 @@ export default function PromotionManager() {
       title: "ชื่อโปรโมชัน",
       dataIndex: "title",
       key: "title",
-      render: (t: string) => <Text style={{ color: "white" }}>{t}</Text>,
+      render: (t: string) => <Text style={{ color: "back" }}>{t}</Text>,
     },
     {
       title: "ส่วนลด",
