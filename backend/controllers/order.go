@@ -42,13 +42,25 @@ func CreateOrder(c *gin.Context) {
 }
 
 func FindOrders(c *gin.Context) {
+	uid, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+
 	var rows []entity.Order
 	db := configs.DB().Preload("User").Preload("OrderItems").Preload("Payments").Preload("OrderPromotions")
-	userID := c.Query("user_id")
-	status := c.Query("status")
-	if userID != "" {
-		db = db.Where("user_id = ?", userID)
+
+	var user entity.User
+	if err := configs.DB().First(&user, uid).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found"})
+		return
 	}
+	if user.RoleID != 3 {
+		db = db.Where("user_id = ?", uid)
+	}
+
+	status := c.Query("status")
 	if status != "" {
 		db = db.Where("order_status = ?", status)
 	}
