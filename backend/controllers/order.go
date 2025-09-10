@@ -14,17 +14,17 @@ import (
 )
 
 func CreateOrder(c *gin.Context) {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 	var body entity.Order
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
 		return
 	}
-	// ตรวจ User
-	var user entity.User
-	if tx := configs.DB().First(&user, body.UserID); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
-		return
-	}
+	body.UserID = user.ID
 	if body.OrderCreate.IsZero() {
 		body.OrderCreate = time.Now()
 	}
@@ -86,6 +86,11 @@ func FindOrderByID(c *gin.Context) {
 }
 
 func UpdateOrder(c *gin.Context) {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 	var payload entity.Order
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -97,6 +102,10 @@ func UpdateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
 		return
 	}
+	if user.RoleID != 3 && row.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 	if err := db.Model(&row).Updates(payload).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -105,8 +114,23 @@ func UpdateOrder(c *gin.Context) {
 }
 
 func DeleteOrder(c *gin.Context) {
-	if tx := configs.DB().Exec("DELETE FROM orders WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	var row entity.Order
+	db := configs.DB()
+	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
+		return
+	}
+	if user.RoleID != 3 && row.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	if err := db.Delete(&row).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
