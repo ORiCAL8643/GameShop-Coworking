@@ -168,7 +168,8 @@ func ToggleReviewLike(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"review_id": review.ID, "likes": count})
 }
 
-// GET /games/:id/reviews
+// FindReviewsByGame handles GET /games/:id/reviews
+// and returns all reviews for a particular game.
 func FindReviewsByGame(c *gin.Context) {
 	var rows []entity.Review
 	if err := configs.DB().

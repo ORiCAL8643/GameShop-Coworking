@@ -32,6 +32,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   async function load() {
     setLoading(true);
     try {
+      // Load reviews for the given game via GET /games/:gameId/reviews
       const list = await ReviewsAPI.listByGame(gameId);
       setItems(
         list
