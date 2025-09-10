@@ -88,9 +88,10 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
           const total =
             orderRes.data.total_amount ??
             (orderRes.data.order_items || []).reduce(
-              (sum: number, it: any) => sum + Number(it.line_total),
-              0
-            );
+          (sum: number, it: { line_total: number }) =>
+            sum + Number(it.line_total),
+          0
+        );
           await axios.put(`${base_url}/orders/${newId}`, {
             total_amount: total,
           });
@@ -101,13 +102,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
           order_id: Number(stored),
           game_key_id: g.key_id,
           qty: 1,
-          unit_price: unitPrice,
         });
         const orderRes = await axios.get(`${base_url}/orders/${stored}`);
         const total =
           orderRes.data.total_amount ??
           (orderRes.data.order_items || []).reduce(
-            (sum: number, it: any) => sum + Number(it.line_total),
+            (sum: number, it: { line_total: number }) =>
+              sum + Number(it.line_total),
             0
           );
         await axios.put(`${base_url}/orders/${stored}`, { total_amount: total });
