@@ -128,8 +128,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         loading={loading}
         dataSource={items}
         locale={{ emptyText: "ยังไม่มีรีวิวสำหรับเกมนี้" }}
+        className="space-y-4"
+        split={false}
         renderItem={(item) => (
           <List.Item
+            className="bg-white p-4 rounded-md shadow"
             actions={[
               <Button key="like" onClick={() => handleToggleLike(item)} icon={<Heart size={16} />}>
                 {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
