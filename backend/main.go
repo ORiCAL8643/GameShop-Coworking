@@ -126,9 +126,12 @@ func main() {
 		// categories routes
 		router.GET("/categories", controllers.FindCategories)
 
-		// keygame routes
-		router.GET("/keygame", controllers.FindKeyGame)
-		router.POST("/new-keygame", controllers.CreateKeyGame)
+		// ===== KeyGames =====
+		router.POST("/keygames", controllers.CreateKeyGame)
+		router.GET("/keygames", controllers.FindKeyGames)
+		router.GET("/keygames/:id", controllers.FindKeyGameByID)
+		router.DELETE("/keygames/:id", controllers.DeleteKeyGame)
+
 
 		//minimumspec routes
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
@@ -141,20 +144,23 @@ func main() {
 		// ===== Orders =====
 		router.POST("/orders", controllers.CreateOrder)
 		router.GET("/orders", controllers.FindOrders)
-		router.GET("/orders/:id", controllers.FindOrderByID)
-		router.PUT("/orders/:id", controllers.UpdateOrder)
-		router.DELETE("/orders/:id", controllers.DeleteOrder)
+		router.GET("/orders/:id", controllers.GetOrder)
+		// ลบสองบรรทัดนี้ทิ้ง ถ้าไม่มีฟังก์ชันใน controller
+		// router.PUT("/orders/:id", controllers.UpdateOrder)
+		// router.DELETE("/orders/:id", controllers.DeleteOrder)
+
 		// ===== Order Items =====
 		router.POST("/order-items", controllers.CreateOrderItem)
 		router.GET("/order-items", controllers.FindOrderItems)
-		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+		router.PUT("/order-items/:id/qty", controllers.UpdateOrderItemQty) // เปลี่ยนเส้นทาง
 		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
 		// ===== Payments =====
 		router.POST("/payments", controllers.CreatePayment)
 		router.GET("/payments", controllers.FindPayments)
-		router.PATCH("/payments/:id", controllers.UpdatePayment)
-		router.DELETE("/payments/:id", controllers.DeletePayment)
+		// ลบสองบรรทัดนี้ทิ้ง เพราะเราไม่รองรับแก้ไข/ลบ payment โดยตรง
+		// router.PATCH("/payments/:id", controllers.UpdatePayment)
+		// router.DELETE("/payments/:id", controllers.DeletePayment)
 		router.POST("/payments/:id/approve", controllers.ApprovePayment)
 		router.POST("/payments/:id/reject", controllers.RejectPayment)
 
