@@ -253,7 +253,12 @@ func ReplyReport(c *gin.Context) {
 		return
 	}
 
-	text := strings.TrimSpace(c.PostForm("text"))
+        text := strings.TrimSpace(c.PostForm("text"))
+
+        // ✅ บันทึกข้อความตอบกลับลงใน report
+        if text != "" {
+                rp.Reply = text
+        }
 
 	// ✅ แนบไฟล์ถ้ามี
 	if form, _ := c.MultipartForm(); form != nil {
@@ -278,12 +283,12 @@ func ReplyReport(c *gin.Context) {
 		}
 	}
 
-	// ✅ ยิง Notification ให้เจ้าของ report
-	if text != "" {
-		_ = db.Create(&entity.Notification{
-			Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
-			Message: text,
-			Type:    "report_reply",
+        // ✅ ยิง Notification ให้เจ้าของ report
+        if text != "" {
+                _ = db.Create(&entity.Notification{
+                        Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
+                        Message: text,
+                        Type:    "report_reply",
 			UserID:  rp.UserID,
 			IsRead:  false,
 		}).Error

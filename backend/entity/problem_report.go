@@ -6,18 +6,21 @@ import (
 )
 
 type ProblemReport struct {
-	gorm.Model
-	Title       string `json:"title"`
-	Description string `json:"description"`
+        gorm.Model
+        Title       string `json:"title"`
+        Description string `json:"description"`
 
 	UserID uint  `json:"user_id"`
 	User   *User `gorm:"foreignKey:UserID" json:"user"`
 
-	GameID uint  `json:"game_id"`
-	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
+        GameID uint  `json:"game_id"`
+        Game   *Game `gorm:"foreignKey:GameID" json:"game"`
 
-	Status     string    `json:"status" gorm:"default:open"`
-	ResolvedAt time.Time `json:"resolved_at"` // ✅ เพิ่มฟิลด์นี้
+        Status     string    `json:"status" gorm:"default:open"`
+        ResolvedAt time.Time `json:"resolved_at"` // ✅ เพิ่มฟิลด์นี้
 
-	Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
+        // ✅ ข้อความตอบกลับจากแอดมิน (ถ้ามี)
+        Reply string `json:"reply"`
+
+        Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
 }

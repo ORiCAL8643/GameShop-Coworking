@@ -1,6 +1,6 @@
 // src/services/Notification.ts
 import api from "../lib/api";
-import type { Notification, CreateNotificationRequest } from "../interfaces/Notification";
+import type { Notification } from "../interfaces/Notification";
 import type { User } from "../interfaces/User";
 
 // ดึงแจ้งเตือน (ผู้ใช้คนเดียว)
@@ -46,13 +46,18 @@ export async function createNotification(payload: {
 }): Promise<Notification | null> {
   try {
     console.log("🔔 Sending notification:", payload);
-    const res = await axios.post(`${API_URL}/notifications`, payload);
+    const res = await api.post("/notifications", payload);
     console.log("✅ Notification created:", res.data);
-    return res.data;
+    return res.data as Notification;
   } catch (err) {
     console.error("❌ createNotification error:", err);
     return null;
   }
+}
+
+// ทำเป็นอ่านแล้ว (เฉพาะรายการ)
+export async function markNotificationRead(id: number): Promise<void> {
+  await api.put(`/notifications/${id}/read`);
 }
 
 // ✅ ทำเป็นอ่านแล้วทั้งหมด
