@@ -1,9 +1,7 @@
 package controllers
 
 import (
-	"math"
 	"net/http"
-	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
@@ -32,55 +30,22 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	// ตรวจ Game และดึงราคาเกม
-	var game entity.Game
-	if tx := db.First(&game, body.GameID); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+	qty := body.QTY
+	if qty <= 0 {
+		qty = 1
+	}
+
+	unitPrice, lineDiscount, lineTotal, err := calculateLineTotal(body.GameID, qty, body.OrderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	unitPrice := float64(game.BasePrice)
-
-	// หาส่วนลดจากโปรโมชั่นที่ผูกกับเกมหรือออร์เดอร์
-	sub := unitPrice * float64(body.QTY)
-	discount := 0.0
-
-	now := time.Now()
-	var promos []entity.Promotion
-	// โปรโมชันจากเกม
-	var gamePromos []entity.Promotion
-	db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
-		Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.GameID, now, now).
-		Find(&gamePromos)
-	promos = append(promos, gamePromos...)
-	// โปรโมชันจากออร์เดอร์
-	var orderPromos []entity.Promotion
-	db.Joins("JOIN order_promotions op ON op.promotion_id = promotions.id").
-		Where("op.order_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.OrderID, now, now).
-		Find(&orderPromos)
-	promos = append(promos, orderPromos...)
-
-	for _, p := range promos {
-		var d float64
-		if p.DiscountType == entity.DiscountPercent {
-			d = sub * float64(p.DiscountValue) / 100
-		} else if p.DiscountType == entity.DiscountAmount {
-			d = float64(p.DiscountValue) * float64(body.QTY)
-		}
-		if d > discount {
-			discount = d
-		}
-	}
-	if discount > sub {
-		discount = sub
-	}
-	total := sub - discount
-	total = math.Round(total*100) / 100
 
 	item := entity.OrderItem{
 		UnitPrice:    unitPrice,
-		QTY:          body.QTY,
-		LineDiscount: math.Round(discount*100) / 100,
-		LineTotal:    total,
+		QTY:          qty,
+		LineDiscount: lineDiscount,
+		LineTotal:    lineTotal,
 		OrderID:      body.OrderID,
 		GameID:       body.GameID,
 	}
