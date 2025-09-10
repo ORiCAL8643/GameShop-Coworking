@@ -129,6 +129,7 @@ func main() {
 
 		// ===== Payments =====
 		router.POST("/payments", controllers.CreatePayment)
+		router.POST("/payments/checkout", controllers.CreatePaymentWithGames)
 		router.GET("/payments", controllers.FindPayments)
 		router.PATCH("/payments/:id", controllers.UpdatePayment)
 		router.DELETE("/payments/:id", controllers.DeletePayment)
