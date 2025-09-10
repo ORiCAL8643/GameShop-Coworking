@@ -1,14 +1,32 @@
 // src/services/Notification.ts
 import api from "../lib/api";
 import type { Notification, CreateNotificationRequest } from "../interfaces/Notification";
+import type { User } from "../interfaces/User";
 
 // ดึงแจ้งเตือน (ผู้ใช้คนเดียว)
+interface RawNotification {
+  ID?: number;
+  title?: string;
+  Title?: string;
+  message?: string;
+  Message?: string;
+  type?: string;
+  Type?: string;
+  user_id?: number;
+  UserID?: number;
+  created_at?: string;
+  CreatedAt?: string;
+  is_read?: boolean;
+  IsRead?: boolean;
+  user?: User;
+  User?: User;
+}
+
 export async function fetchNotifications(userId: number): Promise<Notification[]> {
   const { data } = await api.get("/notifications", { params: { user_id: userId } });
-  // backend ของคุณคืนชื่อฟิลด์แบบ PascalCase/camelCase ปนกัน
-  // map ให้เป็นรูปแบบเดียว
-  return (data as any[]).map((n) => ({
-    ID: n.ID,
+  const list = data as RawNotification[];
+  return list.map((n) => ({
+    ID: n.ID ?? 0,
     title: n.title ?? n.Title ?? "",
     message: n.message ?? n.Message ?? "",
     type: n.type ?? n.Type ?? "",
@@ -36,4 +54,9 @@ export async function markAllNotificationsRead(userId: number): Promise<void> {
   const list = await fetchNotifications(userId);
   const unread = list.filter((n) => !n.is_read);
   await Promise.all(unread.map((n) => markNotificationRead(n.ID)));
+}
+
+// ลบแจ้งเตือน
+export async function deleteNotification(id: number): Promise<void> {
+  await api.delete(`/notifications/${id}`);
 }

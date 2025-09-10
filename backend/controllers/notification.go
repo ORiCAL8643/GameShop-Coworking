@@ -12,11 +12,11 @@ import (
 
 // POST /notifications
 func CreateNotification(c *gin.Context) {
-	var body entity.Notification
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
-		return
-	}
+        var body entity.Notification
+        if err := c.ShouldBindJSON(&body); err != nil {
+                c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
+                return
+        }
 
 	// ตรวจสอบว่ามี user_id นี้จริงไหม
 	var user entity.User
@@ -25,10 +25,12 @@ func CreateNotification(c *gin.Context) {
 		return
 	}
 
-	// default type ถ้าไม่ส่งมา
-	if body.Type == "" {
-		body.Type = "system"
-	}
+       // default type ถ้าไม่ส่งมา
+       if body.Type == "" {
+               body.Type = "system"
+       }
+       // เริ่มต้นให้ยังไม่อ่าน
+       body.IsRead = false
 
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -88,12 +90,13 @@ func UpdateNotification(c *gin.Context) {
 		return
 	}
 
-	if err := db.Model(&row).Updates(payload).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+       if err := db.Model(&row).Updates(payload).Error; err != nil {
+               c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+               return
+       }
 
-	c.JSON(http.StatusOK, gin.H{"message": "updated successfully"})
+       _ = db.First(&row, row.ID)
+       c.JSON(http.StatusOK, row)
 }
 
 // DELETE /notifications/:id
