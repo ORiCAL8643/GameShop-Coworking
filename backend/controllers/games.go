@@ -115,6 +115,15 @@ func FindGames(c *gin.Context) {
 
 	c.JSON(http.StatusOK, res)
 }
+
+func FindGameByID(c *gin.Context) {
+	var game entity.Game
+	if tx := configs.DB().First(&game, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
+		return
+	}
+	c.JSON(http.StatusOK, game)
+}
 func CreateGame(c *gin.Context) {
 	var input struct {
 		GameName        string `json:"game_name" binding:"required"`
