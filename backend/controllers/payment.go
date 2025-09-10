@@ -12,6 +12,7 @@ import (
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 func CreatePayment(c *gin.Context) {
@@ -76,37 +77,12 @@ func CreatePaymentWithGames(c *gin.Context) {
 		if qty <= 0 {
 			qty = 1
 		}
-		var game entity.Game
-		if tx := db.First(&game, g.GameID); tx.RowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+
+		unitPrice, lineDiscount, lineTotal, err := calculateLineTotal(g.GameID, qty, 0)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		unitPrice := float64(game.BasePrice)
-		discount := 0.0
-
-		var promos []entity.Promotion
-		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
-			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", g.GameID, now, now).
-			Find(&promos)
-		for _, p := range promos {
-			var d float64
-			if p.DiscountType == entity.DiscountPercent {
-				d = unitPrice * float64(p.DiscountValue) / 100
-			} else if p.DiscountType == entity.DiscountAmount {
-				d = float64(p.DiscountValue)
-			}
-			if d > discount {
-				discount = d
-			}
-		}
-		if discount > unitPrice {
-			discount = unitPrice
-		}
-		lineDiscount := discount * float64(qty)
-		lineTotal := (unitPrice - discount) * float64(qty)
-		lineDiscount = math.Round(lineDiscount*100) / 100
-		lineTotal = math.Round(lineTotal*100) / 100
 		total += lineTotal
 
 		item := entity.OrderItem{
@@ -227,6 +203,30 @@ func authorizeAdmin(c *gin.Context) (*entity.User, error) {
 	return &user, nil
 }
 
+// assignKeysToItems เลือกคีย์เกมที่ยังไม่ถูกใช้ตามจำนวนที่ซื้อ
+// แล้วอัปเดตให้ผูกกับรายการสินค้า หากคีย์ไม่พอจะคืน error
+func assignKeysToItems(tx *gorm.DB, items []entity.OrderItem) error {
+	for _, it := range items {
+		var keys []entity.KeyGame
+		if err := tx.Where("game_id = ? AND order_item_id IS NULL", it.GameID).
+			Limit(it.QTY).Find(&keys).Error; err != nil {
+			return err
+		}
+		if len(keys) < it.QTY {
+			return errors.New("not enough key games")
+		}
+		var ids []uint
+		for _, k := range keys {
+			ids = append(ids, k.ID)
+		}
+		if err := tx.Model(&entity.KeyGame{}).Where("id IN ?", ids).
+			Update("order_item_id", it.ID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ApprovePayment(c *gin.Context) {
 	if _, err := authorizeAdmin(c); err != nil {
 		if err.Error() == "forbidden" {
@@ -236,17 +236,36 @@ func ApprovePayment(c *gin.Context) {
 		}
 		return
 	}
+	db := configs.DB()
 	var payment entity.Payment
-	if tx := configs.DB().First(&payment, c.Param("id")); tx.RowsAffected == 0 {
+	if tx := db.First(&payment, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
-	payment.Status = "APPROVED"
-	payment.RejectReason = ""
-	if err := configs.DB().Save(&payment).Error; err != nil {
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var items []entity.OrderItem
+		if err := tx.Where("order_id = ?", payment.OrderID).Find(&items).Error; err != nil {
+			return err
+		}
+		if err := assignKeysToItems(tx, items); err != nil {
+			return err
+		}
+		payment.Status = "APPROVED"
+		payment.RejectReason = ""
+		if err := tx.Save(&payment).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.Order{}).Where("id = ?", payment.OrderID).
+			Update("order_status", "PAID").Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	c.JSON(http.StatusOK, payment)
 }
 

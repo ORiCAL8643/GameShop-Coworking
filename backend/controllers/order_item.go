@@ -1,23 +1,18 @@
 package controllers
 
 import (
-	"math"
 	"net/http"
-	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
-// payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
+// payload สำหรับสร้าง OrderItem โดยให้ส่งเฉพาะเกมและจำนวน
 type createOrderItemRequest struct {
-	UnitPrice    float64  `json:"unit_price" binding:"required"`
-	QTY          int      `json:"qty" binding:"required"`
-	OrderID      uint     `json:"order_id" binding:"required"`
-	GameID       uint     `json:"game_id" binding:"required"`
-	LineDiscount *float64 `json:"line_discount"`
-	LineTotal    *float64 `json:"line_total"`
+	GameID  uint `json:"game_id" binding:"required"`
+	QTY     int  `json:"qty" binding:"required"`
+	OrderID uint `json:"order_id" binding:"required"`
 }
 
 func CreateOrderItem(c *gin.Context) {
@@ -35,63 +30,22 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	// ตรวจ Game
-	var game entity.Game
-	if tx := db.First(&game, body.GameID); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
-		return
+	qty := body.QTY
+	if qty <= 0 {
+		qty = 1
 	}
 
-	// หาส่วนลดจากโปรโมชั่นที่ผูกกับเกมหรือออร์เดอร์
-	sub := body.UnitPrice * float64(body.QTY)
-	discount := 0.0
-
-	now := time.Now()
-	var promos []entity.Promotion
-	// โปรโมชันจากเกม
-	var gamePromos []entity.Promotion
-	db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
-		Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.GameID, now, now).
-		Find(&gamePromos)
-	promos = append(promos, gamePromos...)
-	// โปรโมชันจากออร์เดอร์
-	var orderPromos []entity.Promotion
-	db.Joins("JOIN order_promotions op ON op.promotion_id = promotions.id").
-		Where("op.order_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.OrderID, now, now).
-		Find(&orderPromos)
-	promos = append(promos, orderPromos...)
-
-	for _, p := range promos {
-		var d float64
-		if p.DiscountType == entity.DiscountPercent {
-			d = sub * float64(p.DiscountValue) / 100
-		} else if p.DiscountType == entity.DiscountAmount {
-			d = float64(p.DiscountValue) * float64(body.QTY)
-		}
-		if d > discount {
-			discount = d
-		}
-	}
-	if discount > sub {
-		discount = sub
-	}
-	// ตรวจสอบถ้ามีส่ง line_discount/line_total มาต้องตรงกับที่คำนวณ
-	if body.LineDiscount != nil && math.Round(*body.LineDiscount*100)/100 != math.Round(discount*100)/100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_discount mismatch"})
-		return
-	}
-	total := sub - discount
-	total = math.Round(total*100) / 100
-	if body.LineTotal != nil && math.Round(*body.LineTotal*100)/100 != total {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_total mismatch"})
+	unitPrice, lineDiscount, lineTotal, err := calculateLineTotal(body.GameID, qty, body.OrderID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	item := entity.OrderItem{
-		UnitPrice:    body.UnitPrice,
-		QTY:          body.QTY,
-		LineDiscount: math.Round(discount*100) / 100,
-		LineTotal:    total,
+		UnitPrice:    unitPrice,
+		QTY:          qty,
+		LineDiscount: lineDiscount,
+		LineTotal:    lineTotal,
 		OrderID:      body.OrderID,
 		GameID:       body.GameID,
 	}
