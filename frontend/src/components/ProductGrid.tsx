@@ -1,9 +1,10 @@
 import { Row, Col } from "antd";
 //import AddProductCard from "./AddProductCard";
 import { useNavigate } from "react-router-dom";
-import { Card, Button } from "antd";
+import { Card, Button, Modal} from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { MoreOutlined } from "@ant-design/icons";
 
 const base_url = "http://localhost:8088";
 
@@ -47,6 +48,19 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
   const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);   //usestate
+
+  const showModal = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleOk = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleCancel = () => {
+    setIsModalOpen(false);
+  };
 
   async function GetGame() {
     try {
@@ -101,12 +115,32 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
                 <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
               }
             >
-              <Card.Meta
-                title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
-                description={
-                  <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
-                }
-              />
+            <Row>
+                <Col span={22}>
+                  <Card.Meta
+                    title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
+                    description={
+                      <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
+                    }
+                  />
+                </Col>
+                <Col >
+                  <div>
+                    <Button onClick={showModal} type="text" shape="circle" size="small" style={{background: "#1f1f1f"}} icon={<MoreOutlined style={{fontSize:"18px" , color: "#fffcfcff"}}/>} />
+                      <Modal
+                        title= {c.game_name}
+                        closable={{ 'aria-label': 'Custom Close Button' }}
+                        open={isModalOpen}
+                        onOk={handleOk}
+                        onCancel={handleCancel}
+                      >
+                        <p>หมวดหมู่: {c.categories.title}</p>
+                        <p>วันวางขาย: {c.release_date}</p>
+                        <p>อายุขั้นต่ำ: {c.age_rating}</p>
+                      </Modal>
+                  </div>
+                </Col>
+            </Row>
               <div style={{ marginTop: 10, color: "#9254de" }}>
                 {hasDiscount ? (
                   <>
