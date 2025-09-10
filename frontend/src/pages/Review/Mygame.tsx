@@ -7,7 +7,7 @@ const { Content } = Layout;
 const { Title } = Typography;
 
 const Mygame = () => {
-  const { userId } = useAuth();
+  const { id } = useAuth();
   return (
     <Layout style={{ minHeight: "100vh", background: "#0f0f0f" }}>
       {/* Sidebar ทางซ้าย */}
@@ -33,7 +33,7 @@ const Mygame = () => {
           </Space>
 
           {/* UI-only: แสดงกริดเกมจากคอมโพเนนต์ที่มีอยู่แล้ว */}
-          <ProductGrid userId={userId} />
+          <ProductGrid userId={id} />
         </div>
       </Content>
     </Layout>
