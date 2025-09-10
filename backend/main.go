@@ -58,6 +58,7 @@ func main() {
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
+		router.POST("/upload/game", controllers.UploadGame)
 		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
 		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
