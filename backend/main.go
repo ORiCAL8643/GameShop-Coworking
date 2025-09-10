@@ -35,10 +35,10 @@ func main() {
 		// ===== Games =====
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
+		router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		/*router.GET("/games/:id", controllers.FindGameByID)
-		router.PUT("/games/:id", controllers.UpdateGame)
-		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
+		// router.PUT("/games/:id", controllers.UpdateGame)
+		// router.DELETE("/games/:id", controllers.DeleteGameByID)
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
