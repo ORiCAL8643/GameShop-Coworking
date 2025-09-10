@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ReviewsAPI, type Review } from "../services/reviews";
 import { Avatar, Button, Form, Input, List, Modal, Popconfirm, Rate, Space, message } from "antd";
-import { Heart, Pencil, Trash2, Plus } from "lucide-react";
-import { UserOutlined } from "@ant-design/icons";
+import { Heart, Pencil, Trash2 } from "lucide-react";
+import { UserOutlined, PlusOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
