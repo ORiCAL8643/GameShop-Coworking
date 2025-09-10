@@ -57,7 +57,7 @@ const PaymentPage = () => {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { id: userId } = useAuth();
+  const { id } = useAuth();
 
   const updateItems = (next: CartItem[]) => {
     setItems(next);
@@ -110,7 +110,7 @@ const PaymentPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: userId || 1,
+          user_id: id || 1,
           games: items.map((it) => ({
             game_id: it.id,
             quantity: it.quantity,

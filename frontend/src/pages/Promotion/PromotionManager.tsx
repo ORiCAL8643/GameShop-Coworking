@@ -37,7 +37,7 @@ export default function PromotionManager() {
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
-  const { userId: currentUserId, token } = useAuth();
+  const { id, token } = useAuth();
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 
@@ -94,8 +94,8 @@ export default function PromotionManager() {
       body.append("end_date", values.dateRange[1].toISOString());
       body.append("status", String(values.status));
       values.gameIds.forEach(id => body.append("game_ids", id));
-      if (currentUserId != null) {
-        body.append("user_id", String(currentUserId));
+      if (id != null) {
+        body.append("user_id", String(id));
       }
       if (promoFile) {
         body.append("promo_image", promoFile);
