@@ -77,37 +77,12 @@ func CreatePaymentWithGames(c *gin.Context) {
 		if qty <= 0 {
 			qty = 1
 		}
-		var game entity.Game
-		if tx := db.First(&game, g.GameID); tx.RowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+
+		unitPrice, lineDiscount, lineTotal, err := calculateLineTotal(g.GameID, qty, 0)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
-		unitPrice := float64(game.BasePrice)
-		discount := 0.0
-
-		var promos []entity.Promotion
-		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
-			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", g.GameID, now, now).
-			Find(&promos)
-		for _, p := range promos {
-			var d float64
-			if p.DiscountType == entity.DiscountPercent {
-				d = unitPrice * float64(p.DiscountValue) / 100
-			} else if p.DiscountType == entity.DiscountAmount {
-				d = float64(p.DiscountValue)
-			}
-			if d > discount {
-				discount = d
-			}
-		}
-		if discount > unitPrice {
-			discount = unitPrice
-		}
-		lineDiscount := discount * float64(qty)
-		lineTotal := (unitPrice - discount) * float64(qty)
-		lineDiscount = math.Round(lineDiscount*100) / 100
-		lineTotal = math.Round(lineTotal*100) / 100
 		total += lineTotal
 
 		item := entity.OrderItem{
