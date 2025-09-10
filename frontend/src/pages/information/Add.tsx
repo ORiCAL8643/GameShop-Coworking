@@ -1,10 +1,9 @@
-import { Select, Layout } from 'antd';
+import { Select, Layout, Image } from 'antd';
 import Navbar from "../../components/Navbar";
 import { Typography, } from "antd";
 import { Col, Row, Space } from 'antd';
 import {Input, Button} from 'antd';
 import { Upload } from "antd";
-import type { UploadFile } from "antd/es/upload/interface";
 import {
   PlusOutlined,
   UploadOutlined,
@@ -12,6 +11,8 @@ import {
 const { Title } = Typography;
 import { useState,useEffect } from 'react';
 import axios from 'axios';
+import { message } from "antd";
+import type { UploadProps } from "antd";
 
 const base_url = 'http://localhost:8088'
 const Add = () => {
@@ -31,6 +32,34 @@ const Add = () => {
     const [memory, setMemory] = useState("");
     const [graphics, setGraphics] = useState("");
     const [storage, setStorage] = useState("");
+
+    async function uploadGameImage(file: File): Promise<string> {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await axios.post(`${base_url}/upload/game`, fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        return res.data.url as string; // "/uploads/games/xxx.png"
+  }
+
+    const handleUpload: UploadProps["customRequest"] = async ({
+    file,
+    onSuccess,
+    onError,
+  }) => {
+    try {
+      // อัปขึ้น backend
+      const path = await uploadGameImage(file as File);
+      // ตั้งรูปให้โชว์ทันที (เก็บ URL เต็มไว้ใช้แสดงผล)
+      setImageurl(base_url + path);
+      onSuccess?.({}, new XMLHttpRequest());
+      message.success("อัปโหลดสำเร็จ");
+    } catch (e) {
+      onError?.(e as any);
+      message.error("อัปโหลดล้มเหลว");
+    }
+  };
+
     /*
     const handleChange = ({ fileList }: { fileList: UploadFile[] }) => {
     if (fileList.length > 0) {
@@ -43,7 +72,7 @@ const Add = () => {
       setImageurl(""); // ถ้าลบไฟล์ออกก็เคลียร์ state
     }
   };*/
-    const handleChange = ({ fileList }: { fileList: UploadFile[] }) => {
+   /* const handleChange = ({ fileList }: { fileList: UploadFile[] }) => {
     if (fileList.length === 0) {
         setImageurl("");
         return;
@@ -58,7 +87,7 @@ const Add = () => {
     };
     reader.onerror = (e) => console.error("FileReader error:", e);
     reader.readAsDataURL(file);
-};
+}; */
 
     async function GetCategories() {
         try {
@@ -139,11 +168,18 @@ const Add = () => {
                             <Select placeholder="กรุณากรอกหมวดหมู่" style={{ width: 500 }} options={categories.map(c => ({ value: c.ID, label: c.title }))} value={categoryId ?? undefined} onChange={(val, option) => {console.log("onChange val:", val);console.log("onChange option:", option);setCategoryId(val);}}/>
                         </Col>
                         <Col span={12}>
-                            <img src={imgurl} width={"750px"} height={"300px"}/>
+                            <Image src={imgurl || "https://via.placeholder.com/750x300?text=Preview"} width={750} height={300} style={{ objectFit: "cover", background: "#eee" }}preview={false}/>
                             <br />
                             <br />
-                            <Upload onChange={(handleChange)} maxCount={1} beforeUpload={() => false} accept="image/*"/*ไม่อัปโหลดจริง แค่เก็บใน state*/><Button icon={<UploadOutlined />}>Upload</Button></Upload>
-                        </Col>
+                            <Upload
+                                accept="image/*"
+                                maxCount={1}
+                                showUploadList={false}     // ไม่ต้องแสดงรายการไฟล์
+                                customRequest={handleUpload} // กดปุ่มแล้วอัปโหลดจริง แล้ว set รูปทันที
+                            >
+                                <Button icon={<UploadOutlined />}>Upload</Button>
+                            </Upload>
+                         </Col>
                     </Row>
                     <Row>
                         <Col span={12}><Space><PlusOutlined  style={{background: '#141414', color: '#d6d6d6ff'}}/><text style={{ color: '#d6d6d6ff' }}>Minimum Spec</text></Space></Col>

@@ -12,7 +12,7 @@ interface ProductGridProps {
   userId: number | null;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
+const ProductGrid: React.FC<ProductGridProps> = () => {
   interface Game {
     ID: number;
     game_name: string;
@@ -115,7 +115,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
               }
             >
             <Row>
-                <Col span={22}>
+                <Col span={21}>
                   <Card.Meta
                     title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
                     description={
