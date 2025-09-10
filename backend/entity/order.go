@@ -19,5 +19,5 @@ type Order struct {
 	// relations
 	OrderItems      []OrderItem      `gorm:"foreignKey:OrderID" json:"order_items,omitempty"`
 	Payments        []Payment        `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
-	OrderPromotions []OrderPromotion `gorm:"foreignKey:OrderID" json:"order_promotions,omitempty"`
+
 }

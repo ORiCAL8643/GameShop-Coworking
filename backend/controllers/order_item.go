@@ -15,7 +15,7 @@ type createOrderItemRequest struct {
 	UnitPrice    float64  `json:"unit_price" binding:"required"`
 	QTY          int      `json:"qty" binding:"required"`
 	OrderID      uint     `json:"order_id" binding:"required"`
-	GameKeyID    *uint    `json:"game_key_id"`
+	GameID       uint     `json:"game_id" binding:"required"`
 	LineDiscount *float64 `json:"line_discount"`
 	LineTotal    *float64 `json:"line_total"`
 }
@@ -35,24 +35,11 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	// ตรวจ GameKey (ถ้าระบุ)
-	var gameID uint
-	if body.GameKeyID != nil {
-		var gk entity.KeyGame
-		if tx := db.First(&gk, *body.GameKeyID); tx.RowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "game_key_id not found"})
-			return
-		}
-		// ตรวจว่าคีย์เกมถูกใช้ไปแล้วหรือยัง (อาศัยคอลัมน์ order_item_id)
-		var cnt int64
-		db.Model(&entity.KeyGame{}).
-			Where("id = ? AND order_item_id IS NOT NULL", *body.GameKeyID).
-			Count(&cnt)
-		if cnt > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "game key already assigned"})
-			return
-		}
-		gameID = gk.GameID
+	// ตรวจ Game
+	var game entity.Game
+	if tx := db.First(&game, body.GameID); tx.RowsAffected == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
+		return
 	}
 
 	// หาส่วนลดจากโปรโมชั่นที่ผูกกับเกมหรือออร์เดอร์
@@ -62,13 +49,11 @@ func CreateOrderItem(c *gin.Context) {
 	now := time.Now()
 	var promos []entity.Promotion
 	// โปรโมชันจากเกม
-	if gameID != 0 {
-		var gamePromos []entity.Promotion
-		db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
-			Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", gameID, now, now).
-			Find(&gamePromos)
-		promos = append(promos, gamePromos...)
-	}
+	var gamePromos []entity.Promotion
+	db.Joins("JOIN promotion_games pg ON pg.promotion_id = promotions.id").
+		Where("pg.game_id = ? AND promotions.status = 1 AND promotions.start_date <= ? AND promotions.end_date >= ?", body.GameID, now, now).
+		Find(&gamePromos)
+	promos = append(promos, gamePromos...)
 	// โปรโมชันจากออร์เดอร์
 	var orderPromos []entity.Promotion
 	db.Joins("JOIN order_promotions op ON op.promotion_id = promotions.id").
@@ -108,7 +93,7 @@ func CreateOrderItem(c *gin.Context) {
 		LineDiscount: math.Round(discount*100) / 100,
 		LineTotal:    total,
 		OrderID:      body.OrderID,
-		GameKeyID:    body.GameKeyID,
+		GameID:       body.GameID,
 	}
 
 	if err := db.Create(&item).Error; err != nil {
@@ -116,19 +101,12 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	// ถ้าผูก GameKey ให้ตั้ง owner
-	if body.GameKeyID != nil {
-		db.Model(&entity.KeyGame{}).
-			Where("id = ?", *body.GameKeyID).
-			Update("order_item_id", item.ID)
-	}
-
 	c.JSON(http.StatusCreated, item)
 }
 
 func FindOrderItems(c *gin.Context) {
 	var rows []entity.OrderItem
-	db := configs.DB().Preload("Order").Preload("KeyGame")
+	db := configs.DB().Preload("Order").Preload("Game").Preload("KeyGames")
 	orderID := c.Query("order_id")
 	if orderID != "" {
 		db = db.Where("order_id = ?", orderID)
