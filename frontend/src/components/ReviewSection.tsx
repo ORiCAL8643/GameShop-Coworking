@@ -1,8 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ReviewsAPI, type Review } from "../services/reviews";
 import { Avatar, Button, Form, Input, List, Modal, Popconfirm, Rate, Space, message } from "antd";
-import { Heart, Pencil, Trash2 } from "lucide-react";
-import { UserOutlined, PlusOutlined } from "@ant-design/icons";
+import {
+  HeartOutlined,
+  HeartFilled,
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+  UserOutlined,
+} from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
@@ -29,7 +35,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       const list = await ReviewsAPI.listByGame(gameId);
       setItems(
         list
-          .map(r => ({ ...r, likedByMe: false }))
+          .map(r => ({ ...r, likedByMe: false })) // ถ้า backend ส่งสถานะ liked มาได้ ค่อยอัปเดตส่วนนี้
           .sort((a, b) => (b.ID ?? 0) - (a.ID ?? 0))
       );
     } catch (err) {
@@ -111,6 +117,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       return;
     }
     const alreadyLiked = !!r.likedByMe;
+
     // optimistic update
     setItems(prev =>
       prev.map(it =>
@@ -162,7 +169,10 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         className="space-y-4"
         split={false}
         renderItem={(item) => {
-          const initials = (item.user?.username || (item.user_id === userId && username) || "").charAt(0).toUpperCase();
+          const initials = (item.user?.username || (item.user_id === userId && username) || "")
+            .charAt(0)
+            .toUpperCase();
+
           const actionButtons = [
             (
               <Button
@@ -170,23 +180,21 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 type="text"
                 shape="round"
                 onClick={() => handleToggleLike(item)}
-                icon={
-                  <Heart
-                    size={16}
-                    className={item.likedByMe ? "text-red-500" : undefined}
-                    fill={item.likedByMe ? "currentColor" : "none"}
-                  />
-                }
+                icon={item.likedByMe ? <HeartFilled /> : <HeartOutlined />}
               >
                 {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
               </Button>
             ),
             canEdit(item) && (
-              <Button key="edit" type="text" shape="round" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
+              <Button key="edit" type="text" shape="round" onClick={() => openEdit(item)} icon={<EditOutlined />}>
+                แก้ไข
+              </Button>
             ),
             canEdit(item) && (
               <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
-                <Button danger type="text" shape="round" icon={<Trash2 size={16} />}>ลบ</Button>
+                <Button danger type="text" shape="round" icon={<DeleteOutlined />}>
+                  ลบ
+                </Button>
               </Popconfirm>
             ),
           ].filter(Boolean) as React.ReactNode[];
@@ -197,11 +205,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
               actions={[<Space key="actions" size={8}>{actionButtons}</Space>]}
             >
               <List.Item.Meta
+                avatar={<Avatar icon={!initials && <UserOutlined />}>{initials || undefined}</Avatar>}
                 title={
                   <Space align="center" size={8}>
-                    <Avatar icon={!initials && <UserOutlined />}>{initials || undefined}</Avatar>
                     <span className="font-medium">{item.review_title}</span>
-                    <Rate disabled count={10} value={item.rating} />
+                    <Rate disabled allowHalf value={item.rating / 2} />
                     <span className="text-xs text-gray-500">ให้ {item.rating}/10</span>
                   </Space>
                 }
@@ -239,8 +247,8 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
             <Input.TextArea rows={4} maxLength={2000} placeholder="เล่าประสบการณ์ จุดเด่น จุดที่ควรปรับ" />
           </Form.Item>
           <Form.Item label="คะแนน (0-10)" name="rating" rules={[{ required: true }]}>
-            <Rate count={10} tooltips={Array.from({ length: 10 }, (_, i) => `${i + 1}/10`)} />
-            <div className="text-xs text-gray-500 mt-1">* คะแนนเต็ม 10 ดาว</div>
+            <Rate allowHalf defaultValue={4} tooltips={["0","1","2","3","4","5","6","7","8","9","10"].map(x=>`${x}/10`)} />
+            <div className="text-xs text-gray-500 mt-1">* แสดงเป็น 0–10 (ดาวจะคิดครึ่ง = /2)</div>
           </Form.Item>
         </Form>
       </Modal>
