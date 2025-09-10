@@ -66,13 +66,16 @@ func FindUsers(c *gin.Context) {
 
 	username := c.Query("username")
 	email := c.Query("email")
-
+	roleID := c.Query("role_id")
 	tx := db.Model(&entity.User{})
 	if username != "" {
 		tx = tx.Where("username = ?", username)
 	}
 	if email != "" {
 		tx = tx.Where("email = ?", email)
+	}
+	if roleID != "" {
+		tx = tx.Where("role_id = ?", roleID)
 	}
 	if err := tx.Preload("Requests").Find(&users).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -111,6 +114,30 @@ func UpdateUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
 }
+// PATCH /users/:id/role
+func UpdateUserRole(c *gin.Context) {
+	var body struct {
+		RoleID uint `json:"role_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var user entity.User
+	if tx := configs.DB().First(&user, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
+		return
+	}
+
+	user.RoleID = body.RoleID
+	if err := configs.DB().Save(&user).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, user)
+}
+
 
 // DELETE /users/:id
 func DeleteUserByID(c *gin.Context) {

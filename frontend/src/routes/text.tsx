@@ -74,8 +74,8 @@ const router = createBrowserRouter([
       },
 
       { path: "/workshop", element: <WorkshopMain /> },
-      { path: "/workshop/:title", element: <WorkshopDetail /> },
-      { path: "/mod/:title", element: <ModDetail /> },
+      { path: "/workshop/:id", element: <WorkshopDetail /> },
+      { path: "/mod/:id", element: <ModDetail /> },
       { path: "/upload", element: <Workshop /> },
 
       { path: "/promotion", element: <PromotionManager /> },
@@ -90,19 +90,28 @@ const router = createBrowserRouter([
       {
         path: "/Admin",
         children: [
-          { path: "/Admin/Page", element:<AdminPage
-            refunds={refunds}
-            setRefunds={() => {}}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          /> },
+          {
+            path: "/Admin/Page",
+            element: (
+              <AdminPage
+                refunds={refunds}
+                setRefunds={() => { }}
+                addNotification={addNotification}
+                addRefundUpdate={addRefundUpdate}
+              />
+            ),
+          },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
-          { path: "/Admin/RolePage", element: <RoleManagement />},
+          { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
       {
-        path: "/roles/:id" ,
-        element: <RoleEdit/>
+        path: "/roles",
+        element: <RoleManagement />
+      },
+      {
+        path: "/roles/:id",
+        element: <RoleEdit />
       }
     ],
   },

@@ -11,3 +11,5 @@ export * from "./OrderItem";
 export * from "./KeyGame";
 export * from "./Promotion";
 export * from "./Review";
+export * from "./Mod";
+export * from "./ModRating";
