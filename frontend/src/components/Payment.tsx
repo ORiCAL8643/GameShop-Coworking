@@ -179,9 +179,6 @@ const PaymentPage = () => {
                       {it.title}
                     </Typography.Title>
                     <Space size="small" wrap>
-                      <Tag color="default" style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}>
-                        สำหรับบัญชีของฉัน
-                      </Tag>
                       {it.note && (
                         <Tag color="purple" style={{ backgroundColor: `${THEME_PRIMARY}22`, color: THEME_PRIMARY, borderColor: THEME_PRIMARY }}>
                           {it.note}
@@ -231,24 +228,12 @@ const PaymentPage = () => {
               สรุปการสั่งซื้อ
             </Typography.Title>
             <Space direction="vertical" style={{ width: "100%" }}>
-              <Row>
-                <Col flex="auto" style={{ color: TEXT_SUB }}>
-                  ราคารวม
-                </Col>
-                <Col style={{ color: TEXT_MAIN }}>{formatTHB(subtotal)}</Col>
-              </Row>
-              <Row>
-                <Col flex="auto" style={{ color: TEXT_SUB }}>
-                  ค่าธรรมเนียม
-                </Col>
-                <Col style={{ color: TEXT_MAIN }}>{formatTHB(fee)}</Col>
-              </Row>
 
-              <Divider style={{ margin: "8px 0", borderColor: BORDER }} />
+              <Divider style={{ margin: "10px 0", borderColor: BORDER }} />
 
               <Row>
                 <Col flex="auto">
-                  <strong style={{ color: TEXT_MAIN }}>ราคารวมโดยประมาณ</strong>
+                  <strong style={{ color: TEXT_MAIN }}>ราคารวม</strong>
                 </Col>
                 <Col>
                   <Typography.Title level={2} style={{ margin: 0, color: "#fff" }}>
