@@ -21,6 +21,11 @@ type createOrderItemRequest struct {
 }
 
 func CreateOrderItem(c *gin.Context) {
+	user, err := authorize(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
 	var body createOrderItemRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
@@ -32,6 +37,10 @@ func CreateOrderItem(c *gin.Context) {
 	var od entity.Order
 	if tx := db.First(&od, body.OrderID); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "order_id not found"})
+		return
+	}
+	if user.RoleID != 3 && od.UserID != user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
