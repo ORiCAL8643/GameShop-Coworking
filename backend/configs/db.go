@@ -57,7 +57,6 @@ func SetupDatabase() {
 		&entity.OrderItem{},
 		&entity.Payment{},
 		&entity.PaymentSlip{},
-		&entity.PaymentReview{},
 		&entity.Categories{},
 		&entity.MinimumSpec{},
 		&entity.Request{},
