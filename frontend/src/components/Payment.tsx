@@ -14,6 +14,7 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
+import { PlusOutlined, MinusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -57,6 +58,33 @@ const PaymentPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { id: userId } = useAuth();
+
+  const updateItems = (next: CartItem[]) => {
+    setItems(next);
+    localStorage.setItem("cart", JSON.stringify(next));
+  };
+
+  const incQuantity = (id: number) => {
+    updateItems(
+      items.map((it) =>
+        it.id === id ? { ...it, quantity: it.quantity + 1 } : it
+      )
+    );
+  };
+
+  const decQuantity = (id: number) => {
+    updateItems(
+      items.map((it) =>
+        it.id === id
+          ? { ...it, quantity: Math.max(1, it.quantity - 1) }
+          : it
+      )
+    );
+  };
+
+  const removeItem = (id: number) => {
+    updateItems(items.filter((it) => it.id !== id));
+  };
 
     const subtotal = useMemo(
       () => items.reduce((s, it) => s + it.price * it.quantity, 0),
@@ -149,7 +177,6 @@ const PaymentPage = () => {
                   <Col flex="auto">
                     <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
                       {it.title}
-                      {it.quantity > 1 && ` x${it.quantity}`}
                     </Typography.Title>
                     <Space size="small" wrap>
                       <Tag color="default" style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}>
@@ -161,11 +188,22 @@ const PaymentPage = () => {
                         </Tag>
                       )}
                     </Space>
+                    <Space style={{ marginTop: 8 }}>
+                      <Button size="small" icon={<MinusOutlined />} onClick={() => decQuantity(it.id)} />
+                      <Typography.Text style={{ color: TEXT_MAIN }}>{it.quantity}</Typography.Text>
+                      <Button size="small" icon={<PlusOutlined />} onClick={() => incQuantity(it.id)} />
+                      <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeItem(it.id)} />
+                    </Space>
                   </Col>
                   <Col>
-                    <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
-                      {formatTHB(it.price * it.quantity)}
-                    </Typography.Title>
+                    <Space direction="vertical" align="end" size={0}>
+                      <Typography.Text style={{ color: TEXT_SUB }}>
+                        ราคาเกม: {formatTHB(it.price)}
+                      </Typography.Text>
+                      <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
+                        ราคารวม: {formatTHB(it.price * it.quantity)}
+                      </Typography.Title>
+                    </Space>
                   </Col>
                 </Row>
               </Card>
