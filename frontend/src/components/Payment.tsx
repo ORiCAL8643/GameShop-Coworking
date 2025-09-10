@@ -17,6 +17,8 @@ import type { UploadFile } from "antd/es/upload/interface";
 import { PlusOutlined, MinusOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { checkout, uploadPaymentSlip } from "../services/payments";
+import { updateOrder } from "../services/orders";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -115,21 +117,15 @@ const PaymentPage = () => {
     try {
       setSubmitting(true);
       // 1) สร้างออร์เดอร์และการชำระเงินจากรายการสินค้า
-      const res = await fetch("http://localhost:8088/payments/checkout", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
+      const data = await checkout(
+        {
           games: items.map((it) => ({
             game_id: it.id,
             quantity: it.quantity,
           })),
-        }),
-      });
-      if (!res.ok) throw new Error("checkout failed");
-      const data = await res.json();
+        },
+        token,
+      );
       const orderId = data.order?.id || data.order?.ID;
       const paymentId = data.payment?.id || data.payment?.ID;
 
@@ -138,22 +134,10 @@ const PaymentPage = () => {
       form.append("file", files[0].originFileObj as File);
       form.append("payment_id", String(paymentId));
       form.append("order_id", String(orderId));
-      const slipRes = await fetch("http://localhost:8088/payment_slips", {
-        method: "POST",
-        body: form,
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      });
-      if (!slipRes.ok) throw new Error("upload slip failed");
+      await uploadPaymentSlip(form, token);
 
       // 3) อัปเดตสถานะคำสั่งซื้อหลังส่งสลิปสำเร็จ
-      await fetch(`http://localhost:8088/orders/${orderId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ order_status: "PAID" }),
-      });
+      await updateOrder(orderId, { order_status: "PAID" }, token);
 
       // 4) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
       message.success(
