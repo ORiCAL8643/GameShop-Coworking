@@ -24,7 +24,7 @@ export interface CreateUserRequest {
   first_name: string;
   last_name: string;
   birthday: string;
-  role_id: number;
+  //role_id: number;
 }
 
 export interface UpdateUserRequest {

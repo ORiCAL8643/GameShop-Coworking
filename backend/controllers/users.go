@@ -19,7 +19,7 @@ func CreateUser(c *gin.Context) {
 		FirstName string `json:"first_name"`
 		LastName  string `json:"last_name"`
 		Birthday  string `json:"birthday"`
-		RoleID    uint   `json:"role_id"`
+		//RoleID    uint   `json:"role_id"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
@@ -39,7 +39,7 @@ func CreateUser(c *gin.Context) {
 		FirstName: req.FirstName,
 		LastName:  req.LastName,
 		Birthday:  birthday,
-		RoleID:    req.RoleID,
+		RoleID:    configs.UserRoleID(),
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(body.Password), bcrypt.DefaultCost)
@@ -114,6 +114,7 @@ func UpdateUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
 }
+
 // PATCH /users/:id/role
 func UpdateUserRole(c *gin.Context) {
 	var body struct {
@@ -137,7 +138,6 @@ func UpdateUserRole(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, user)
 }
-
 
 // DELETE /users/:id
 func DeleteUserByID(c *gin.Context) {
