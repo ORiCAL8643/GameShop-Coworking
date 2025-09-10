@@ -16,7 +16,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   const userId = id;
 
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<Review[]>([]);
+  const [items, setItems] = useState<(Review & { likedByMe?: boolean })[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Review | null>(null);
   const [form] = Form.useForm<{ review_title: string; review_text?: string; rating: number }>();
@@ -27,7 +27,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
     setLoading(true);
     try {
       const list = await ReviewsAPI.listByGame(gameId);
-      setItems(list.sort((a, b) => (b.ID ?? 0) - (a.ID ?? 0)));
+      setItems(
+        list
+          .map(r => ({ ...r, likedByMe: false }))
+          .sort((a, b) => (b.ID ?? 0) - (a.ID ?? 0))
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       message.error(msg || "โหลดรีวิวไม่สำเร็จ");
@@ -101,19 +105,42 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
     }
   }
 
-  async function handleToggleLike(r: Review) {
+  async function handleToggleLike(r: Review & { likedByMe?: boolean }) {
     if (!userId) {
       message.info("กรุณาเข้าสู่ระบบเพื่อกดถูกใจ");
       return;
     }
+    const alreadyLiked = !!r.likedByMe;
     // optimistic update
-    setItems(prev => prev.map(it => (it.ID === r.ID ? { ...it, likes: (it.likes || 0) + 1 } : it)));
+    setItems(prev =>
+      prev.map(it =>
+        it.ID === r.ID
+          ? {
+              ...it,
+              likedByMe: !alreadyLiked,
+              likes: Math.max(0, (it.likes || 0) + (alreadyLiked ? -1 : 1)),
+            }
+          : it,
+      ),
+    );
     try {
       const res = await ReviewsAPI.toggleLike(r.ID, Number(userId));
-      setItems(prev => prev.map(it => (it.ID === r.ID ? { ...it, likes: res.likes } : it)));
+      setItems(prev =>
+        prev.map(it => (it.ID === r.ID ? { ...it, likes: res.likes } : it)),
+      );
     } catch {
       // rollback
-      setItems(prev => prev.map(it => (it.ID === r.ID ? { ...it, likes: Math.max(0, (it.likes || 1) - 1) } : it)));
+      setItems(prev =>
+        prev.map(it =>
+          it.ID === r.ID
+            ? {
+                ...it,
+                likedByMe: alreadyLiked,
+                likes: Math.max(0, (it.likes || 0) + (alreadyLiked ? 1 : -1)),
+              }
+            : it,
+        ),
+      );
     }
   }
 
@@ -136,22 +163,38 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         split={false}
         renderItem={(item) => {
           const initials = (item.user?.username || (item.user_id === userId && username) || "").charAt(0).toUpperCase();
+          const actionButtons = [
+            (
+              <Button
+                key="like"
+                type="text"
+                shape="round"
+                onClick={() => handleToggleLike(item)}
+                icon={
+                  <Heart
+                    size={16}
+                    className={item.likedByMe ? "text-red-500" : undefined}
+                    fill={item.likedByMe ? "currentColor" : "none"}
+                  />
+                }
+              >
+                {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
+              </Button>
+            ),
+            canEdit(item) && (
+              <Button key="edit" type="text" shape="round" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
+            ),
+            canEdit(item) && (
+              <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
+                <Button danger type="text" shape="round" icon={<Trash2 size={16} />}>ลบ</Button>
+              </Popconfirm>
+            ),
+          ].filter(Boolean) as React.ReactNode[];
+
           return (
             <List.Item
               className="bg-white p-4 rounded-md shadow"
-              actions={[
-                <Button key="like" onClick={() => handleToggleLike(item)} icon={<Heart size={16} />}>
-                  {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
-                </Button>,
-                canEdit(item) && (
-                  <Button key="edit" type="text" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
-                ),
-                canEdit(item) && (
-                  <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
-                    <Button danger type="text" icon={<Trash2 size={16} />}>ลบ</Button>
-                  </Popconfirm>
-                ),
-              ].filter(Boolean) as React.ReactNode[]}
+              actions={[<Space key="actions" size={8}>{actionButtons}</Space>]}
             >
               <List.Item.Meta
                 title={
