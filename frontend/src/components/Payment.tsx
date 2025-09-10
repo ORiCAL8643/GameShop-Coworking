@@ -1,5 +1,5 @@
 // src/pages/PaymentPage.tsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
   Row,
   Col,
@@ -14,7 +14,8 @@ import {
   message,
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -30,7 +31,8 @@ import qrPromptPay from "../assets/ktb-qr.png";
 interface CartItem {
   id: number;
   title: string;
-  price: number; // THB
+  price: number; // THB per unit
+  quantity: number;
   note?: string;
 }
 
@@ -38,74 +40,59 @@ const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const PaymentPage = () => {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [order, setOrder] = useState<any | null>(null);
+  const [items, setItems] = useState<CartItem[]>(() => {
+    const stored = localStorage.getItem("cart");
+    return stored
+      ? JSON.parse(stored).map((it: any) => ({
+          id: it.game_id ?? it.id,
+          title: it.title,
+          price: it.price,
+          quantity: it.quantity ?? 1,
+          note: it.note,
+        }))
+      : [];
+  });
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const orderIdParam =
-    id ||
-    searchParams.get("id") ||
-    searchParams.get("order_id") ||
-    localStorage.getItem("orderId");
+  const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  useEffect(() => {
-    if (!orderIdParam) return;
-    const load = async () => {
-      try {
-        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`);
-        if (!res.ok) throw new Error("fetch order failed");
-        const data = await res.json();
-        setOrder(data);
-        const mapped: CartItem[] =
-          data.order_items?.map((it: any) => ({
-            id: it.id,
-            title: it.key_game.game.game_name,
-            price: it.line_total,
-          })) || [];
-        setItems(mapped);
-      } catch (err) {
-        console.error(err);
-        message.error("ไม่สามารถโหลดคำสั่งซื้อ");
-      }
-    };
-    load();
-  }, [orderIdParam]);
-
-  const subtotal = useMemo(() => items.reduce((s, it) => s + it.price, 0), [items]);
+    const subtotal = useMemo(
+      () => items.reduce((s, it) => s + it.price * it.quantity, 0),
+      [items]
+    );
   const fee = 0;
   // ✅ ตัดส่วนลดออก
   const total = useMemo(() => subtotal + fee, [subtotal]);
-
-  const orderId = order?.id;
 
   const handleSubmitSlip = async () => {
     if (!files.length) {
       message.warning("กรุณาแนบสลิปการชำระเงิน");
       return;
     }
-    if (!orderId) {
-      message.error("ไม่พบหมายเลขคำสั่งซื้อ");
+    if (!items.length) {
+      message.error("ไม่มีรายการสินค้า");
       return;
     }
     try {
       setSubmitting(true);
-
-      // 1) สร้างข้อมูลการชำระเงิน
-      const res = await fetch("http://localhost:8088/payments", {
+      // 1) สร้างออร์เดอร์และการชำระเงินจากรายการสินค้า
+      const res = await fetch("http://localhost:8088/payments/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          order_id: orderId,
-          amount: total,
-          status: "PENDING",
+          user_id: userId || 1,
+          games: items.map((it) => ({
+            game_id: it.id,
+            quantity: it.quantity,
+          })),
         }),
       });
-      if (!res.ok) throw new Error("create payment failed");
-      const payment = await res.json();
-      const paymentId = payment.id || payment.ID;
+      if (!res.ok) throw new Error("checkout failed");
+      const data = await res.json();
+      const orderId = data.order?.id || data.order?.ID;
+      const paymentId = data.payment?.id || data.payment?.ID;
 
       // 2) อัปโหลดสลิปการชำระเงิน
       const form = new FormData();
@@ -126,10 +113,13 @@ const PaymentPage = () => {
       });
 
       // 4) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
-      message.success(`ส่งยืนยันการชำระเงินเรียบร้อย (ชำระเงินเลขที่ ${paymentId})`);
-      setOrder({ ...order, order_status: "PAID" });
+      message.success(
+        `ส่งยืนยันการชำระเงินเรียบร้อย (ชำระเงินเลขที่ ${paymentId})`
+      );
       setPayOpen(false);
       setFiles([]);
+      setItems([]);
+      localStorage.removeItem("cart");
     } catch (err) {
       console.error(err);
       message.error("ส่งสลิปไม่สำเร็จ กรุณาลองใหม่");
@@ -159,6 +149,7 @@ const PaymentPage = () => {
                   <Col flex="auto">
                     <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
                       {it.title}
+                      {it.quantity > 1 && ` x${it.quantity}`}
                     </Typography.Title>
                     <Space size="small" wrap>
                       <Tag color="default" style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}>
@@ -173,7 +164,7 @@ const PaymentPage = () => {
                   </Col>
                   <Col>
                     <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
-                      {formatTHB(it.price)}
+                      {formatTHB(it.price * it.quantity)}
                     </Typography.Title>
                   </Col>
                 </Row>
@@ -189,6 +180,7 @@ const PaymentPage = () => {
                 color: THEME_PRIMARY,
                 background: "transparent",
               }}
+              onClick={() => navigate("/home")}
             >
               ดำเนินการเลือกซื้อต่อไป
             </Button>
@@ -266,9 +258,6 @@ const PaymentPage = () => {
                 <strong>จำนวนเงิน:</strong>{" "}
                 <span style={{ color: THEME_PRIMARY }}>{formatTHB(total)}</span>
               </Typography.Paragraph>
-              <Typography.Text style={{ color: TEXT_SUB }}>
-                กรุณาสแกนและระบุอ้างอิง: {orderId}
-              </Typography.Text>
             </div>
           </Card>
 

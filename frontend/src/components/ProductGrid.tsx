@@ -61,32 +61,31 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     GetGame();
   }, []);
 
-  const handleAddToCart = async (g: Game) => {
-    try {
-      const price = g.discounted_price ?? g.base_price;
-      const discount = g.base_price - price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: g.base_price,
-            qty: 1,
-            line_discount: discount,
-            line_total: price,
-            game_key_id: g.key_id,
-          },
-        ],
+  interface CartStorageItem {
+    game_id: number;
+    title: string;
+    price: number;
+    quantity: number;
+  }
+
+  const handleAddToCart = (g: Game) => {
+    const price = g.discounted_price ?? g.base_price;
+    const cart: CartStorageItem[] = JSON.parse(
+      localStorage.getItem("cart") || "[]"
+    );
+    const existing = cart.find((it) => it.game_id === g.ID);
+    if (existing) {
+      existing.quantity += 1;
+    } else {
+      cart.push({
+        game_id: g.ID,
+        title: g.game_name,
+        price,
+        quantity: 1,
       });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
-      }
-      navigate("/category/Payment");
-    } catch (err) {
-      console.error("add to cart error", err);
     }
+    localStorage.setItem("cart", JSON.stringify(cart));
+    navigate("/category/Payment");
   };
 
   const approveGames = game.filter((g) => g.status === "approve");
