@@ -64,14 +64,17 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   const handleAddToCart = async (g: Game) => {
     try {
       const price = g.discounted_price ?? g.base_price;
+      const discount = g.base_price - price;
       const res = await axios.post(`${base_url}/orders`, {
         user_id: 1,
         total_amount: price,
         order_status: "PENDING",
         order_items: [
           {
-            unit_price: price,
+            unit_price: g.base_price,
             qty: 1,
+            line_discount: discount,
+            line_total: price,
             game_key_id: g.key_id,
           },
         ],
