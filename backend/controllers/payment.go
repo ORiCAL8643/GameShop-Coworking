@@ -12,6 +12,7 @@ import (
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 func CreatePayment(c *gin.Context) {
@@ -227,6 +228,30 @@ func authorizeAdmin(c *gin.Context) (*entity.User, error) {
 	return &user, nil
 }
 
+// assignKeysToItems เลือกคีย์เกมที่ยังไม่ถูกใช้ตามจำนวนที่ซื้อ
+// แล้วอัปเดตให้ผูกกับรายการสินค้า หากคีย์ไม่พอจะคืน error
+func assignKeysToItems(tx *gorm.DB, items []entity.OrderItem) error {
+	for _, it := range items {
+		var keys []entity.KeyGame
+		if err := tx.Where("game_id = ? AND order_item_id IS NULL", it.GameID).
+			Limit(it.QTY).Find(&keys).Error; err != nil {
+			return err
+		}
+		if len(keys) < it.QTY {
+			return errors.New("not enough key games")
+		}
+		var ids []uint
+		for _, k := range keys {
+			ids = append(ids, k.ID)
+		}
+		if err := tx.Model(&entity.KeyGame{}).Where("id IN ?", ids).
+			Update("order_item_id", it.ID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ApprovePayment(c *gin.Context) {
 	if _, err := authorizeAdmin(c); err != nil {
 		if err.Error() == "forbidden" {
@@ -242,41 +267,29 @@ func ApprovePayment(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
-	payment.Status = "APPROVED"
-	payment.RejectReason = ""
-	if err := db.Save(&payment).Error; err != nil {
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		var items []entity.OrderItem
+		if err := tx.Where("order_id = ?", payment.OrderID).Find(&items).Error; err != nil {
+			return err
+		}
+		if err := assignKeysToItems(tx, items); err != nil {
+			return err
+		}
+		payment.Status = "APPROVED"
+		payment.RejectReason = ""
+		if err := tx.Save(&payment).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&entity.Order{}).Where("id = ?", payment.OrderID).
+			Update("order_status", "PAID").Error; err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// หลังอนุมัติการชำระเงิน จับคู่คีย์เกมกับรายการสินค้า
-	var items []entity.OrderItem
-	if err := db.Where("order_id = ?", payment.OrderID).Find(&items).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	for _, it := range items {
-		var keys []entity.KeyGame
-		if err := db.Where("game_id = ? AND order_item_id IS NULL", it.GameID).Limit(it.QTY).Find(&keys).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if len(keys) < it.QTY {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "not enough key games"})
-			return
-		}
-		var ids []uint
-		for _, k := range keys {
-			ids = append(ids, k.ID)
-		}
-		if err := db.Model(&entity.KeyGame{}).Where("id IN ?", ids).Update("order_item_id", it.ID).Error; err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-	}
-
-	// อัปเดตสถานะคำสั่งซื้อเป็น PAID
-	db.Model(&entity.Order{}).Where("id = ?", payment.OrderID).Update("order_status", "PAID")
 
 	c.JSON(http.StatusOK, payment)
 }
