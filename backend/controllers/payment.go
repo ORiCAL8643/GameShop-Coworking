@@ -75,8 +75,6 @@ func CreatePaymentWithGames(c *gin.Context) {
 		return
 	}
 
-	total := 0.0
-
 	for _, g := range req.Games {
 		qty := g.Quantity
 		if qty <= 0 {
@@ -113,7 +111,6 @@ func CreatePaymentWithGames(c *gin.Context) {
 		lineTotal := (unitPrice - discount) * float64(qty)
 		lineDiscount = math.Round(lineDiscount*100) / 100
 		lineTotal = math.Round(lineTotal*100) / 100
-		total += lineTotal
 
 		item := entity.OrderItem{
 			UnitPrice:    unitPrice,
@@ -128,8 +125,11 @@ func CreatePaymentWithGames(c *gin.Context) {
 		}
 	}
 
-	total = math.Round(total*100) / 100
-	db.Model(&order).Update("total_amount", total)
+	total, err := updateOrderTotal(order.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	payment := entity.Payment{
 		OrderID:     order.ID,

@@ -132,6 +132,11 @@ func CreateOrderItem(c *gin.Context) {
 			Update("order_item_id", item.ID)
 	}
 
+	if _, err := updateOrderTotal(item.OrderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	c.JSON(http.StatusCreated, item)
 }
 
@@ -165,16 +170,29 @@ func UpdateOrderItem(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if _, err := updateOrderTotal(row.OrderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
 }
 
 func DeleteOrderItem(c *gin.Context) {
-	// เคลียร์การอ้างอิง GameKey ก่อน
 	db := configs.DB()
-	db.Model(&entity.KeyGame{}).Where("order_item_id = ?", c.Param("id")).Update("order_item_id", nil)
-
-	if tx := db.Exec("DELETE FROM order_items WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
+	var row entity.OrderItem
+	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
+		return
+	}
+	// เคลียร์การอ้างอิง GameKey ก่อน
+	db.Model(&entity.KeyGame{}).Where("order_item_id = ?", row.ID).Update("order_item_id", nil)
+
+	if err := db.Delete(&row).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if _, err := updateOrderTotal(row.OrderID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
