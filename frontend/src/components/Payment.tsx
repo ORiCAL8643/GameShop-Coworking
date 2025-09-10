@@ -103,6 +103,10 @@ const PaymentPage = () => {
       message.error("ไม่มีรายการสินค้า");
       return;
     }
+    if (!id) {
+      message.error("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+      return;
+    }
     try {
       setSubmitting(true);
       // 1) สร้างออร์เดอร์และการชำระเงินจากรายการสินค้า
@@ -110,7 +114,7 @@ const PaymentPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: id || 1,
+          user_id: id,
           games: items.map((it) => ({
             game_id: it.id,
             quantity: it.quantity,
