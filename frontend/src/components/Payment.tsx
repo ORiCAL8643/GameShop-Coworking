@@ -196,9 +196,14 @@ const PaymentPage = () => {
                     </Space>
                   </Col>
                   <Col>
-                    <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
-                      {formatTHB(it.price * it.quantity)}
-                    </Typography.Title>
+                    <Space direction="vertical" align="end" size={0}>
+                      <Typography.Text style={{ color: TEXT_SUB }}>
+                        ราคาเกม: {formatTHB(it.price)}
+                      </Typography.Text>
+                      <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
+                        ราคารวม: {formatTHB(it.price * it.quantity)}
+                      </Typography.Title>
+                    </Space>
                   </Col>
                 </Row>
               </Card>
