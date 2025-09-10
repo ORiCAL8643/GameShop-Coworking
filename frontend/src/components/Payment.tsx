@@ -71,9 +71,13 @@ const PaymentPage = () => {
     load();
   }, [orderIdParam]);
 
-  const subtotal = useMemo(() => items.reduce((s, it) => s + it.price, 0), [items]);
+  // ใช้ราคารวมจาก backend (total_amount) เพื่อให้รวมส่วนลดแล้ว
+  const subtotal = useMemo(
+    () => order?.total_amount ?? items.reduce((s, it) => s + it.price, 0),
+    [order, items]
+  );
   const fee = 0;
-  // ✅ ตัดส่วนลดออก
+  // ✅ ตัดส่วนลดออก และอาศัย line_total ที่คำนวณฝั่ง backend
   const total = useMemo(() => subtotal + fee, [subtotal]);
 
   const orderId = order?.id;

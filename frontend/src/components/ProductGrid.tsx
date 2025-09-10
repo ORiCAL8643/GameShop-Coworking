@@ -61,24 +61,25 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     GetGame();
   }, []);
 
-    const handleAddToCart = async (g: Game) => {
-      if (!userId) return; // ต้องเข้าสู่ระบบก่อนสั่งซื้อ
-      try {
-        const stored = localStorage.getItem("orderId");
-        if (!stored) {
-          // สร้างออร์เดอร์ใหม่พร้อมรายการแรก
-          const res = await axios.post(`${base_url}/orders`, {
-            user_id: userId,
-            total_amount: g.base_price,
-            order_status: "PENDING",
-            order_items: [
-              {
-                unit_price: g.base_price,
-                qty: 1,
-                game_key_id: g.key_id,
-              },
-            ],
-          });
+  const handleAddToCart = async (g: Game) => {
+    if (!userId) return; // ต้องเข้าสู่ระบบก่อนสั่งซื้อ
+    const price = g.discounted_price ?? g.base_price;
+    try {
+      const stored = localStorage.getItem("orderId");
+      if (!stored) {
+        // สร้างออร์เดอร์ใหม่พร้อมรายการแรก โดยใช้ราคาหลังหักส่วนลด
+        const res = await axios.post(`${base_url}/orders`, {
+          user_id: userId,
+          total_amount: price,
+          order_status: "PENDING",
+          order_items: [
+            {
+              unit_price: price,
+              qty: 1,
+              game_key_id: g.key_id,
+            },
+          ],
+        });
         const newId = res.data.ID || res.data.id;
         if (newId) {
           localStorage.setItem("orderId", String(newId));
@@ -87,15 +88,17 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
             (sum: number, it: any) => sum + Number(it.line_total),
             0
           );
-          await axios.put(`${base_url}/orders/${newId}`, { total_amount: total });
+          await axios.put(`${base_url}/orders/${newId}`, {
+            total_amount: total,
+          });
         }
       } else {
-        // เพิ่มรายการเข้าออร์เดอร์เดิม
+        // เพิ่มรายการเข้าออร์เดอร์เดิม โดยอ้างอิงราคาส่วนลดจาก backend
         await axios.post(`${base_url}/order-items`, {
           order_id: Number(stored),
           game_key_id: g.key_id,
           qty: 1,
-          unit_price: g.base_price,
+          unit_price: price,
         });
         const orderRes = await axios.get(`${base_url}/orders/${stored}`);
         const total = (orderRes.data.order_items || []).reduce(
