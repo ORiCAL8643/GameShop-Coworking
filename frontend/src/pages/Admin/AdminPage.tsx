@@ -1,7 +1,16 @@
 import { useState, useEffect } from "react";
-import { Card, Button, Typography, Tag, Input, Upload, message, Modal } from "antd";
+import {
+  Card,
+  Button,
+  Typography,
+  Tag,
+  Input,
+  Upload,
+  message,
+  Modal,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { fetchReports, resolveReport } from "../../services/Report";
+import { fetchReports, resolveReport, replyReport } from "../../services/Report";
 import { createNotification } from "../../services/Notification";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
@@ -33,7 +42,9 @@ export default function AdminPage({
 }: AdminPageProps) {
   const [problems, setProblems] = useState<ProblemReport[]>([]);
   const [activeTab, setActiveTab] = useState<"refunds" | "problems">("refunds");
-  const [replies, setReplies] = useState<Record<number, { text: string; fileList: UploadFile[] }>>({});
+  const [replies, setReplies] = useState<
+    Record<number, { text: string; fileList: UploadFile[] }>
+  >({});
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
@@ -47,10 +58,6 @@ export default function AdminPage({
       }
     };
     load();
-
-    // ถ้าอยาก auto-refresh ทุก 10 วินาที เปิดคอมเมนต์บรรทัดล่าง
-    // const timer = setInterval(load, 10000);
-    // return () => clearInterval(timer);
   }, []);
 
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
@@ -62,31 +69,61 @@ export default function AdminPage({
     addRefundUpdate(`Refund #${id} ${action.toLowerCase()}`);
   };
 
+  // ✅ ตอบกลับลูกค้าด้วยข้อความ + ไฟล์ + สร้างแจ้งเตือน
   const handleSendReply = async (rep: ProblemReport) => {
     const reply = replies[rep.ID];
     if (!reply || (!reply.text && reply.fileList.length === 0)) {
       message.warning("กรุณาพิมพ์ข้อความหรือติดไฟล์อย่างน้อย 1 อย่าง");
       return;
     }
+
     try {
-      await createNotification({
+      // ✅ รวมไฟล์แนบ (แก้ type ให้ไม่แดง)
+      const files: File[] = (reply.fileList || [])
+        .map((f: UploadFile) => {
+          if (f.originFileObj && f.originFileObj instanceof File) {
+            return f.originFileObj as File;
+          }
+          return null;
+        })
+        .filter((f: File | null): f is File => f !== null);
+
+      // ✅ ส่งคำตอบไป backend
+      const updated = await replyReport(rep.ID, reply.text, files);
+      setProblems((prev: any[]) =>
+        prev.map((p) => (p.ID === rep.ID ? updated : p))
+      );
+
+      // ✅ ยิงแจ้งเตือนให้ลูกค้าเจ้าของคำร้อง
+      const targetUserId =
+        (rep as any).user_id ||
+        (rep as any)?.user?.ID ||
+        (rep as any)?.user?.id ||
+        0;
+
+      if (!targetUserId) {
+        message.error("ไม่สามารถระบุผู้รับแจ้งเตือนได้ (user_id หาย)");
+        return;
+      }
+
+      const payload = {
         title: `ตอบกลับคำร้อง #${rep.ID}`,
-        message: reply.text,
+        message: reply.text || "มีการตอบกลับคำร้องของคุณ",
         type: "report",
-        user_id: rep.user_id, // ใช้ฟิลด์ normalized
-      });
-
-      message.success("ส่งคำตอบกลับไปยังลูกค้าเรียบร้อย!");
-
-      // mark resolved
-      const updated = await resolveReport(rep.ID);
-      setProblems((prev) => prev.map((p) => (p.ID === rep.ID ? updated : p)));
+        user_id: Number(targetUserId),
+      };
+      console.log("🔔 createNotification payload =>", payload);
+      await createNotification(payload);
 
       addNotification(`Problem report #${rep.ID} has a reply`);
-    } catch (e) {
-      console.error(e);
-      message.error("ส่งคำตอบไม่สำเร็จ");
+      message.success("ตอบกลับลูกค้าสำเร็จ และส่งการแจ้งเตือนแล้ว");
+    } catch (e: any) {
+      console.error("❌ Error while sending reply:", e);
+      const detail = e?.response?.data?.error || e?.message || String(e);
+      message.error(`ไม่สามารถส่งคำตอบ/แจ้งเตือนได้: ${detail}`);
     }
+
+    // ล้างค่าในช่อง reply
     setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
   };
 
@@ -101,8 +138,12 @@ export default function AdminPage({
     }
   };
 
-  const handlePreview = (file: UploadFile) => {
-    setPreviewImage(file.thumbUrl || file.url || "");
+  const handlePreview = (file: UploadFile | string) => {
+    if (typeof file === "string") {
+      setPreviewImage(file);
+    } else {
+      setPreviewImage(file.thumbUrl || file.url || "");
+    }
     setPreviewOpen(true);
   };
 
@@ -121,6 +162,8 @@ export default function AdminPage({
     fontWeight: 600 as const,
     color: "#ffffff",
   };
+
+  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8088";
 
   return (
     <div
@@ -182,83 +225,6 @@ export default function AdminPage({
         })}
       </div>
 
-      {/* Refund Requests */}
-      {activeTab === "refunds" && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-            gap: "25px",
-          }}
-        >
-          {refunds.map((req) => (
-            <Card key={req.id} style={cardStyle}>
-              <p style={textStyle}>User: {req.user}</p>
-              <p style={textStyle}>Game: {req.game}</p>
-              <p style={textStyle}>Reason: {req.reason}</p>
-              <p style={textStyle}>Order ID: {req.orderId}</p>
-              <p style={textStyle}>
-                Status:{" "}
-                <Tag
-                  color={
-                    req.status === "Pending"
-                      ? "#d9d9d9"
-                      : req.status === "Approved"
-                      ? "#05ef66"
-                      : "#ff6b81"
-                  }
-                  style={{
-                    fontWeight: 700,
-                    color: "#000",
-                    textShadow: "0 0 8px rgba(255,255,255,0.7)",
-                    borderRadius: 8,
-                  }}
-                >
-                  {req.status}
-                </Tag>
-              </p>
-              {req.status === "Pending" && (
-                <div
-                  style={{
-                    marginTop: "20px",
-                    display: "flex",
-                    justifyContent: "flex-start",
-                    gap: "15px",
-                  }}
-                >
-                  <Button
-                    onClick={() => handleRefundAction(req.id, "Approved")}
-                    style={{
-                      flex: 1,
-                      background: "linear-gradient(90deg, #52c41a, #389e0d)",
-                      color: "white",
-                      fontWeight: "bold",
-                      borderRadius: 12,
-                      boxShadow: "0 0 10px #52c41a",
-                    }}
-                  >
-                    ✅ Approve
-                  </Button>
-                  <Button
-                    onClick={() => handleRefundAction(req.id, "Rejected")}
-                    style={{
-                      flex: 1,
-                      background: "linear-gradient(90deg, #f5222d, #cf1322)",
-                      color: "white",
-                      fontWeight: "bold",
-                      borderRadius: 12,
-                      boxShadow: "0 0 10px #f5222d",
-                    }}
-                  >
-                    ❌ Reject
-                  </Button>
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
-
       {/* Problem Reports */}
       {activeTab === "problems" && (
         <div
@@ -270,7 +236,9 @@ export default function AdminPage({
         >
           {problems.map((rep) => (
             <Card key={rep.ID} style={cardStyle}>
-              <p style={textStyle}>User: {rep.user?.username ?? rep.user_id}</p>
+              <p style={textStyle}>
+                User: {rep.user?.username ?? (rep as any).user_id}
+              </p>
               <p style={textStyle}>Title: {rep.title}</p>
               <p style={textStyle}>Description: {rep.description}</p>
               <p style={textStyle}>
@@ -282,6 +250,53 @@ export default function AdminPage({
                 )}
               </p>
 
+              {/* Attachments */}
+              {rep.attachments && rep.attachments.length > 0 && (
+                <div style={{ margin: "15px 0" }}>
+                  <p style={{ ...textStyle, marginBottom: 8 }}>
+                    📎 User Attachments:
+                  </p>
+                  <div
+                    style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}
+                  >
+                    {rep.attachments.map((att) => {
+                      const path = (att as any).file_path || "";
+                      const isImage = path
+                        .toLowerCase()
+                        .match(/\.(jpg|jpeg|png|gif)$/i);
+                      const url = `${API_URL}/${path}`;
+                      return isImage ? (
+                        <img
+                          key={(att as any).ID}
+                          src={url}
+                          alt="attachment"
+                          style={{
+                            width: 100,
+                            height: 100,
+                            objectFit: "cover",
+                            borderRadius: 8,
+                            cursor: "pointer",
+                            boxShadow: "0 0 6px rgba(0,0,0,0.4)",
+                          }}
+                          onClick={() => handlePreview(url)}
+                        />
+                      ) : (
+                        <a
+                          key={(att as any).ID}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#40a9ff" }}
+                        >
+                          📄 {path.split("/").pop()}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Reply form */}
               {rep.status !== "resolved" && (
                 <div style={{ marginTop: "20px" }}>
                   <TextArea
@@ -323,7 +338,8 @@ export default function AdminPage({
                     listType="picture-card"
                     multiple
                   >
-                    {(!replies[rep.ID] || replies[rep.ID].fileList.length < 5) && (
+                    {(!replies[rep.ID] ||
+                      replies[rep.ID].fileList.length < 5) && (
                       <div style={{ color: "#aaa" }}>
                         <UploadOutlined /> อัปโหลด
                       </div>
@@ -334,7 +350,8 @@ export default function AdminPage({
                       onClick={() => handleSendReply(rep)}
                       style={{
                         flex: 1,
-                        background: "linear-gradient(90deg, #52c41a, #389e0d)",
+                        background:
+                          "linear-gradient(90deg, #52c41a, #389e0d)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
@@ -347,7 +364,8 @@ export default function AdminPage({
                       onClick={() => handleResolveProblem(rep.ID)}
                       style={{
                         flex: 1,
-                        background: "linear-gradient(90deg, #f759ab, #9254de)",
+                        background:
+                          "linear-gradient(90deg, #f759ab, #9254de)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
@@ -370,7 +388,11 @@ export default function AdminPage({
         onCancel={() => setPreviewOpen(false)}
         destroyOnClose
       >
-        <img alt="preview" style={{ width: "100%", borderRadius: 12 }} src={previewImage} />
+        <img
+          alt="preview"
+          style={{ width: "100%", borderRadius: 12 }}
+          src={previewImage}
+        />
       </Modal>
     </div>
   );
