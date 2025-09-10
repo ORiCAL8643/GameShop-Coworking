@@ -115,6 +115,7 @@ func CreatePaymentWithGames(c *gin.Context) {
 			LineDiscount: lineDiscount,
 			LineTotal:    lineTotal,
 			OrderID:      order.ID,
+			GameID:       g.GameID,
 		}
 		if err := db.Create(&item).Error; err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -136,7 +137,7 @@ func CreatePaymentWithGames(c *gin.Context) {
 		return
 	}
 
-	db.Preload("OrderItems").First(&order, order.ID)
+	db.Preload("OrderItems.Game").Preload("OrderItems.KeyGames").First(&order, order.ID)
 
 	c.JSON(http.StatusCreated, gin.H{"order": order, "payment": payment})
 }

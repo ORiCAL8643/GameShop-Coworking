@@ -42,7 +42,12 @@ func FindOrders(c *gin.Context) {
 		return
 	}
 	var rows []entity.Order
-	db := configs.DB().Preload("User").Preload("OrderItems").Preload("Payments").Preload("OrderPromotions")
+	db := configs.DB().
+		Preload("User").
+		Preload("OrderItems.Game").
+		Preload("OrderItems.KeyGames").
+		Preload("Payments").
+		Preload("OrderPromotions")
 	status := c.Query("status")
 	if user.RoleID == 3 {
 		userID := c.Query("user_id")
@@ -71,7 +76,8 @@ func FindOrderByID(c *gin.Context) {
 	var row entity.Order
 	if tx := configs.DB().
 		Preload("User").
-		Preload("OrderItems.KeyGame.Game").
+		Preload("OrderItems.Game").
+		Preload("OrderItems.KeyGames").
 		Preload("Payments.PaymentSlips").
 		Preload("OrderPromotions.Promotion").
 		First(&row, c.Param("id")); tx.RowsAffected == 0 {
