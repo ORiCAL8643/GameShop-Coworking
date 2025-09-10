@@ -19,7 +19,7 @@ const Home = () => {
           <Button shape="round">Recommended</Button>
           <Button shape="round">Filter</Button>
         </Space>
-        <ProductGrid userId={id} />
+        <ProductGrid id={id} />
       </div>
     </div>
   );

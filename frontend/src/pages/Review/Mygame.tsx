@@ -33,7 +33,7 @@ const Mygame = () => {
           </Space>
 
           {/* UI-only: แสดงกริดเกมจากคอมโพเนนต์ที่มีอยู่แล้ว */}
-          <ProductGrid userId={id} />
+          <ProductGrid id={id} />
         </div>
       </Content>
     </Layout>
