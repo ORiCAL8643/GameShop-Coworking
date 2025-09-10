@@ -13,12 +13,10 @@ import (
 
 // payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
 type createOrderItemRequest struct {
-	UnitPrice    float64  `json:"unit_price" binding:"required"`
-	QTY          int      `json:"qty" binding:"required"`
-	OrderID      uint     `json:"order_id" binding:"required"`
-	GameKeyID    *uint    `json:"game_key_id"`
-	LineDiscount *float64 `json:"line_discount"`
-	LineTotal    *float64 `json:"line_total"`
+	UnitPrice float64 `json:"unit_price" binding:"required"`
+	QTY       int     `json:"qty" binding:"required"`
+	OrderID   uint    `json:"order_id" binding:"required"`
+	GameKeyID *uint   `json:"game_key_id"`
 }
 
 func CreateOrderItem(c *gin.Context) {
@@ -91,17 +89,8 @@ func CreateOrderItem(c *gin.Context) {
 	if discount > sub {
 		discount = sub
 	}
-	// ตรวจสอบถ้ามีส่ง line_discount/line_total มาต้องตรงกับที่คำนวณ
-	if body.LineDiscount != nil && math.Round(*body.LineDiscount*100)/100 != math.Round(discount*100)/100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_discount mismatch"})
-		return
-	}
 	total := sub - discount
 	total = math.Round(total*100) / 100
-	if body.LineTotal != nil && math.Round(*body.LineTotal*100)/100 != total {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_total mismatch"})
-		return
-	}
 
 	item := entity.OrderItem{
 		UnitPrice:    body.UnitPrice,
