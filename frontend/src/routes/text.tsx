@@ -95,19 +95,23 @@ const router = createBrowserRouter([
             element: (
               <AdminPage
                 refunds={refunds}
-                setRefunds={() => {}}
+                setRefunds={() => { }}
                 addNotification={addNotification}
                 addRefundUpdate={addRefundUpdate}
               />
             ),
           },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
-          { path: "/Admin/RolePage", element: <RoleManagement />},
+          { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
       {
-        path: "/roles/:id" ,
-        element: <RoleEdit/>
+        path: "/roles",
+        element: <RoleManagement />
+      },
+      {
+        path: "/roles/:id",
+        element: <RoleEdit />
       }
     ],
   },

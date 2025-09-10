@@ -10,6 +10,7 @@ import {
   List,
   Button,
   message,
+  Select,
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { getGame, listMods, listGames, listUserGames } from "../../services/workshop";
@@ -35,6 +36,9 @@ const WorkshopDetail: React.FC = () => {
   const [searchText, setSearchText] = useState("");
   const [filteredMods, setFilteredMods] = useState<Mod[]>([]);
   const [userGames, setUserGames] = useState<number[]>([]); // game_id list ที่ผู้ใช้มี
+
+  // 🆕 Sort
+  const [sortKey, setSortKey] = useState<"views" | "downloads">("views");
 
   // โหลดข้อมูลเกมและม็อด
   useEffect(() => {
@@ -108,7 +112,7 @@ const WorkshopDetail: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    const result = mods.filter((m) => m.title.toLowerCase().includes(value.toLowerCase()));
+    const result = mods.filter((m) => (m.title ?? "").toLowerCase().includes(value.toLowerCase()));
     setFilteredMods(result);
   };
 
@@ -127,6 +131,23 @@ const WorkshopDetail: React.FC = () => {
     m?.image_path ?? m?.image ?? m?.imageUrl ?? m?.img_src ?? "";
 
   const bannerImg = (game as any)?.img_src ?? "";
+
+  // 🆕 Helpers สำหรับดึงค่าดู/ดาวน์โหลดให้ robust
+  const getViews = (m: any) =>
+    Number(m.view_count ?? m.views ?? m.viewCount ?? m.Views ?? 0);
+  const getDownloads = (m: any) =>
+    Number(m.downloads ?? m.download_count ?? m.downloadCount ?? m.Downloads ?? 0);
+
+  // 🆕 รายการหลังจัดเรียง
+  const sortedMods = useMemo(() => {
+    const modsCopy = [...filteredMods];
+    modsCopy.sort((a, b) => {
+      const av = sortKey === "views" ? getViews(a) : getDownloads(a);
+      const bv = sortKey === "views" ? getViews(b) : getDownloads(b);
+      return bv - av; // มาก → น้อย
+    });
+    return modsCopy;
+  }, [filteredMods, sortKey]);
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
@@ -257,9 +278,31 @@ const WorkshopDetail: React.FC = () => {
       <Layout>
         {/* Content */}
         <Content style={{ padding: "20px" }}>
+          {/* 🆕 Toolbar: Sort by */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <span style={{ color: "#bfbfbf" }}>Sort by</span>
+            <Select<"views" | "downloads">
+              value={sortKey}
+              onChange={(v) => setSortKey(v)}
+              style={{ width: 220 }}
+              options={[
+                { value: "views", label: "Most viewed" },
+                { value: "downloads", label: "Most downloaded" },
+              ]}
+            />
+          </div>
+
           {/* Grid Mods */}
           <Row gutter={[16, 16]}>
-            {filteredMods.map((mod) => {
+            {sortedMods.map((mod) => {
               const modImg = getModImg(mod);
               return (
                 <Col xs={24} sm={12} md={8} lg={6} key={mod.ID}>
@@ -359,6 +402,18 @@ const WorkshopDetail: React.FC = () => {
                         >
                           {mod.title}
                         </Text>
+                        {/* 🆕 แสดงสถิติ (ถ้ามี) เล็ก ๆ ใต้ชื่อ */}
+                        <div style={{ color: "#9aa4ad", fontSize: 12, marginTop: 4 }}>
+                          {(() => {
+                            const v = getViews(mod);
+                            const d = getDownloads(mod);
+                            const parts = [
+                              Number.isFinite(v) ? `${v} views` : null,
+                              Number.isFinite(d) ? `${d} downloads` : null,
+                            ].filter(Boolean);
+                            return parts.length ? parts.join(" • ") : null;
+                          })()}
+                        </div>
                       </div>
                     </div>
                   </Card>
@@ -366,7 +421,7 @@ const WorkshopDetail: React.FC = () => {
               );
             })}
 
-            {filteredMods.length === 0 && (
+            {sortedMods.length === 0 && (
               <Col span={24} style={{ textAlign: "center", color: "#aaa" }}>
                 No mods found.
               </Col>
@@ -376,30 +431,30 @@ const WorkshopDetail: React.FC = () => {
 
         {/* Sidebar */}
         <Sider
-          width={220}
+          width={200}
           style={{
             background: "#141414",
             padding: "20px",
             borderLeft: "1px solid #2a2a2a",
           }}
         >
-          <h3 style={{ color: "white" }}>SHOW:</h3>
+          <h3 style={{ color: "white" }}>Browse Items</h3>
           <List
-            dataSource={[
-              { name: "All", path: "#" },
-              { name: "Your Favorites", path: "#" },
-            ]}
+            dataSource={[{ name: "All", key: "all" as const }]}
             renderItem={(item) => (
               <List.Item
                 style={{
                   color: "white",
-                  cursor: "pointer",
+                  cursor: "default",
                   border: "none",
-                  padding: "8px 0",
-                  transition: "color 0.2s",
+                  padding: "8px 12px",
+                  marginBottom: 4,
+                  borderRadius: 6,
+                  background: "#1890ff33", // ✅ active ตลอด
+                  borderLeft: "3px solid #1890ff",
+                  fontWeight: 600,
+                  transition: "all 0.2s",
                 }}
-                onMouseEnter={(e) => ((e.currentTarget.style.color = "#40a9ff"))}
-                onMouseLeave={(e) => ((e.currentTarget.style.color = "white"))}
               >
                 {item.name}
               </List.Item>
