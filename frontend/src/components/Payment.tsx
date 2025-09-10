@@ -1,22 +1,13 @@
-// src/pages/PaymentPage.tsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
-  Row,
-  Col,
-  Card,
-  Button,
-  Typography,
-  Space,
-  Tag,
-  Divider,
-  Modal,
-  Upload,
-  message,
+  Row, Col, Card, Button, Typography, Space, Tag, Divider, Modal, Upload, message,
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
-import { useParams, useSearchParams } from "react-router-dom";
+import { PlusOutlined, MinusOutlined, DeleteOutlined, HistoryOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
 
-// ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
 const BG_DARK = "#1e1e2f";
 const CARD_DARK = "#171923";
@@ -24,123 +15,94 @@ const BORDER = "#2b2f3a";
 const TEXT_MAIN = "#e8e8f3";
 const TEXT_SUB = "#a9afc3";
 
-// ⬇️ นำรูปไปไว้ที่ src/assets/ktb-qr.png
+const API = "http://localhost:8088";
 import qrPromptPay from "../assets/ktb-qr.png";
-
-interface CartItem {
-  id: number;
-  title: string;
-  price: number; // THB
-  note?: string;
-}
 
 const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const PaymentPage = () => {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [order, setOrder] = useState<any | null>(null);
+export default function PaymentPage() {
+  const { items, updateQty, removeItem, clearCart } = useCart();
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const { id } = useParams();
-  const [searchParams] = useSearchParams();
-  const orderIdParam =
-    id ||
-    searchParams.get("id") ||
-    searchParams.get("order_id") ||
-    localStorage.getItem("orderId");
+  const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  useEffect(() => {
-    if (!orderIdParam) return;
-    const load = async () => {
-      try {
-        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`);
-        if (!res.ok) throw new Error("fetch order failed");
-        const data = await res.json();
-        setOrder(data);
-        const mapped: CartItem[] =
-          data.order_items?.map((it: any) => ({
-            id: it.id,
-            title: it.key_game.game.game_name,
-            price: it.line_total,
-          })) || [];
-        setItems(mapped);
-      } catch (err) {
-        console.error(err);
-        message.error("ไม่สามารถโหลดคำสั่งซื้อ");
-      }
-    };
-    load();
-  }, [orderIdParam]);
-
-  const subtotal = useMemo(() => items.reduce((s, it) => s + it.price, 0), [items]);
+  const subtotal = useMemo(
+    () => items.reduce((s, it) => s + it.price * it.quantity, 0),
+    [items]
+  );
   const fee = 0;
-  // ✅ ตัดส่วนลดออก
   const total = useMemo(() => subtotal + fee, [subtotal]);
 
-  const orderId = order?.id;
+  const incQuantity = (id: number) =>
+    updateQty(id, (items.find((i) => i.id === id)?.quantity ?? 1) + 1);
+
+  const decQuantity = (id: number) => {
+    const cur = items.find((i) => i.id === id)?.quantity ?? 1;
+    updateQty(id, Math.max(1, cur - 1));
+  };
 
   const handleSubmitSlip = async () => {
     if (!files.length) {
       message.warning("กรุณาแนบสลิปการชำระเงิน");
       return;
     }
-    if (!orderId) {
-      message.error("ไม่พบหมายเลขคำสั่งซื้อ");
+    if (!items.length) {
+      message.error("ไม่มีรายการสินค้า");
       return;
     }
+    if (!userId) {
+      message.error("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+      return;
+    }
+
     try {
       setSubmitting(true);
 
-      // 1) สร้างข้อมูลการชำระเงิน
-      const res = await fetch("http://localhost:8088/payments", {
+      // 1) สร้างคำสั่งซื้อ (backend จะคำนวณราคาสุทธิ/โปรโมชันเอง)
+      const orderRes = await fetch(`${API}/orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          order_id: orderId,
-          amount: total,
-          status: "PENDING",
+          user_id: userId,
+          items: items.map((it) => ({ game_id: it.id, qty: it.quantity })),
         }),
       });
-      if (!res.ok) throw new Error("create payment failed");
-      const payment = await res.json();
-      const paymentId = payment.id || payment.ID;
+      if (!orderRes.ok) throw new Error("สร้างคำสั่งซื้อไม่สำเร็จ");
+      const order = await orderRes.json();
+      const orderId = order.ID ?? order.id;
+      if (!orderId) throw new Error("ไม่พบเลขคำสั่งซื้อ");
 
-      // 2) อัปโหลดสลิปการชำระเงิน
+      // 2) อัปโหลดสลิป
       const form = new FormData();
-      form.append("file", files[0].originFileObj as File);
-      form.append("payment_id", String(paymentId));
       form.append("order_id", String(orderId));
-      const slipRes = await fetch("http://localhost:8088/payment_slips", {
-        method: "POST",
-        body: form,
-      });
-      if (!slipRes.ok) throw new Error("upload slip failed");
+      form.append("file", files[0].originFileObj as File);
 
-      // 3) อัปเดตสถานะคำสั่งซื้อหลังส่งสลิปสำเร็จ
-      await fetch(`http://localhost:8088/orders/${orderId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_status: "PAID" }),
-      });
+      const payRes = await fetch(`${API}/payments`, { method: "POST", body: form });
+      if (!payRes.ok) throw new Error("อัปโหลดสลิปไม่สำเร็จ");
 
-      // 4) แจ้งผลลัพธ์และเคลียร์สถานะไฟล์
-      message.success(`ส่งยืนยันการชำระเงินเรียบร้อย (ชำระเงินเลขที่ ${paymentId})`);
-      setOrder({ ...order, order_status: "PAID" });
+      // Success
+      message.success("ส่งการยืนยันสำเร็จ กรุณารอการอัปเดตสถานะ");
       setPayOpen(false);
       setFiles([]);
-    } catch (err) {
+      clearCart();
+      navigate("/orders-status");
+    } catch (err: any) {
       console.error(err);
-      message.error("ส่งสลิปไม่สำเร็จ กรุณาลองใหม่");
+      message.error(err?.message || "ส่งสลิปไม่สำเร็จ กรุณาลองใหม่");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1, justifyContent: "space-between", }}>
-      <Typography.Title level={2} style={{ color: THEME_PRIMARY, textAlign: "center", marginBottom: 24 }}>
+    <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1 }}>
+      <Typography.Title
+        level={2}
+        style={{ color: THEME_PRIMARY, textAlign: "center", marginBottom: 24 }}
+      >
         YOUR GAME CART
       </Typography.Title>
 
@@ -151,7 +113,6 @@ const PaymentPage = () => {
               <Card
                 key={it.id}
                 hoverable
-                className="payment-item"
                 style={{ borderRadius: 14, background: CARD_DARK, borderColor: BORDER }}
                 bodyStyle={{ padding: 16 }}
               >
@@ -160,21 +121,38 @@ const PaymentPage = () => {
                     <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
                       {it.title}
                     </Typography.Title>
+
                     <Space size="small" wrap>
-                      <Tag color="default" style={{ borderColor: THEME_PRIMARY, color: THEME_PRIMARY, background: "transparent" }}>
-                        สำหรับบัญชีของฉัน
-                      </Tag>
                       {it.note && (
-                        <Tag color="purple" style={{ backgroundColor: `${THEME_PRIMARY}22`, color: THEME_PRIMARY, borderColor: THEME_PRIMARY }}>
+                        <Tag
+                          color="purple"
+                          style={{
+                            backgroundColor: `${THEME_PRIMARY}22`,
+                            color: THEME_PRIMARY,
+                            borderColor: THEME_PRIMARY,
+                          }}
+                        >
                           {it.note}
                         </Tag>
                       )}
                     </Space>
+
+                    <Space style={{ marginTop: 8 }}>
+                      <Button size="small" icon={<MinusOutlined />} onClick={() => decQuantity(it.id)} />
+                      <Typography.Text style={{ color: TEXT_MAIN }}>{it.quantity}</Typography.Text>
+                      <Button size="small" icon={<PlusOutlined />} onClick={() => incQuantity(it.id)} />
+                      <Button size="small" danger icon={<DeleteOutlined />} onClick={() => removeItem(it.id)} />
+                    </Space>
                   </Col>
                   <Col>
-                    <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
-                      {formatTHB(it.price)}
-                    </Typography.Title>
+                    <Space direction="vertical" align="end" size={0}>
+                      <Typography.Text style={{ color: TEXT_SUB }}>
+                        ราคาเกม: {formatTHB(it.price)}
+                      </Typography.Text>
+                      <Typography.Title level={4} style={{ margin: 0, color: TEXT_MAIN }}>
+                        ราคารวม: {formatTHB(it.price * it.quantity)}
+                      </Typography.Title>
+                    </Space>
                   </Col>
                 </Row>
               </Card>
@@ -189,6 +167,7 @@ const PaymentPage = () => {
                 color: THEME_PRIMARY,
                 background: "transparent",
               }}
+              onClick={() => navigate("/home")}
             >
               ดำเนินการเลือกซื้อต่อไป
             </Button>
@@ -196,29 +175,20 @@ const PaymentPage = () => {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }} bodyStyle={{ padding: 16 }}>
+          <Card
+            style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }}
+            bodyStyle={{ padding: 16 }}
+          >
             <Typography.Title level={4} style={{ marginTop: 4, color: TEXT_MAIN }}>
               สรุปการสั่งซื้อ
             </Typography.Title>
-            <Space direction="vertical" style={{ width: "100%" }}>
-              <Row>
-                <Col flex="auto" style={{ color: TEXT_SUB }}>
-                  ราคารวม
-                </Col>
-                <Col style={{ color: TEXT_MAIN }}>{formatTHB(subtotal)}</Col>
-              </Row>
-              <Row>
-                <Col flex="auto" style={{ color: TEXT_SUB }}>
-                  ค่าธรรมเนียม
-                </Col>
-                <Col style={{ color: TEXT_MAIN }}>{formatTHB(fee)}</Col>
-              </Row>
 
-              <Divider style={{ margin: "8px 0", borderColor: BORDER }} />
+            <Space direction="vertical" style={{ width: "100%" }}>
+              <Divider style={{ margin: "10px 0", borderColor: BORDER }} />
 
               <Row>
                 <Col flex="auto">
-                  <strong style={{ color: TEXT_MAIN }}>ราคารวมโดยประมาณ</strong>
+                  <strong style={{ color: TEXT_MAIN }}>ราคารวม</strong>
                 </Col>
                 <Col>
                   <Typography.Title level={2} style={{ margin: 0, color: "#fff" }}>
@@ -226,24 +196,45 @@ const PaymentPage = () => {
                   </Typography.Title>
                 </Col>
               </Row>
+
               <Typography.Paragraph style={{ marginTop: -4, color: TEXT_SUB }}>
-                หากมีการชำระเงิน ค่าจะถูกกำหนดในขั้นตอนการชำระเงิน
+                *ราคาสุทธิจะถูกคำนวณอีกครั้งเมื่อสร้างคำสั่งซื้อ (อิงโปรโมชันขณะชำระ)
               </Typography.Paragraph>
 
-              {/* ❌ เอากล่องกรอกโค้ดส่วนลดออก */}
+              <Space direction="vertical" style={{ width: "100%" }} size={10}>
+                <Button
+                  type="primary"
+                  size="large"
+                  style={{
+                    backgroundColor: THEME_PRIMARY,
+                    borderColor: THEME_PRIMARY,
+                    color: "#fff",
+                  }}
+                  onClick={() => setPayOpen(true)}
+                  disabled={!items.length}
+                  block
+                >
+                  ดำเนินการต่อไปยังการชำระเงิน
+                </Button>
 
-              <Button
-                type="primary"
-                size="large"
-                style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
-                onClick={() => setPayOpen(true)}
-              >
-                ดำเนินการต่อไปยังการชำระเงิน
-              </Button>
+                <Button
+                  size="large"
+                  block
+                  icon={<HistoryOutlined />}
+                  style={{
+                    borderColor: THEME_PRIMARY,
+                    color: THEME_PRIMARY,
+                    background: "transparent",
+                  }}
+                  onClick={() => navigate("/orders-status")}
+                >
+                  ดูสถานะคำสั่งซื้อ
+                </Button>
+              </Space>
             </Space>
           </Card>
         </Col>
-      </Row>
+      </Row> {/* ✅ ปิด Row ก่อนเริ่ม Modal */}
 
       <Modal
         title={<span style={{ color: THEME_PRIMARY }}>ชำระเงินด้วยคิวอาร์โค้ด</span>}
@@ -256,19 +247,20 @@ const PaymentPage = () => {
         <Space direction="vertical" style={{ width: "100%" }} size={16}>
           <Card bordered={false} style={{ background: CARD_DARK }}>
             <div style={{ textAlign: "center" }}>
-              {/* ✅ ใช้รูปคิวอาร์ที่แนบแทน QRCode component */}
               <img
                 src={qrPromptPay}
                 alt="PromptPay QR"
-                style={{ width: 280, maxWidth: "100%", borderRadius: 12, boxShadow: "0 0 0 1px " + BORDER }}
+                style={{
+                  width: 280,
+                  maxWidth: "100%",
+                  borderRadius: 12,
+                  boxShadow: "0 0 0 1px " + BORDER,
+                }}
               />
               <Typography.Paragraph style={{ marginTop: 12, color: TEXT_MAIN }}>
-                <strong>จำนวนเงิน:</strong>{" "}
+                <strong>จำนวนเงินโดยประมาณ:</strong>{" "}
                 <span style={{ color: THEME_PRIMARY }}>{formatTHB(total)}</span>
               </Typography.Paragraph>
-              <Typography.Text style={{ color: TEXT_SUB }}>
-                กรุณาสแกนและระบุอ้างอิง: {orderId}
-              </Typography.Text>
             </div>
           </Card>
 
@@ -315,6 +307,4 @@ const PaymentPage = () => {
       </Modal>
     </div>
   );
-};
-
-export default PaymentPage;
+}
