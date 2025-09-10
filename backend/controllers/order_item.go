@@ -8,6 +8,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
@@ -123,6 +124,11 @@ func CreateOrderItem(c *gin.Context) {
 			Update("order_item_id", item.ID)
 	}
 
+	// อัปเดตราคารวมของออร์เดอร์หลังเพิ่มรายการใหม่
+	db.Model(&entity.Order{}).
+		Where("id = ?", body.OrderID).
+		Update("total_amount", gorm.Expr("total_amount + ?", item.LineTotal))
+
 	c.JSON(http.StatusCreated, item)
 }
 
@@ -162,11 +168,22 @@ func UpdateOrderItem(c *gin.Context) {
 func DeleteOrderItem(c *gin.Context) {
 	// เคลียร์การอ้างอิง GameKey ก่อน
 	db := configs.DB()
+	var item entity.OrderItem
+	if tx := db.First(&item, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
+		return
+	}
+
 	db.Model(&entity.KeyGame{}).Where("order_item_id = ?", c.Param("id")).Update("order_item_id", nil)
 
 	if tx := db.Exec("DELETE FROM order_items WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
+
+	db.Model(&entity.Order{}).
+		Where("id = ?", item.OrderID).
+		Update("total_amount", gorm.Expr("total_amount - ?", item.LineTotal))
+
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
 }
