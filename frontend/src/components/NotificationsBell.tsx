@@ -2,7 +2,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Popover, List, Button, Typography } from "antd";
 import { BellOutlined } from "@ant-design/icons";
-import { fetchNotifications, markAllNotificationsRead } from "../services/Notification";
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  deleteNotification,
+} from "../services/Notification";
 import type { Notification } from "../interfaces/Notification";
 
 const { Text } = Typography;
@@ -38,11 +43,17 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   const onOpenChange = async (v: boolean) => {
     setOpen(v);
-    if (v && unreadCount > 0) {
-      await markAllNotificationsRead(userId);
-      // โหลดใหม่เพื่ออัปเดต badge = 0
-      await load();
-    }
+    if (v) await load();
+  };
+
+  const handleRead = async (id: number) => {
+    await markNotificationRead(id);
+    await load();
+  };
+
+  const handleDelete = async (id: number) => {
+    await deleteNotification(id);
+    await load();
   };
 
   const content = (
@@ -53,27 +64,44 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
           ทำเป็นอ่านแล้วทั้งหมด
         </Button>
       </div>
-      <List
-        dataSource={items}
-        locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
-        renderItem={(n) => (
-          <List.Item style={{ background: n.is_read ? "transparent" : "rgba(146,84,222,0.12)", borderRadius: 8, marginBottom: 6, padding: "10px 12px" }}>
-            <List.Item.Meta
-              title={<Text strong>{n.title || "แจ้งเตือน"}</Text>}
-              description={
-                <div>
-                  <div>{n.message}</div>
-                  {!!n.created_at && (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      {new Date(n.created_at).toLocaleString()}
-                    </Text>
-                  )}
-                </div>
-              }
-            />
-          </List.Item>
-        )}
-      />
+        <List
+          dataSource={items}
+          locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
+          renderItem={(n) => (
+            <List.Item
+              style={{
+                background: n.is_read ? "transparent" : "rgba(146,84,222,0.12)",
+                borderRadius: 8,
+                marginBottom: 6,
+                padding: "10px 12px",
+              }}
+              actions={[
+                !n.is_read ? (
+                  <Button size="small" type="link" onClick={() => handleRead(n.ID)}>
+                    อ่านแล้ว
+                  </Button>
+                ) : null,
+                <Button size="small" danger type="link" onClick={() => handleDelete(n.ID)}>
+                  ลบ
+                </Button>,
+              ].filter(Boolean)}
+            >
+              <List.Item.Meta
+                title={<Text strong>{n.title || "แจ้งเตือน"}</Text>}
+                description={
+                  <div>
+                    <div>{n.message}</div>
+                    {!!n.created_at && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        {new Date(n.created_at).toLocaleString()}
+                      </Text>
+                    )}
+                  </div>
+                }
+              />
+            </List.Item>
+          )}
+        />
     </div>
   );
 
