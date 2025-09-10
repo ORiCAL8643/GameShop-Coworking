@@ -1,7 +1,5 @@
-import { Row, Col } from "antd";
+import { Row, Col, Card, Button, message } from "antd";
 //import AddProductCard from "./AddProductCard";
-import { useNavigate } from "react-router-dom";
-import { Card, Button } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
@@ -46,7 +44,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   };
 
   const [game, Setgame] = useState<Game[]>([]);
-  const navigate = useNavigate();
 
   async function GetGame() {
     try {
@@ -63,29 +60,27 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
   const handleAddToCart = async (g: Game) => {
     try {
-      const price = g.discounted_price ?? g.base_price;
-      const discount = g.base_price - price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: g.base_price,
-            qty: 1,
-            line_discount: discount,
-            line_total: price,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
+      let orderId = localStorage.getItem("orderId");
+      if (!orderId) {
+        const res = await axios.post(`${base_url}/orders`, {
+          user_id: userId ?? 0,
+          order_status: "PENDING",
+        });
+        orderId = String(res.data.ID || res.data.id);
+        localStorage.setItem("orderId", orderId);
       }
-      navigate("/category/Payment");
+
+      await axios.post(`${base_url}/order-items`, {
+        unit_price: g.base_price,
+        qty: 1,
+        order_id: Number(orderId),
+        game_key_id: g.key_id,
+      });
+
+      message.success("เพิ่มเกมลงตะกร้าสำเร็จ");
     } catch (err) {
       console.error("add to cart error", err);
+      message.error("ไม่สามารถเพิ่มเกมลงตะกร้าได้");
     }
   };
 
@@ -94,12 +89,15 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     <Row gutter={[16, 16]}>
       {approveGames?.map((c) => {
         const hasDiscount =
-          c.discounted_price !== undefined &&
-          c.discounted_price < c.base_price;
+          c.discounted_price !== undefined && c.discounted_price < c.base_price;
         return (
           <Col xs={24} sm={12} md={8} lg={6}>
             <Card
-              style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
+              style={{
+                background: "#1f1f1f",
+                color: "white",
+                borderRadius: 10,
+              }}
               cover={
                 <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
               }
