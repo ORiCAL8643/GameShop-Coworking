@@ -78,7 +78,7 @@ export default function AdminPage({
     }
 
     try {
-      // ✅ รวมไฟล์แนบ (แก้ type ให้ไม่แดง)
+      // รวมไฟล์แนบ
       const files: File[] = (reply.fileList || [])
         .map((f: UploadFile) => {
           if (f.originFileObj && f.originFileObj instanceof File) {
@@ -88,24 +88,22 @@ export default function AdminPage({
         })
         .filter((f: File | null): f is File => f !== null);
 
-      // ✅ ส่งคำตอบไป backend
+      // ส่งคำตอบไป backend
       const updated = await replyReport(rep.ID, reply.text, files);
       setProblems((prev: any[]) =>
         prev.map((p) => (p.ID === rep.ID ? updated : p))
       );
 
-      // ✅ ยิงแจ้งเตือนให้ลูกค้าเจ้าของคำร้อง
+      // ✅ หาค่า user_id ของเจ้าของคำร้อง
       const targetUserId =
-        (rep as any).user_id ||
-        (rep as any)?.user?.ID ||
-        (rep as any)?.user?.id ||
-        0;
+        rep.user_id || rep.user?.ID || rep.user?.ID || 0;
 
       if (!targetUserId) {
         message.error("ไม่สามารถระบุผู้รับแจ้งเตือนได้ (user_id หาย)");
         return;
       }
 
+      // ✅ ยิงแจ้งเตือนให้ลูกค้าเจ้าของคำร้อง
       const payload = {
         title: `ตอบกลับคำร้อง #${rep.ID}`,
         message: reply.text || "มีการตอบกลับคำร้องของคุณ",
@@ -123,7 +121,7 @@ export default function AdminPage({
       message.error(`ไม่สามารถส่งคำตอบ/แจ้งเตือนได้: ${detail}`);
     }
 
-    // ล้างค่าในช่อง reply
+    // ล้างช่อง reply
     setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
   };
 
