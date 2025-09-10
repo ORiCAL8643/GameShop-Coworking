@@ -236,17 +236,48 @@ func ApprovePayment(c *gin.Context) {
 		}
 		return
 	}
+	db := configs.DB()
 	var payment entity.Payment
-	if tx := configs.DB().First(&payment, c.Param("id")); tx.RowsAffected == 0 {
+	if tx := db.First(&payment, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
 	payment.Status = "APPROVED"
 	payment.RejectReason = ""
-	if err := configs.DB().Save(&payment).Error; err != nil {
+	if err := db.Save(&payment).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	// หลังอนุมัติการชำระเงิน จับคู่คีย์เกมกับรายการสินค้า
+	var items []entity.OrderItem
+	if err := db.Where("order_id = ?", payment.OrderID).Find(&items).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	for _, it := range items {
+		var keys []entity.KeyGame
+		if err := db.Where("game_id = ? AND order_item_id IS NULL", it.GameID).Limit(it.QTY).Find(&keys).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		if len(keys) < it.QTY {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "not enough key games"})
+			return
+		}
+		var ids []uint
+		for _, k := range keys {
+			ids = append(ids, k.ID)
+		}
+		if err := db.Model(&entity.KeyGame{}).Where("id IN ?", ids).Update("order_item_id", it.ID).Error; err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// อัปเดตสถานะคำสั่งซื้อเป็น PAID
+	db.Model(&entity.Order{}).Where("id = ?", payment.OrderID).Update("order_status", "PAID")
+
 	c.JSON(http.StatusOK, payment)
 }
 

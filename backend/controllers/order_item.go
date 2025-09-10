@@ -10,14 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// payload สำหรับสร้าง OrderItem โดยไม่ให้ผู้ใช้กำหนดส่วนลดเอง
+// payload สำหรับสร้าง OrderItem โดยให้ส่งเฉพาะเกมและจำนวน
 type createOrderItemRequest struct {
-	UnitPrice    float64  `json:"unit_price" binding:"required"`
-	QTY          int      `json:"qty" binding:"required"`
-	OrderID      uint     `json:"order_id" binding:"required"`
-	GameID       uint     `json:"game_id" binding:"required"`
-	LineDiscount *float64 `json:"line_discount"`
-	LineTotal    *float64 `json:"line_total"`
+	GameID  uint `json:"game_id" binding:"required"`
+	QTY     int  `json:"qty" binding:"required"`
+	OrderID uint `json:"order_id" binding:"required"`
 }
 
 func CreateOrderItem(c *gin.Context) {
@@ -35,15 +32,16 @@ func CreateOrderItem(c *gin.Context) {
 		return
 	}
 
-	// ตรวจ Game
+	// ตรวจ Game และดึงราคาเกม
 	var game entity.Game
 	if tx := db.First(&game, body.GameID); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
 		return
 	}
+	unitPrice := float64(game.BasePrice)
 
 	// หาส่วนลดจากโปรโมชั่นที่ผูกกับเกมหรือออร์เดอร์
-	sub := body.UnitPrice * float64(body.QTY)
+	sub := unitPrice * float64(body.QTY)
 	discount := 0.0
 
 	now := time.Now()
@@ -75,20 +73,11 @@ func CreateOrderItem(c *gin.Context) {
 	if discount > sub {
 		discount = sub
 	}
-	// ตรวจสอบถ้ามีส่ง line_discount/line_total มาต้องตรงกับที่คำนวณ
-	if body.LineDiscount != nil && math.Round(*body.LineDiscount*100)/100 != math.Round(discount*100)/100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_discount mismatch"})
-		return
-	}
 	total := sub - discount
 	total = math.Round(total*100) / 100
-	if body.LineTotal != nil && math.Round(*body.LineTotal*100)/100 != total {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "line_total mismatch"})
-		return
-	}
 
 	item := entity.OrderItem{
-		UnitPrice:    body.UnitPrice,
+		UnitPrice:    unitPrice,
 		QTY:          body.QTY,
 		LineDiscount: math.Round(discount*100) / 100,
 		LineTotal:    total,
