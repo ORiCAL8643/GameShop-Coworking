@@ -26,6 +26,7 @@ export function normalizeReport(r: any): ProblemReport {
     game_id: r.game_id ?? r.GameID ?? 0,
     user: r.user ?? (r.User as User | undefined),
     game: r.game ?? (r.Game as Game | undefined),
+    reply: r.reply ?? r.Reply ?? "",
     attachments: r.attachments ?? (r.Attachments as ProblemAttachment[] | undefined),
   };
 }

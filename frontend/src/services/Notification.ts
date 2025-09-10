@@ -1,6 +1,6 @@
 // src/services/Notification.ts
 import api from "../lib/api";
-import type { Notification, CreateNotificationRequest } from "../interfaces/Notification";
+import type { Notification } from "../interfaces/Notification";
 import type { User } from "../interfaces/User";
 
 // ดึงแจ้งเตือน (ผู้ใช้คนเดียว)
@@ -24,7 +24,14 @@ interface RawNotification {
 
 export async function fetchNotifications(userId: number): Promise<Notification[]> {
   const { data } = await api.get("/notifications", { params: { user_id: userId } });
-  const list = data as RawNotification[];
+
+  // Some endpoints in the project wrap lists inside an `items` property while
+  // others return the array directly.  When the shape wasn't an array the
+  // previous implementation treated the response object as an empty list, so no
+  // notifications appeared in the bell UI.  Normalise the shape before mapping
+  // to our `Notification` type.
+  const list = (Array.isArray(data) ? data : data?.items || []) as RawNotification[];
+
   return list.map((n) => ({
     ID: n.ID ?? 0,
     title: n.title ?? n.Title ?? "",
@@ -46,13 +53,18 @@ export async function createNotification(payload: {
 }): Promise<Notification | null> {
   try {
     console.log("🔔 Sending notification:", payload);
-    const res = await axios.post(`${API_URL}/notifications`, payload);
+    const res = await api.post("/notifications", payload);
     console.log("✅ Notification created:", res.data);
-    return res.data;
+    return res.data as Notification;
   } catch (err) {
     console.error("❌ createNotification error:", err);
     return null;
   }
+}
+
+// ทำเป็นอ่านแล้ว (เฉพาะรายการ)
+export async function markNotificationRead(id: number): Promise<void> {
+  await api.put(`/notifications/${id}/read`);
 }
 
 // ✅ ทำเป็นอ่านแล้วทั้งหมด
