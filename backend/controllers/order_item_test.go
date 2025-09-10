@@ -73,12 +73,11 @@ func TestCreateOrderItemWithPromotion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
-	payload := map[string]interface{}{
-		"unit_price":  100,
-		"qty":         1,
-		"order_id":    order.ID,
-		"game_key_id": key.ID,
-	}
+        payload := map[string]interface{}{
+                "qty":         1,
+                "order_id":    order.ID,
+                "game_key_id": key.ID,
+        }
 	b, _ := json.Marshal(payload)
 	req := httptest.NewRequest(http.MethodPost, "/order-items", bytes.NewReader(b))
 	req.Header.Set("Content-Type", "application/json")
@@ -89,11 +88,19 @@ func TestCreateOrderItemWithPromotion(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected status 201, got %d", w.Code)
 	}
-	var resp entity.OrderItem
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("invalid response: %v", err)
-	}
-	if resp.LineDiscount != 10 || resp.LineTotal != 90 {
-		t.Fatalf("unexpected discount or total: %+v", resp)
-	}
+        var resp entity.OrderItem
+        if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+                t.Fatalf("invalid response: %v", err)
+        }
+        if resp.UnitPrice != 100 || resp.LineDiscount != 10 || resp.LineTotal != 90 {
+                t.Fatalf("unexpected pricing: %+v", resp)
+        }
+
+        var updatedOrder entity.Order
+        if err := db.First(&updatedOrder, order.ID).Error; err != nil {
+                t.Fatalf("fetch order: %v", err)
+        }
+        if updatedOrder.TotalAmount != 90 {
+                t.Fatalf("order total not updated: %v", updatedOrder.TotalAmount)
+        }
 }
