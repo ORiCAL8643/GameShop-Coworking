@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ReviewsAPI, type Review } from "../services/reviews";
 import { Button, Form, Input, List, Modal, Popconfirm, Rate, message } from "antd";
-import { Heart, Pencil, Trash2, Plus } from "lucide-react";
+import { LikeOutlined, EditOutlined, DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
@@ -118,7 +118,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold">รีวิวจากผู้เล่น</h2>
         {allowCreate && (
-          <Button type="primary" icon={<Plus size={16} />} onClick={openCreate}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             เขียนรีวิว
           </Button>
         )}
@@ -131,15 +131,19 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         renderItem={(item) => (
           <List.Item
             actions={[
-              <Button key="like" onClick={() => handleToggleLike(item)} icon={<Heart size={16} />}>
+              <Button key="like" onClick={() => handleToggleLike(item)} icon={<LikeOutlined />}>
                 {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
               </Button>,
               canEdit(item) && (
-                <Button key="edit" type="text" onClick={() => openEdit(item)} icon={<Pencil size={16} />}>แก้ไข</Button>
+                <Button key="edit" type="text" onClick={() => openEdit(item)} icon={<EditOutlined />}>
+                  แก้ไข
+                </Button>
               ),
               canEdit(item) && (
                 <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
-                  <Button danger type="text" icon={<Trash2 size={16} />}>ลบ</Button>
+                  <Button danger type="text" icon={<DeleteOutlined />}>
+                    ลบ
+                  </Button>
                 </Popconfirm>
               ),
             ].filter(Boolean) as any}
