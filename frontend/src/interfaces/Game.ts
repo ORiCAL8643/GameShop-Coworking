@@ -2,14 +2,16 @@
 export interface Game {
   ID: number;
       game_name: string;
-      key_id: number;
-      categories: {ID: number, title: string};
-      release_date: string;
-      base_price: number;
-      img_src: string;
-      age_rating: number;
-      status: string;
-      minimum_spec_id: number;
+  key_id: number;
+  categories: {ID: number, title: string};
+  release_date: string;
+  base_price: number;
+  /** Price after applying promotion, if any */
+  discounted_price?: number;
+  img_src: string;
+  age_rating: number;
+  status: string;
+  minimum_spec_id: number;
 }
 
 export interface CreateGameRequest {
