@@ -253,17 +253,19 @@ func ReplyReport(c *gin.Context) {
 		return
 	}
 
-        text := strings.TrimSpace(c.PostForm("text"))
+	text := strings.TrimSpace(c.PostForm("text"))
 
-        // ✅ บันทึกข้อความตอบกลับลงใน report
-        if text != "" {
-                rp.Reply = text
-        }
+	// ✅ บันทึกข้อความตอบกลับลงใน report
+	if text != "" {
+		rp.Reply = text
+	}
 
 	// ✅ แนบไฟล์ถ้ามี
+	attachCount := 0
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
-		if len(files) > 0 {
+		attachCount = len(files)
+		if attachCount > 0 {
 			dir := filepath.Join("uploads", "replies", time.Now().Format("20060102"))
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
@@ -283,16 +285,24 @@ func ReplyReport(c *gin.Context) {
 		}
 	}
 
-        // ✅ ยิง Notification ให้เจ้าของ report
-        if text != "" {
-                _ = db.Create(&entity.Notification{
-                        Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
-                        Message: text,
-                        Type:    "report_reply",
-			UserID:  rp.UserID,
-			IsRead:  false,
-		}).Error
+	// ✅ ยิง Notification ให้เจ้าของ report แม้ว่าจะไม่มีข้อความก็ตาม
+	msg := text
+	if msg == "" {
+		if attachCount > 0 {
+			msg = "แอดมินได้ตอบกลับพร้อมไฟล์แนบ"
+		} else {
+			msg = "แอดมินได้ตอบกลับคำร้องของคุณ"
+		}
+	} else if attachCount > 0 {
+		msg = fmt.Sprintf("%s (แนบไฟล์ %d ไฟล์)", msg, attachCount)
 	}
+	_ = db.Create(&entity.Notification{
+		Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
+		Message: msg,
+		Type:    "report_reply",
+		UserID:  rp.UserID,
+		IsRead:  false,
+	}).Error
 
 	rp.Status = "resolved"
 	rp.ResolvedAt = time.Now()

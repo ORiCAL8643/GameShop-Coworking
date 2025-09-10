@@ -10,8 +10,11 @@ import {
   Modal,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-import { fetchReports, resolveReport, replyReport } from "../../services/Report";
-import { createNotification } from "../../services/Notification";
+import {
+  fetchReports,
+  resolveReport,
+  replyReport,
+} from "../../services/Report";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
 
@@ -62,7 +65,7 @@ export default function AdminPage({
 
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
     const updated = refunds.map((r) =>
-      r.id === id ? { ...r, status: action } : r
+      r.id === id ? { ...r, status: action } : r,
     );
     setRefunds(updated);
     message.success(`Refund #${id} ${action} successfully!`);
@@ -91,30 +94,10 @@ export default function AdminPage({
       // ✅ ส่งคำตอบไป backend
       const updated = await replyReport(rep.ID, reply.text, files);
       setProblems((prev: any[]) =>
-        prev.map((p) => (p.ID === rep.ID ? updated : p))
+        prev.map((p) => (p.ID === rep.ID ? updated : p)),
       );
 
-      // ✅ ยิงแจ้งเตือนให้ลูกค้าเจ้าของคำร้อง
-      const targetUserId =
-        (rep as any).user_id ||
-        (rep as any)?.user?.ID ||
-        (rep as any)?.user?.id ||
-        0;
-
-      if (!targetUserId) {
-        message.error("ไม่สามารถระบุผู้รับแจ้งเตือนได้ (user_id หาย)");
-        return;
-      }
-
-      const payload = {
-        title: `ตอบกลับคำร้อง #${rep.ID}`,
-        message: reply.text || "มีการตอบกลับคำร้องของคุณ",
-        type: "report",
-        user_id: Number(targetUserId),
-      };
-      console.log("🔔 createNotification payload =>", payload);
-      await createNotification(payload);
-
+      // ✅ เพิ่มรายการใน log ภายในแอดมินและแจ้งเตือนผู้ใช้ผ่าน backend
       addNotification(`Problem report #${rep.ID} has a reply`);
       message.success("ตอบกลับลูกค้าสำเร็จ และส่งการแจ้งเตือนแล้ว");
     } catch (e: any) {
@@ -369,8 +352,7 @@ export default function AdminPage({
                       onClick={() => handleSendReply(rep)}
                       style={{
                         flex: 1,
-                        background:
-                          "linear-gradient(90deg, #52c41a, #389e0d)",
+                        background: "linear-gradient(90deg, #52c41a, #389e0d)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
@@ -383,8 +365,7 @@ export default function AdminPage({
                       onClick={() => handleResolveProblem(rep.ID)}
                       style={{
                         flex: 1,
-                        background:
-                          "linear-gradient(90deg, #f759ab, #9254de)",
+                        background: "linear-gradient(90deg, #f759ab, #9254de)",
                         color: "white",
                         fontWeight: "bold",
                         borderRadius: 12,
