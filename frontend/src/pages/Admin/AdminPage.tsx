@@ -1,3 +1,4 @@
+// src/pages/Admin/AdminPage.tsx
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -17,7 +18,8 @@ import {
 } from "../../services/Report";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
-import { createNotification } from "../../services/Notification";
+import { useNavigate } from "react-router-dom";
+import { markReportsSeen } from "../../hooks/useReportNewCount";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -30,7 +32,6 @@ interface RefundRequest {
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
 }
-
 interface AdminPageProps {
   refunds: RefundRequest[];
   setRefunds: (refunds: RefundRequest[]) => void;
@@ -41,11 +42,11 @@ interface AdminPageProps {
 export default function AdminPage({
   refunds,
   setRefunds,
-  addNotification,
-  addRefundUpdate,
 }: AdminPageProps) {
+  const navigate = useNavigate();
+
   const [problems, setProblems] = useState<ProblemReport[]>([]);
-  const [activeTab, setActiveTab] = useState<"refunds" | "problems">("refunds");
+  const [activeTab, setActiveTab] = useState<"refunds" | "problems">("problems");
   const [replies, setReplies] = useState<
     Record<number, { text: string; fileList: UploadFile[] }>
   >({});
@@ -56,7 +57,15 @@ export default function AdminPage({
     const load = async () => {
       try {
         const items = await fetchReports();
-        setProblems(items);
+        const pending = (items || []).filter((it) => it.status !== "resolved");
+        setProblems(pending);
+
+        // ✅ ตั้ง "เวลาที่เห็นล่าสุด" = created_at ที่ใหม่ที่สุดในชุดข้อมูล (หรือเวลาปัจจุบันถ้าไม่มี)
+        const latestTs = (items || []).reduce((max, r) => {
+          const t = r.created_at ? Date.parse(r.created_at) : 0;
+          return t > max ? t : max;
+        }, 0);
+        markReportsSeen(latestTs ? new Date(latestTs).toISOString() : undefined);
       } catch (e) {
         console.error(e);
       }
@@ -66,59 +75,49 @@ export default function AdminPage({
 
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
     const updated = refunds.map((r) =>
-      r.id === id ? { ...r, status: action } : r,
+      r.id === id ? { ...r, status: action } : r
     );
     setRefunds(updated);
     message.success(`Refund #${id} ${action} successfully!`);
-    addRefundUpdate(`Refund #${id} ${action.toLowerCase()}`);
   };
 
-  // ✅ ตอบกลับลูกค้าด้วยข้อความ + ไฟล์ + สร้างแจ้งเตือน
+  // ✅ ตอบกลับแล้ว ย้ายการ์ดออก (ถือว่าแก้แล้ว)
   const handleSendReply = async (rep: ProblemReport) => {
     const reply = replies[rep.ID];
-    if (!reply || (!reply.text && reply.fileList.length === 0)) {
+    if (!reply || (!reply.text && (reply.fileList?.length ?? 0) === 0)) {
       message.warning("กรุณาพิมพ์ข้อความหรือติดไฟล์อย่างน้อย 1 อย่าง");
       return;
     }
 
     try {
-      // รวมไฟล์แนบ
       const files: File[] = (reply.fileList || [])
-        .map((f: UploadFile) => {
-          if (f.originFileObj && f.originFileObj instanceof File) {
-            return f.originFileObj as File;
-          }
-          return null;
-        })
+        .map((f: UploadFile) =>
+          f.originFileObj && f.originFileObj instanceof File
+            ? (f.originFileObj as File)
+            : null
+        )
         .filter((f: File | null): f is File => f !== null);
 
-      // ส่งคำตอบไป backend
-      const updated = await replyReport(rep.ID, reply.text, files);
-      setProblems((prev: any[]) =>
-        prev.map((p) => (p.ID === rep.ID ? updated : p)),
-      );
-
-      // ✅ เพิ่มรายการใน log ภายในแอดมินและแจ้งเตือนผู้ใช้ผ่าน backend
-      addNotification(`Problem report #${rep.ID} has a reply`);
-      message.success("ตอบกลับลูกค้าสำเร็จ และส่งการแจ้งเตือนแล้ว");
+      await replyReport(rep.ID, reply.text, files);
+      setProblems((prev) => prev.filter((p) => p.ID !== rep.ID)); // เอาออกจากหน้ารอแก้
+      message.success("ตอบกลับลูกค้าสำเร็จ (ย้ายไปหน้ารายการที่แก้แล้ว)");
     } catch (e: any) {
       console.error("❌ Error while sending reply:", e);
       const detail = e?.response?.data?.error || e?.message || String(e);
-      message.error(`ไม่สามารถส่งคำตอบ/แจ้งเตือนได้: ${detail}`);
+      message.error(`ไม่สามารถส่งคำตอบได้: ${detail}`);
     }
 
-    // ล้างช่อง reply
     setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
   };
 
+  // ✅ ปิดงานเป็น resolved แล้วลบออกจากลิสต์
   const handleResolveProblem = async (id: number) => {
     try {
-      const updated = await resolveReport(id);
-      setProblems((prev) => prev.map((p) => (p.ID === id ? updated : p)));
+      await resolveReport(id);
+      setProblems((prev) => prev.filter((p) => p.ID !== id));
       message.success(`Problem report #${id} marked as resolved`);
     } catch (e) {
       console.error(e);
-      message.error("ไม่สามารถอัปเดตสถานะได้");
     }
   };
 
@@ -160,23 +159,39 @@ export default function AdminPage({
         flex: 1,
       }}
     >
-      <Title
-        level={2}
-        style={{
-          textAlign: "center",
-          background: "linear-gradient(90deg, #9254de, #f759ab, #9d4edd)",
-          WebkitBackgroundClip: "text",
-          color: "transparent",
-          textShadow: "0 0 20px rgba(157, 78, 221, 0.6)",
-          marginBottom: "50px",
-          fontWeight: 900,
-        }}
-      >
-        🎮 Admin Dashboard
-      </Title>
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <Title
+          level={2}
+          style={{
+            flex: 1,
+            background: "linear-gradient(90deg, #9254de, #f759ab, #9d4edd)",
+            WebkitBackgroundClip: "text",
+            color: "transparent",
+            textShadow: "0 0 20px rgba(157, 78, 221, 0.6)",
+            marginBottom: 30,
+            fontWeight: 900,
+          }}
+        >
+          🎮 Admin Dashboard
+        </Title>
+
+        <Button
+          type="primary"
+          onClick={() => navigate("/Admin/Resolved")}
+          style={{
+            height: 40,
+            borderRadius: 10,
+            background: "linear-gradient(90deg, #52c41a, #2bbb72)",
+            border: "none",
+            fontWeight: 700,
+          }}
+        >
+          ดูรายการที่แก้ไขแล้ว
+        </Button>
+      </div>
 
       {/* Tabs */}
-      <div style={{ textAlign: "center", marginBottom: "40px" }}>
+      <div style={{ textAlign: "center", marginBottom: "30px" }}>
         {["refunds", "problems"].map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -209,7 +224,7 @@ export default function AdminPage({
         })}
       </div>
 
-      {/* Problem Reports */}
+      {/* Problem Reports: เฉพาะที่ยังไม่ resolved */}
       {activeTab === "problems" && (
         <div
           style={{
@@ -226,15 +241,9 @@ export default function AdminPage({
               <p style={textStyle}>Title: {rep.title}</p>
               <p style={textStyle}>Description: {rep.description}</p>
               <p style={textStyle}>
-                Status:{" "}
-                {rep.status === "resolved" ? (
-                  <Tag color="#52c41a">✅ Resolved</Tag>
-                ) : (
-                  <Tag color="#f0a6ff">⏳ Pending</Tag>
-                )}
+                Status: <Tag color="#f0a6ff">⏳ Pending</Tag>
               </p>
 
-              {/* Attachments */}
               {rep.attachments && rep.attachments.length > 0 && (
                 <div style={{ margin: "15px 0" }}>
                   <p style={{ ...textStyle, marginBottom: 8 }}>
@@ -247,7 +256,7 @@ export default function AdminPage({
                       const path = (att as any).file_path || "";
                       const isImage = path
                         .toLowerCase()
-                        .match(/\.(jpg|jpeg|png|gif)$/i);
+                        .match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
                       const url = `${API_URL}/${path}`;
                       return isImage ? (
                         <img
@@ -280,104 +289,83 @@ export default function AdminPage({
                 </div>
               )}
 
-              {/* Admin reply message */}
-              {rep.reply && (
-                <div style={{ marginTop: 15 }}>
-                  <p style={{ ...textStyle, marginBottom: 8 }}>
-                    📨 Admin Reply:
-                  </p>
-                  <div
-                    style={{
-                      background: "#141322",
-                      padding: "10px 12px",
-                      borderRadius: 8,
-                      whiteSpace: "pre-line",
-                    }}
-                  >
-                    {rep.reply}
-                  </div>
-                </div>
-              )}
-
               {/* Reply form */}
-              {rep.status !== "resolved" && (
-                <div style={{ marginTop: "20px" }}>
-                  <TextArea
-                    rows={3}
-                    placeholder="พิมพ์ข้อความตอบกลับลูกค้า..."
-                    value={replies[rep.ID]?.text || ""}
-                    onChange={(e) =>
-                      setReplies((prev) => ({
-                        ...prev,
-                        [rep.ID]: {
-                          text: e.target.value,
-                          fileList: prev[rep.ID]?.fileList || [],
-                        },
-                      }))
-                    }
+              <div style={{ marginTop: "20px" }}>
+                <TextArea
+                  rows={3}
+                  placeholder="พิมพ์ข้อความตอบกลับลูกค้า..."
+                  value={replies[rep.ID]?.text || ""}
+                  onChange={(e) =>
+                    setReplies((prev) => ({
+                      ...prev,
+                      [rep.ID]: {
+                        text: e.target.value,
+                        fileList: prev[rep.ID]?.fileList || [],
+                      },
+                    }))
+                  }
+                  style={{
+                    marginBottom: 12,
+                    background: "#141414",
+                    color: "#fff",
+                    borderRadius: 12,
+                    border: "1px solid #434343",
+                    boxShadow: "0 0 8px #9d4edd inset",
+                    padding: 10,
+                  }}
+                />
+                <Upload
+                  fileList={replies[rep.ID]?.fileList || []}
+                  beforeUpload={() => false}
+                  onChange={({ fileList }: { fileList: UploadFile[] }) =>
+                    setReplies((prev) => ({
+                      ...prev,
+                      [rep.ID]: {
+                        text: prev[rep.ID]?.text || "",
+                        fileList,
+                      },
+                    }))
+                  }
+                  onPreview={handlePreview}
+                  listType="picture-card"
+                  multiple
+                >
+                  {(!replies[rep.ID] ||
+                    replies[rep.ID].fileList.length < 5) && (
+                    <div style={{ color: "#aaa" }}>
+                      <UploadOutlined /> อัปโหลด
+                    </div>
+                  )}
+                </Upload>
+                <div style={{ display: "flex", gap: "15px", marginTop: 12 }}>
+                  <Button
+                    onClick={() => handleSendReply(rep)}
                     style={{
-                      marginBottom: 12,
-                      background: "#141414",
-                      color: "#fff",
+                      flex: 1,
+                      background: "linear-gradient(90deg, #52c41a, #389e0d)",
+                      color: "white",
+                      fontWeight: "bold",
                       borderRadius: 12,
-                      border: "1px solid #434343",
-                      boxShadow: "0 0 8px #9d4edd inset",
-                      padding: 10,
+                      boxShadow: "0 0 10px #52c41a",
                     }}
-                  />
-                  <Upload
-                    fileList={replies[rep.ID]?.fileList || []}
-                    beforeUpload={() => false}
-                    onChange={({ fileList }: { fileList: UploadFile[] }) =>
-                      setReplies((prev) => ({
-                        ...prev,
-                        [rep.ID]: {
-                          text: prev[rep.ID]?.text || "",
-                          fileList,
-                        },
-                      }))
-                    }
-                    onPreview={handlePreview}
-                    listType="picture-card"
-                    multiple
                   >
-                    {(!replies[rep.ID] ||
-                      replies[rep.ID].fileList.length < 5) && (
-                      <div style={{ color: "#aaa" }}>
-                        <UploadOutlined /> อัปโหลด
-                      </div>
-                    )}
-                  </Upload>
-                  <div style={{ display: "flex", gap: "15px", marginTop: 12 }}>
-                    <Button
-                      onClick={() => handleSendReply(rep)}
-                      style={{
-                        flex: 1,
-                        background: "linear-gradient(90deg, #52c41a, #389e0d)",
-                        color: "white",
-                        fontWeight: "bold",
-                        borderRadius: 12,
-                        boxShadow: "0 0 10px #52c41a",
-                      }}
-                    >
-                      📩 Send Reply
-                    </Button>
-                    <Button
-                      onClick={() => handleResolveProblem(rep.ID)}
-                      style={{
-                        flex: 1,
-                        background: "linear-gradient(90deg, #f759ab, #9254de)",
-                        color: "white",
-                        fontWeight: "bold",
-                        borderRadius: 12,
-                        boxShadow: "0 0 10px #f759ab",
-                      }}
-                    >
-                      ✔ Mark as Resolved
-                    </Button>
-                  </div>
+                    📩 Send Reply
+                  </Button>
+                  <Button
+                    onClick={() => handleResolveProblem(rep.ID)}
+                    style={{
+                      flex: 1,
+                      background: "linear-gradient(90deg, #f759ab, #9254de)",
+                      color: "white",
+                      fontWeight: "bold",
+                      borderRadius: 12,
+                      boxShadow: "0 0 10px #f759ab",
+                    }}
+                  >
+                    ✔ Mark as Resolved
+                  </Button>
                 </div>
-              )}
+              </div>
             </Card>
           ))}
         </div>

@@ -13,34 +13,24 @@ import WorkshopDetail from "../pages/Workshop/WorkshopDetail.tsx";
 import ModDetail from "../pages/Workshop/ModDetail.tsx";
 import Workshop from "../pages/Workshop/UploadPage.tsx";
 import RoleManagement from "../pages/role/RoleManagement.tsx";
-// 🟣 Import เพิ่ม
+
+// 🟣 Report / Refund / Admin
 import ReportPage from "../pages/Report/ReportPage.tsx";
+import ReportSuccessPage from "../pages/Report/ReportSuccess.tsx";
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
+import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage.tsx"; // ✅ เพิ่ม
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
+
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
-import RoleEdit from "../pages/role/RoleEdit.tsx";
 import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
-import ReportSuccessPage from "../pages/Report/ReportSuccess.tsx";
+import RoleEdit from "../pages/role/RoleEdit.tsx";
+
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
-  {
-    id: 1,
-    orderId: "A001",
-    user: "Alice",
-    game: "Cyberpunk 2077",
-    reason: "Buggy gameplay",
-    status: "Pending",
-  },
-  {
-    id: 2,
-    orderId: "A002",
-    user: "Bob",
-    game: "Elden Ring",
-    reason: "Accidental purchase",
-    status: "Approved",
-  },
+  { id: 1, orderId: "A001", user: "Alice", game: "Cyberpunk 2077", reason: "Buggy gameplay", status: "Pending" },
+  { id: 2, orderId: "A002", user: "Bob", game: "Elden Ring", reason: "Accidental purchase", status: "Approved" },
 ];
 
 // 🟣 Mock ฟังก์ชัน
@@ -55,10 +45,9 @@ const router = createBrowserRouter([
       { path: "/", element: <Home /> },
       { path: "/home", element: <Home /> },
 
-      // ✅ เพิ่มหน้ารีพอร์ต
+      // ✅ Report
       { path: "/report", element: <ReportPage /> },
       { path: "/report/success", element: <ReportSuccessPage /> },
-
 
       { path: "/request", element: <Request /> },
       { path: "/requestinfo", element: <Requestinfo /> },
@@ -87,7 +76,6 @@ const router = createBrowserRouter([
       { path: "/promotion", element: <PromotionManager /> },
       { path: "/promotion/:id", element: <PromotionDetail /> },
 
-
       // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
       { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
@@ -107,14 +95,14 @@ const router = createBrowserRouter([
               />
             ),
           },
+          // ✅ หน้าเก็บปัญหาที่แก้ไขแล้ว
+          { path: "/Admin/Resolved", element: <ResolvedReportsPage /> },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
-          { path: "/Admin/RolePage", element: <RoleManagement />},
+          { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
-      {
-        path: "/roles/:id" ,
-        element: <RoleEdit/>
-      }
+
+      { path: "/roles/:id", element: <RoleEdit /> },
     ],
   },
 ]);

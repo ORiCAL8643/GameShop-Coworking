@@ -1,34 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Card,
-  Form,
-  Input,
-  Button,
-  Select,
-  Upload,
-  message,
-} from "antd";
+import { Card, Form, Input, Button, Select, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { createReport } from "../../services/Report";
+import { useAuth } from "../../context/AuthContext";
 
 export default function ReportPage() {
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<any[]>([]);
   const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  // 🔧 ปรับให้ตรงกับข้อมูลจริงใน DB ของคุณ
-  //   - ต้องมี user id และ game id ที่มีอยู่จริง ไม่งั้น backend จะ 404
-  const DEFAULT_USER_ID = 1;
+  // TODO: เปลี่ยนเป็นเลือกเกมจาก UI ของคุณ
   const DEFAULT_GAME_ID = 1;
 
   const PAGE_BG =
     "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
   const PURPLE = "#9254de";
-  const PURPLE_LIGHT = "#b388ff";
 
   const handleSubmit = async (values: any) => {
     try {
+      if (!userId) {
+        message.error("กรุณาเข้าสู่ระบบก่อนส่งรายงาน");
+        return;
+      }
+
       const files: File[] = (fileList || [])
         .map((f: any) => f?.originFileObj)
         .filter(Boolean);
@@ -36,7 +32,7 @@ export default function ReportPage() {
       await createReport({
         title: values.title,
         description: values.description,
-        user_id: DEFAULT_USER_ID,
+        user_id: userId,          // ✅ ใช้ snake_case ให้ตรง backend
         game_id: DEFAULT_GAME_ID,
         status: "open",
         files,
@@ -45,8 +41,6 @@ export default function ReportPage() {
       message.success("ส่งรายงานปัญหาเรียบร้อย!");
       form.resetFields();
       setFileList([]);
-
-      // ไปหน้า success พร้อมส่งหัวข้อไปแสดง
       navigate("/report/success", { state: { title: values.title } });
     } catch (e: any) {
       const apiMsg =
@@ -54,9 +48,6 @@ export default function ReportPage() {
         e?.message ||
         "เกิดข้อผิดพลาดในการส่งรายงาน";
       message.error(apiMsg);
-      // แนะนำสาเหตุพบบ่อย:
-      // - user_id / game_id ไม่มีใน DB → สร้าง/ใช้ id ที่มีจริง
-      // - backend ไม่ได้รันที่พอร์ตเดียวกับ VITE_API_BASE_URL
     }
   };
 
@@ -74,81 +65,31 @@ export default function ReportPage() {
         color: "#fff",
       }}
     >
-      <style>
-        {`
-          .report-page .card-title {
-            display:flex; align-items:center; gap:8px;
-            font-weight:800; letter-spacing:.2px;
-            background: linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%);
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-          }
-          .report-page .ant-card {
-            background: rgba(15,14,24,.96);
-            border-radius: 16px;
-            box-shadow: 0 10px 34px rgba(146,84,222,.2), 0 2px 10px rgba(0,0,0,.35);
-          }
-          .report-page .ant-card-head { border-bottom: 1px solid rgba(146,84,222,.25); }
-          .report-page .divider-line {
-            height:2px; width:100%; margin-top:8px;
-            background: linear-gradient(90deg, ${PURPLE}, transparent); opacity:.85; border-radius:999px;
-          }
-          .report-page .ant-input,
-          .report-page textarea.ant-input,
-          .report-page .ant-select-selector {
-            background: #0f0f17 !important;
-            color: #eae6ff !important;
-            border: 1px solid rgba(146,84,222,.35) !important;
-            border-radius: 10px !important;
-          }
-          .report-page .ant-select-selection-item,
-          .report-page .ant-select-selection-placeholder { color: #cfc5ff !important; }
-          .report-page .ant-select-arrow { color: #e6dbff !important; }
-          .report-page .ant-input::placeholder,
-          .report-page textarea.ant-input::placeholder { color: #cfc5ff !important; }
-          .report-page .ant-input:hover,
-          .report-page .ant-input:focus,
-          .report-page textarea.ant-input:hover,
-          .report-page textarea.ant-input:focus,
-          .report-page .ant-select-selector:hover,
-          .report-page .ant-select-focused .ant-select-selector {
-            border-color: ${PURPLE} !important;
-            box-shadow: 0 0 0 2px rgba(146,84,222,.28) !important;
-          }
-          .report-page .report-select .ant-select-item {
-            background: #0f0f17; color: #eae6ff;
-          }
-          .report-page .report-select .ant-select-item-option-active {
-            background: rgba(146,84,222,.25);
-          }
-          .report-page .ant-upload.ant-upload-select-picture-card {
-            background: #0f0f17 !important;
-            border: 1px dashed ${PURPLE} !important;
-          }
-          .report-page .ant-upload.ant-upload-select-picture-card:hover {
-            border-color: ${PURPLE_LIGHT} !important;
-          }
-          .report-page .ant-upload-list-item {
-            background: #141322 !important;
-            border-color: rgba(146,84,222,.35) !important;
-          }
-          .report-page .ant-form-item-label > label {
-            color: #e9e1ff !important; font-weight: 600;
-          }
-          .report-page .purple-btn {
-            background: linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%);
-            border: none; color: #fff;
-          }
-          .report-page .purple-btn:hover { filter: brightness(1.05); }
-        `}
-      </style>
-
       <Card
         bordered={false}
         style={{ width: "100%", maxWidth: 720 }}
         title={
           <div>
-            <span className="card-title">📝 รายงานปัญหา</span>
-            <div className="divider-line" />
+            <span
+              style={{
+                fontWeight: 800,
+                background: `linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%)`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              📝 รายงานปัญหา
+            </span>
+            <div
+              style={{
+                height: 2,
+                width: "100%",
+                marginTop: 8,
+                background: `linear-gradient(90deg, ${PURPLE}, transparent)`,
+                opacity: 0.85,
+                borderRadius: 999,
+              }}
+            />
           </div>
         }
       >
@@ -158,7 +99,7 @@ export default function ReportPage() {
             name="category"
             rules={[{ required: true, message: "กรุณาเลือกหมวดปัญหา" }]}
           >
-            <Select placeholder="เลือกหมวดปัญหา" popupClassName="report-select">
+            <Select placeholder="เลือกหมวดปัญหา">
               <Select.Option value="technical">⚙️ ปัญหาทางเทคนิค</Select.Option>
               <Select.Option value="billing">💳 ปัญหาการเรียกเก็บเงิน</Select.Option>
               <Select.Option value="login">🔐 เข้าสู่ระบบ/ยืนยันตัวตน</Select.Option>
@@ -195,7 +136,7 @@ export default function ReportPage() {
             getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
           >
             <Upload
-              name="attachments" // ✅ ชื่อตรงกับ backend
+              name="attachments"
               listType="picture-card"
               fileList={fileList}
               onPreview={(file) => {
@@ -204,11 +145,11 @@ export default function ReportPage() {
               onChange={({ fileList: fl }) => setFileList(fl)}
               onRemove={(file) => {
                 setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-              }}
+              }}  // ✅ แก้จาก })} เป็น }}
               beforeUpload={(file) => {
                 const isImage = file.type?.startsWith("image/");
                 if (!isImage) message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
-                return false; // ไม่อัปโหลดทันที
+                return false; // ไม่อัปโหลดทันที ให้รวมส่งตอน submit
               }}
               maxCount={3}
             >
@@ -233,8 +174,14 @@ export default function ReportPage() {
             <Button
               type="primary"
               htmlType="submit"
-              className="purple-btn"
-              style={{ width: "100%", height: 46, fontWeight: 700, borderRadius: 10 }}
+              style={{
+                width: "100%",
+                height: 46,
+                fontWeight: 700,
+                borderRadius: 10,
+                background: `linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%)`,
+                border: "none",
+              }}
             >
               ส่งรายงานปัญหา
             </Button>

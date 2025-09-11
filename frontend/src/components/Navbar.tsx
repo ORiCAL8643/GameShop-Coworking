@@ -13,6 +13,7 @@ import NotificationBell from "../components/NotificationsBell";
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
   const { token, username, logout, id: userId } = useAuth();
+  console.log("Navbar userId=", userId);
 
   // ให้แน่ใจว่า userId เปลี่ยนแล้วคอมโพเนนต์จะรีเรนเดอร์ (สำหรับบาง context)
   useEffect(() => {}, [userId]);
