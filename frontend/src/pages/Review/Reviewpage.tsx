@@ -90,7 +90,7 @@ const Reviewpage: React.FC = () => {
           )}
           <div className="p-4 text-center">
             <h1 className="text-2xl font-semibold text-white">{game.name}</h1>
-            <p className="text-gray-400">All reviews for this game</p>
+            <p className="text-gray-300">All reviews for this game</p>
           </div>
         </div>
 
