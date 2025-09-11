@@ -1,87 +1,64 @@
 import { Layout, Menu } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const { Sider } = Layout;
-type GroupItem = Required<MenuProps>["items"][number];
-
-const items: GroupItem[] = [
-  {
-    key: "/home",
-    label: "หน้าแรก",
-  },
-  {
-    key: "/request",
-    label: "รีเควสเกม",
-  },
-  {
-    key: "/requestinfo",
-    label: "ข้อมูลรีเควส",
-  },
-  {
-    key: "/information",
-    label: "จัดการข้อมูลเกม",
-    children: [
-      { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
-      { key: "/information/Edit", label: "แก้ไขข้อมูลเกม", icon: <PlusOutlined /> },
-    ],
-  },
-  {
-    key: "/category",
-    label: "หมวดหมู่",
-    children: [
-      { key: "/category/Community", label: "ชุมชน", icon: <PlusOutlined /> },
-      { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined /> },
-    ],
-  },
-
-  {
-    key: "/workshop",
-    label: "Workshop",
-  },
-    {
-    key: '/promotion',
-    label:'Promotion',
-  },
-  {
-    key: '/refund',
-    label:'การคืนเงินผู้ใช้',
-  },
-  {
-    key: '/Admin',
-    label:'Admin',
-    children: [
-        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
-        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
-        { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
-    ],
-  },
-];
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { can, isAuthenticated } = useAuth();
 
-  // เส้นทางที่เป็น "กลุ่ม" (มี children)
-  const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
+  const items: MenuProps["items"] = [];
+  items.push({ key: "home", label: "Home" });
+  if (!isAuthenticated) {
+    items.push({ key: "login", label: "Login" });
+    items.push({ key: "register", label: "Register" });
+  }
+  if (can("requests.create")) items.push({ key: "request", label: "รีเควสเกม" });
+  if (can("requests.read")) items.push({ key: "requestinfo", label: "ข้อมูลรีเควส" });
+  if (can("games.manage")) {
+    items.push({
+      key: "information",
+      label: "จัดการข้อมูลเกม",
+      children: [
+        { key: "information/add", label: "เพิ่มเกม" },
+        { key: "information/edit", label: "แก้ไขข้อมูลเกม" },
+      ],
+    });
+  }
+  const catChildren: MenuProps["items"] = [];
+  if (can("community.read")) catChildren.push({ key: "category/community", label: "ชุมชน" });
+  if (can("payments.create")) catChildren.push({ key: "category/payment", label: "การชำระเงิน" });
+  if (catChildren.length > 0) items.push({ key: "category", label: "หมวดหมู่", children: catChildren });
+  if (can("workshop.read")) items.push({ key: "workshop", label: "Workshop" });
+  if (can("workshop.create")) items.push({ key: "upload", label: "Upload" });
+  if (can("promotions.manage") || can("promotions.read")) items.push({ key: "promotion", label: "Promotion" });
+  if (can("refunds.manage")) items.push({ key: "refund", label: "การคืนเงินผู้ใช้" });
+  if (can("roles.manage") || can("payments.manage")) {
+    const adminChildren: MenuProps["items"] = [];
+    if (can("roles.manage")) {
+      adminChildren.push({ key: "Admin", label: "Page" });
+      adminChildren.push({ key: "Admin/RolePage", label: "Role" });
+    }
+    if (can("payments.manage")) {
+      adminChildren.push({ key: "Admin/PaymentReviewPage", label: "PaymentReview" });
+    }
+    if (adminChildren.length > 0) items.push({ key: "admin", label: "Admin", children: adminChildren });
+  }
 
-  // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
-  const selectedKey = location.pathname;
-
-  const computeOpenKeys = (path: string) =>
-    rootSubmenuKeys.filter((k) => path.startsWith(k));
-
+  const rootSubmenuKeys = useMemo(() => ["information", "category", "admin"], []);
+  const selectedKey = location.pathname.replace(/^\/+/, "") || "home";
+  const computeOpenKeys = (path: string) => rootSubmenuKeys.filter((k) => path.startsWith(k));
   const [openKeys, setOpenKeys] = useState<string[]>(computeOpenKeys(selectedKey));
 
   useEffect(() => {
-    // เปลี่ยนหน้าแล้วให้เปิดเมนูย่อยที่ตรงกับ path ปัจจุบัน
     setOpenKeys(computeOpenKeys(selectedKey));
   }, [selectedKey]);
 
   const onOpenChange: MenuProps["onOpenChange"] = (keys) => {
-    // อนุญาตเปิดได้หลายกลุ่มพร้อมกัน (ถ้าอยากเปิดทีละกลุ่ม ให้คอมเมนต์โค้ดนี้แล้วใช้ logic แบบ antd ตัวอย่าง)
     setOpenKeys(keys as string[]);
   };
 
@@ -107,11 +84,10 @@ const Sidebar = () => {
           selectedKeys={[selectedKey]}
           openKeys={openKeys}
           onOpenChange={onOpenChange}
-          onClick={({ key }) => navigate(String(key))}
+          onClick={({ key }) => navigate(key)}
         />
       </Sider>
 
-      {/* เนื้อหาหลัก */}
       <Outlet />
     </Layout>
   );

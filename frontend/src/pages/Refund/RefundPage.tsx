@@ -1,5 +1,5 @@
 // src/pages/Refund/RefundPage.tsx
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   Card,
   Form,
@@ -16,8 +16,8 @@ export default function RefundPage() {
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<any[]>([]);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const [previewImage, setPreviewImage] = useState("");
-  const [previewTitle, setPreviewTitle] = useState("");
+  const [previewImage] = useState("");
+  const [previewTitle] = useState("");
 
   // 🎮 ตัวอย่างข้อมูลจากหน้าเกม (mock)
   const mockGameData = {

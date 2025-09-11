@@ -1,4 +1,3 @@
-import type { Order } from "./Order";
 import type { KeyGame } from "./KeyGame";
 
 export interface OrderItem {

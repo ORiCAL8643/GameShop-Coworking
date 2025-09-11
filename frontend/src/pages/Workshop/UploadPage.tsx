@@ -40,7 +40,7 @@ const UploadPage: React.FC = () => {
 
   // Game + UserGame
   const [game, setGame] = useState<Game | null>(null);
-  const [userGames, setUserGames] = useState<UserGame[]>([]);
+  const [, setUserGames] = useState<UserGame[]>([]);
   const [userGameId, setUserGameId] = useState<number | null>(null);
 
   const isEditing = modId !== undefined;

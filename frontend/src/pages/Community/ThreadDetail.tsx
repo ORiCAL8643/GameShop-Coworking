@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Avatar, Badge, Button, Card, Input, Modal, Space, Typography } from "antd";
-import { ArrowLeftOutlined, LikeOutlined, MessageOutlined, PictureOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, LikeOutlined, MessageOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
 import CommentItem from "./CommentItem";
 import type { Thread, ThreadComment, CreateReplyPayload } from "./types";
 
@@ -22,7 +22,7 @@ export default function ThreadDetail({ thread, onBack, onReplyRoot }: Props) {
     () => {
       const dfs = (arr: ThreadComment[]): number =>
         arr.reduce((s, c) => s + 1 + (c.children?.length ? dfs(c.children) : 0), 0);
-      return dfs(thread.comments);
+      return dfs(thread.comments || []);
     },
     [thread.comments]
   );
@@ -51,7 +51,7 @@ export default function ThreadDetail({ thread, onBack, onReplyRoot }: Props) {
 
           {/* โซนคอมเมนต์ */}
           <div style={{ marginTop: 8, padding: 12, border: "1px solid #303030", background: "#161616", borderRadius: 12 }}>
-            {thread.comments.map((c) => (
+            {(thread.comments || []).map((c) => (
               <CommentItem
                 key={c.id}
                 data={c}

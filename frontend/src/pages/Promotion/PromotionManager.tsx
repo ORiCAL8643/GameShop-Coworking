@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Layout, Card, Form, Input, InputNumber, DatePicker, Switch,
-  Button, Space, Table, Tag, Popconfirm, message, Typography, Select, Upload
+  Button, Space, Table, Tag, Popconfirm, message, Typography, Select
 } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import type { Promotion, DiscountType } from "../../interfaces/Promotion";
 import {

@@ -24,25 +24,9 @@ import { markReportsSeen } from "../../hooks/useReportNewCount";
 const { Title } = Typography;
 const { TextArea } = Input;
 
-interface RefundRequest {
-  id: number;
-  orderId: string;
-  user: string;
-  game: string;
-  reason: string;
-  status: "Pending" | "Approved" | "Rejected";
-}
-interface AdminPageProps {
-  refunds: RefundRequest[];
-  setRefunds: (refunds: RefundRequest[]) => void;
-  addNotification: (msg: string) => void;
-  addRefundUpdate: (msg: string) => void;
-}
+interface AdminPageProps {}
 
-export default function AdminPage({
-  refunds,
-  setRefunds,
-}: AdminPageProps) {
+export default function AdminPage({}: AdminPageProps) {
   const navigate = useNavigate();
 
   const [problems, setProblems] = useState<ProblemReport[]>([]);
@@ -73,13 +57,6 @@ export default function AdminPage({
     load();
   }, []);
 
-  const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
-    const updated = refunds.map((r) =>
-      r.id === id ? { ...r, status: action } : r
-    );
-    setRefunds(updated);
-    message.success(`Refund #${id} ${action} successfully!`);
-  };
 
   // ✅ ตอบกลับแล้ว ย้ายการ์ดออก (ถือว่าแก้แล้ว)
   const handleSendReply = async (rep: ProblemReport) => {

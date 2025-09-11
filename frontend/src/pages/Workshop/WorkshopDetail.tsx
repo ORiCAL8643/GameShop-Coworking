@@ -18,7 +18,7 @@ import type { Game, Mod } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider, Header } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Search } = Input;
 
 const WorkshopDetail: React.FC = () => {

@@ -73,13 +73,13 @@ export default function CommunityPage() {
       content,
       datetime: "เพิ่งตอบกลับ",
     };
-    setThreads((prev) =>
-      prev.map((t) =>
-        t.id === activeThread.id
-          ? { ...t, comments: [...t.comments, newC], commentCount: t.commentCount + 1 }
-          : t
-      )
-    );
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === activeThread.id
+            ? { ...t, comments: [...(t.comments || []), newC], commentCount: t.commentCount + 1 }
+            : t
+        )
+      );
     message.success("ตอบกลับแล้ว");
   };
 
