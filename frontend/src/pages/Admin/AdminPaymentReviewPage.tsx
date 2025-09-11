@@ -1,35 +1,29 @@
-// src/pages/admin/AdminPaymentReviewPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
-  Card, Table, Tag, Space, Button, Typography, Modal, Input, Image,
-  App, Tooltip, Select
+  Card, Table, Tag, Space, Button, Typography, Modal, Input, Image, App, Tooltip, Select
 } from "antd";
 import {
-  CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
-  ExclamationCircleOutlined, SearchOutlined
+  CheckCircleOutlined, CloseCircleOutlined, EyeOutlined, ExclamationCircleOutlined, SearchOutlined
 } from "@ant-design/icons";
 import axios from "axios";
-import { useAuth } from "../../context/AuthContext";
 
 const THEME_PRIMARY = "#9b59b6";
 const BG_DARK = "#1e1e2f";
 const CARD_DARK = "#171923";
 const BORDER = "#2b2f3a";
-const TEXT_MAIN = "#e8e8f3";
-const TEXT_SUB = "#a9afc3";
+const TEXT_MAIN = "#110f0fff";   // ขาวชัด
+const TEXT_SUB = "#a9afc3";    // เทาอ่อนอ่านง่าย
 
 type PaymentStatus = "PENDING" | "APPROVED" | "REJECTED";
 type ReviewablePayment = {
-  id: number;
-  order_no: string;
-  user_name: string;
-  amount: number;
-  slip_url: string;
-  uploaded_at: string;
+  id: string;              // internal payment id
+  order_no: string;        // e.g. ORD-20240901-0001
+  user_name: string;       // buyer name
+  amount: number;          // THB
+  slip_url: string;        // image url
+  uploaded_at: string;     // ISO / display string
   status: PaymentStatus;
-  reject_reason?: string | null;
-  order_id: number;
-  order_status: string;
+  reject_reason?: string;
 };
 
 const formatTHB = (n: number) =>
@@ -37,75 +31,41 @@ const formatTHB = (n: number) =>
 
 const BASE_URL = "http://localhost:8088";
 
-// แปลง/ทำความสะอาดข้อมูลจาก backend ให้เป็นรูปแบบที่ปุ่มจะไม่โดน disable ผิด
-function normalizeRow(r: any): ReviewablePayment {
-  const statusRaw = (r.status ?? r.Status ?? "PENDING").toString().toUpperCase();
-  const orderStatusRaw = (r.order_status ?? r.OrderStatus ?? "").toString().toUpperCase();
-  return {
-    id: Number(r.id ?? r.ID),
-    order_id: Number(r.order_id ?? r.OrderID),
-    order_no: r.order_no ?? r.OrderNo ?? `ORD-${String(r.order_id ?? r.OrderID ?? "")}`,
-    user_name: r.user_name ?? r.UserName ?? "ไม่ระบุ",
-    amount: Number(r.amount ?? r.Amount ?? 0),
-    slip_url: r.slip_url ?? r.SlipURL ?? r.slip_path ?? r.SlipPath ?? "",
-    uploaded_at: r.uploaded_at ?? r.UploadedAt ?? r.created_at ?? r.CreatedAt ?? "",
-    status: (["PENDING","APPROVED","REJECTED"].includes(statusRaw) ? statusRaw : "PENDING") as PaymentStatus,
-    reject_reason: r.reject_reason ?? r.RejectReason ?? null,
-    order_status: orderStatusRaw || "-",
-  };
-}
-
 export default function AdminPaymentReviewPage() {
   const { modal, message } = App.useApp();
-
-  const { id: userId, token } = useAuth() as { id: number | null; token?: string };
-
-  const authHeaders = useMemo(() => {
-    const h: Record<string, string> = {};
-    if (token) h["Authorization"] = `Bearer ${token}`;
-    if (userId) h["X-User-ID"] = String(userId);
-    return h;
-  }, [token, userId]);
-
   const [rows, setRows] = useState<ReviewablePayment[]>([]);
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
-  const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: number }>({ open: false });
+  const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: string }>({ open: false });
   const [rejectText, setRejectText] = useState("");
 
-  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("PENDING");
   const [keyword, setKeyword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const fetchPayments = async (st: PaymentStatus | "ALL") => {
-    setLoading(true);
-    try {
-      const qs = st === "ALL" ? "" : `?status=${st}`;
-      const res = await axios.get(`${BASE_URL}/payments${qs}`, { headers: authHeaders });
-      const data = Array.isArray(res.data) ? res.data : [];
-      setRows(data.map(normalizeRow));
-    } catch (e) {
-      console.error(e);
-      message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
-      setRows([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    if (!userId) return;
-    fetchPayments(statusFilter);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, userId, token]);
+    const fetchPayments = async () => {
+      try {
+        const res = await axios.get<ReviewablePayment[]>(`${BASE_URL}/payments?status=PENDING`);
+        setRows(res.data);
+      } catch {
+        message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
+      }
+    };
+    fetchPayments();
+  }, [message]);
 
   const data = useMemo(() => {
-    const kw = keyword.trim().toLowerCase();
-    return rows.filter(
-      r => !kw || r.order_no.toLowerCase().includes(kw) || (r.user_name || "").toLowerCase().includes(kw),
-    );
-  }, [rows, keyword]);
+    return rows.filter(r => {
+      const m1 = statusFilter === "ALL" ? true : r.status === statusFilter;
+      const kw = keyword.trim().toLowerCase();
+      const m2 =
+        !kw ||
+        r.order_no.toLowerCase().includes(kw) ||
+        r.user_name.toLowerCase().includes(kw);
+      return m1 && m2;
+    });
+  }, [rows, statusFilter, keyword]);
 
-  const approve = (id: number) => {
+  const approve = (id: string) => {
     modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
       icon: <ExclamationCircleOutlined />,
@@ -114,22 +74,17 @@ export default function AdminPaymentReviewPage() {
       okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
       onOk: async () => {
         try {
-          await axios.post(`${BASE_URL}/payments/${id}/approve`, null, { headers: authHeaders });
-          setRows(prev =>
-            prev.map(p =>
-              p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "PAID" } : p,
-            ),
-          );
+          await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" });
+          setRows(prev => prev.map(p => (p.id === id ? { ...p, status: "APPROVED" } : p)));
           message.success("อนุมัติการชำระเงินแล้ว");
-        } catch (e) {
-          console.error(e);
+        } catch {
           message.error("ไม่สามารถอนุมัติได้");
         }
       },
     });
   };
 
-  const reject = (id: number) => {
+  const reject = (id: string) => {
     setRejectOpen({ open: true, id });
     setRejectText("");
   };
@@ -138,23 +93,18 @@ export default function AdminPaymentReviewPage() {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
-      // ส่งได้ทั้ง reason และ reject_reason เพื่อเข้ากันได้หลาย backend
-      await axios.post(
-        `${BASE_URL}/payments/${id}/reject`,
-        { reason: rejectText.trim(), reject_reason: rejectText.trim() },
-        { headers: authHeaders },
-      );
+      await axios.patch(`${BASE_URL}/payments/${id}`, {
+        status: "REJECTED",
+        reject_reason: rejectText.trim(),
+      });
       setRows(prev =>
         prev.map(p =>
-          p.id === id
-            ? { ...p, status: "REJECTED", reject_reason: rejectText.trim(), order_status: "CANCELLED" }
-            : p,
+          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim() } : p,
         ),
       );
       message.success("ปฏิเสธการชำระเงินแล้ว");
       setRejectOpen({ open: false });
-    } catch (e) {
-      console.error(e);
+    } catch {
       message.error("ไม่สามารถปฏิเสธได้");
     }
   };
@@ -162,24 +112,24 @@ export default function AdminPaymentReviewPage() {
   return (
     <div style={{ padding: 24, background: BG_DARK, minHeight: "100vh", flex: 1 }}>
       <Typography.Title level={2} style={{ color: THEME_PRIMARY, marginBottom: 16 }}>
-        ตรวจสอบการชำระเงิน (แสดงทุกคำสั่งซื้อ)
+        ตรวจสอบการชำระเงิน
       </Typography.Title>
 
       <Card
         style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 14, marginBottom: 12 }}
-        styles={{ body: { padding: 16 } }}
+        bodyStyle={{ padding: 16 }}
       >
         <Space wrap>
           <Select
             value={statusFilter}
             onChange={(v) => setStatusFilter(v)}
             options={[
-              { value: "ALL", label: "สถานะ: ทั้งหมด" },
               { value: "PENDING", label: "สถานะ: รอตรวจสอบ" },
               { value: "APPROVED", label: "สถานะ: อนุมัติแล้ว" },
               { value: "REJECTED", label: "สถานะ: ปฏิเสธแล้ว" },
+              { value: "ALL", label: "สถานะ: ทั้งหมด" },
             ]}
-            style={{ minWidth: 200 }}
+            style={{ minWidth: 180 }}
           />
           <Input
             allowClear
@@ -193,35 +143,34 @@ export default function AdminPaymentReviewPage() {
               borderColor: BORDER,
             }}
           />
-          <Button onClick={() => fetchPayments(statusFilter)} loading={loading}>รีเฟรช</Button>
         </Space>
       </Card>
 
       <Card style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 14 }}>
         <Table
-          rowKey={(r) => String(r.id)}
+          rowKey="id"
           dataSource={data}
-          loading={loading}
-          pagination={{ pageSize: 8, showSizeChanger: false }}
+          pagination={{ pageSize: 6, showSizeChanger: false }}
+          style={{ color: TEXT_MAIN }}
           columns={[
             {
               title: "ออเดอร์",
               dataIndex: "order_no",
               render: (v, r) => (
                 <Space direction="vertical" size={0}>
-                  <Typography.Text style={{ color: TEXT_MAIN, fontWeight: 600 }}>{v}</Typography.Text>
+                  <Typography.Text style={{ color: TEXT_MAIN }}>{v}</Typography.Text>
                   <Typography.Text style={{ color: TEXT_SUB, fontSize: 12 }}>
-                    โดย {r.user_name || "-"}
+                    โดย {r.user_name}
                   </Typography.Text>
                 </Space>
               ),
             },
             {
-              title: "ยอดรวม",
+              title: "จำนวนเงิน",
               dataIndex: "amount",
               align: "right" as const,
               render: (n: number) => (
-                <Typography.Text style={{ color: "#fff", fontWeight: 600 }}>
+                <Typography.Text style={{ color: "#111010ff", fontWeight: 600 }}>
                   {formatTHB(n)}
                 </Typography.Text>
               ),
@@ -229,22 +178,19 @@ export default function AdminPaymentReviewPage() {
             {
               title: "สลิป",
               dataIndex: "slip_url",
-              render: (src: string) =>
-                src ? (
-                  <Button icon={<EyeOutlined />} onClick={() => setPreviewSrc(src)}>
-                    ดูสลิป
-                  </Button>
-                ) : (
-                  <Tag color="default">ไม่มีสลิป</Tag>
-                ),
+              render: (src: string) => (
+                <Button icon={<EyeOutlined />} onClick={() => setPreviewSrc(src)}>
+                  ดูสลิป
+                </Button>
+              ),
             },
             {
               title: "อัปโหลดเมื่อ",
               dataIndex: "uploaded_at",
-              render: (v: string) => <span style={{ color: TEXT_SUB }}>{v || "-"}</span>,
+              render: (v: string) => <span style={{ color: TEXT_SUB }}>{v}</span>,
             },
             {
-              title: "สถานะชำระเงิน",
+              title: "สถานะ",
               dataIndex: "status",
               render: (s: PaymentStatus, r) =>
                 s === "PENDING" ? (
@@ -252,22 +198,10 @@ export default function AdminPaymentReviewPage() {
                 ) : s === "APPROVED" ? (
                   <Tag color="success">อนุมัติแล้ว</Tag>
                 ) : (
-                  <Tooltip title={r.reject_reason || ""}>
+                  <Tooltip title={r.reject_reason}>
                     <Tag color="error">ปฏิเสธแล้ว</Tag>
                   </Tooltip>
                 ),
-            },
-            {
-              title: "สถานะคำสั่งซื้อ",
-              dataIndex: "order_status",
-              render: (st: string) => {
-                const u = (st || "").toUpperCase();
-                const color =
-                  u === "PAID" || u === "FULFILLED" ? "success" :
-                  u === "UNDER_REVIEW" ? "processing" :
-                  u === "CANCELLED" ? "error" : "default";
-                return <Tag color={color}>{u || "-"}</Tag>;
-              },
             },
             {
               title: "จัดการ",
@@ -304,14 +238,13 @@ export default function AdminPaymentReviewPage() {
         onCancel={() => setPreviewSrc(null)}
         footer={null}
         centered
-        styles={{ body: { background: CARD_DARK, padding: 12 } }}
-        title={<span style={{ color: TEXT_MAIN }}>หลักฐานการชำระเงิน</span>}
+        bodyStyle={{ background: CARD_DARK, padding: 12 }}
       >
         {previewSrc && (
           <Image
             src={previewSrc}
             alt="payment slip"
-            style={{ width: "100%", borderRadius: 12, border: `1px solid ${BORDER}` }}
+            style={{ borderRadius: 12, border: `1px solid ${BORDER}` }}
           />
         )}
       </Modal>
