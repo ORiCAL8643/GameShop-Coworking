@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useCart } from "../context/CartContext";
+import { useCart } from "../context/CartContext";
 
 const base_url = "http://localhost:8088";
 
@@ -30,6 +31,7 @@ const resolveImgUrl = (src?: string) => {
 
 const ProductGrid: React.FC = () => {
   const [games, setGames] = useState<Game[]>([]);
+  const { addItem } = useCart();
   const [selected, setSelected] = useState<Game | null>(null);
   const open = !!selected;
 
