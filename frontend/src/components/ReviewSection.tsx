@@ -245,7 +245,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
               key={r.ID}
               actions={[
                 <Space key="like" onClick={() => handleToggleLike(r)} style={{ cursor: "pointer" }}>
-                  <Heart size={18} className={r.likedByMe ? "text-red-400" : "text-gray-500"} />
+                  <Heart
+                    size={18}
+                    fill={r.likedByMe ? "currentColor" : "none"}
+                    className={r.likedByMe ? "text-red-400" : "text-gray-500"}
+                  />
                   <span>{r.likes ?? 0}</span>
                 </Space>,
                 userId === r.user_id ? (
