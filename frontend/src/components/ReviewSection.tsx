@@ -220,7 +220,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   const header = useMemo(
     () => (
       <Space style={{ width: "100%", justifyContent: "space-between" }}>
-        <h3 style={{ margin: 0 }}>รีวิวทั้งหมด</h3>
+        <h3 style={{ margin: 0 }}>รีวิวทั้งหมด ({items.length})</h3>
         {canCreate && (
           <Button type="primary" icon={<Plus size={16} />} onClick={onCreate}>
             สร้างรีวิว
@@ -228,7 +228,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         )}
       </Space>
     ),
-    [canCreate]
+    [canCreate, items.length]
   );
 
   return (
