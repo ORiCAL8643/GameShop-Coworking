@@ -304,15 +304,16 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 					if err := tx.Save(&key).Error; err != nil {
 						return err
 					}
-					ug := entity.UserGame{
-						UserID:             ord.UserID,
-						GameID:             item.GameID,
-						GrantedAt:          time.Now(),
-						GrantedByPaymentID: p.ID,
-					}
-					if err := tx.Where("user_id = ? AND game_id = ?", ord.UserID, item.GameID).FirstOrCreate(&ug).Error; err != nil {
-						return err
-					}
+				}
+
+				ug := entity.UserGame{
+					UserID:             ord.UserID,
+					GameID:             item.GameID,
+					GrantedAt:          time.Now(),
+					GrantedByPaymentID: p.ID,
+				}
+				if err := tx.Where("user_id = ? AND game_id = ?", ord.UserID, item.GameID).FirstOrCreate(&ug).Error; err != nil {
+					return err
 				}
 			}
 			return nil
