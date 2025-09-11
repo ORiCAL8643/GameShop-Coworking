@@ -1,4 +1,3 @@
-// frontend/src/pages/Review/Reviewpage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
@@ -31,7 +30,6 @@ function resolveImgUrl(img?: string) {
   return `${BASE}/${s.replace(/^\/+/, "")}`;
 }
 
-// Reviewpage fetches a game by id from the URL and renders its reviews.
 const Reviewpage: React.FC = () => {
   const { gameId } = useParams();
   const [loading, setLoading] = useState(true);
@@ -48,54 +46,46 @@ const Reviewpage: React.FC = () => {
           setGame(ng);
           document.title = `${ng.name} • Reviews`;
         }
-      } catch (e) {
-        console.error(e);
+      } catch {
         setGame(null);
       } finally {
         if (!ignore) setLoading(false);
       }
     }
     if (gameId) fetchGame();
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, [gameId]);
 
   const cover = useMemo(() => resolveImgUrl(game?.img), [game]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0d0d0d] text-white p-6 flex justify-center">
-        <div className="animate-pulse">Loading…</div>
-      </div>
-    );
-  }
+  // ✅ ลดระยะให้พอดี: padding ซ้าย–ขวา 24px (ไม่มี margin-left 220 อีกแล้ว)
+  const shellStyle: React.CSSProperties = {
+    padding: "16px 24px 24px 24px",
+  };
 
-  if (!game) {
-    return <div className="min-h-screen bg-[#0d0d0d] text-white p-6">ไม่พบข้อมูลเกม</div>;
-  }
+  if (loading) return <div style={shellStyle}>Loading…</div>;
+  if (!game)  return <div style={shellStyle}>ไม่พบข้อมูลเกม</div>;
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] text-white">
-      <div className="h-40 bg-gradient-to-r from-purple-500 to-pink-500" />
-      <div className="p-6 max-w-5xl mx-auto">
-        {/* ส่วนบน: รูปเกม + ชื่อเกม */}
-        <div className="rounded-2xl overflow-hidden bg-[#1a1a1a] shadow-lg shadow-purple-900/50 mb-6">
-          {cover && (
-            <img
-              src={cover}
-              alt={game.name}
-              style={{ width: "100%", height: 320, objectFit: "cover", display: "block" }}
-            />
-          )}
-          <div className="p-4 text-center">
-            <h1 className="text-2xl font-semibold text-white">{game.name}</h1>
-            <p className="text-gray-300">All reviews for this game</p>
-          </div>
+    <div style={shellStyle}>
+      {/* hero กว้างพอดี และไม่ชิดซ้ายเกินไป */}
+      <div className="rounded-2xl overflow-hidden bg-[#1a1a1a] shadow mb-6 max-w-5xl mx-auto">
+        {cover && (
+          <img
+            src={cover}
+            alt={game.name}
+            style={{ width: "100%", height: 240, objectFit: "cover", display: "block" }}
+          />
+        )}
+        <div className="p-4">
+          <h1 className="text-xl md:text-2xl font-semibold">{game.name}</h1>
+          <p className="text-gray-400">All reviews for this game</p>
         </div>
+      </div>
 
-        {/* ส่วนล่าง: ReviewSection ของเกมนี้ */}
-        <ReviewSection gameId={game.id} allowCreate />
+      {/* ส่วนรีวิว – จำกัดความกว้างให้อ่านสบาย */}
+      <div className="max-w-5xl mx-auto">
+        <ReviewSection gameId={game.id} allowCreate className="mt-4" />
       </div>
     </div>
   );
