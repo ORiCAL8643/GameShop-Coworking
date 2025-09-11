@@ -31,8 +31,9 @@ export default function ReportPage() {
 
       await createReport({
         title: values.title,
+        category: values.category,
         description: values.description,
-        user_id: userId,          // ✅ ใช้ snake_case ให้ตรง backend
+        user_id: userId, // ✅ ใช้ snake_case ให้ตรง backend
         game_id: DEFAULT_GAME_ID,
         status: "open",
         files,
@@ -101,13 +102,25 @@ export default function ReportPage() {
           >
             <Select placeholder="เลือกหมวดปัญหา">
               <Select.Option value="technical">⚙️ ปัญหาทางเทคนิค</Select.Option>
-              <Select.Option value="billing">💳 ปัญหาการเรียกเก็บเงิน</Select.Option>
-              <Select.Option value="login">🔐 เข้าสู่ระบบ/ยืนยันตัวตน</Select.Option>
-              <Select.Option value="ui">🖥️ หน้าตา/การใช้งาน (UI/UX)</Select.Option>
-              <Select.Option value="performance">🚀 ประสิทธิภาพช้า/หน่วง</Select.Option>
+              <Select.Option value="billing">
+                💳 ปัญหาการเรียกเก็บเงิน
+              </Select.Option>
+              <Select.Option value="login">
+                🔐 เข้าสู่ระบบ/ยืนยันตัวตน
+              </Select.Option>
+              <Select.Option value="ui">
+                🖥️ หน้าตา/การใช้งาน (UI/UX)
+              </Select.Option>
+              <Select.Option value="performance">
+                🚀 ประสิทธิภาพช้า/หน่วง
+              </Select.Option>
               <Select.Option value="crash">💥 แอปค้าง/เด้ง</Select.Option>
-              <Select.Option value="purchase">🛒 ซื้อ/ชำระเงินผิดพลาด</Select.Option>
-              <Select.Option value="content">📦 เนื้อหาหาย/ไม่ถูกต้อง</Select.Option>
+              <Select.Option value="purchase">
+                🛒 ซื้อ/ชำระเงินผิดพลาด
+              </Select.Option>
+              <Select.Option value="content">
+                📦 เนื้อหาหาย/ไม่ถูกต้อง
+              </Select.Option>
               <Select.Option value="feedback">💬 ข้อเสนอแนะ</Select.Option>
               <Select.Option value="other">❓ อื่น ๆ</Select.Option>
             </Select>
@@ -126,7 +139,10 @@ export default function ReportPage() {
             name="description"
             rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}
           >
-            <Input.TextArea rows={4} placeholder="อธิบายรายละเอียดของปัญหาให้ชัดเจน" />
+            <Input.TextArea
+              rows={4}
+              placeholder="อธิบายรายละเอียดของปัญหาให้ชัดเจน"
+            />
           </Form.Item>
 
           <Form.Item
@@ -140,15 +156,19 @@ export default function ReportPage() {
               listType="picture-card"
               fileList={fileList}
               onPreview={(file) => {
-                window.open((file as any).url || (file as any).thumbUrl, "_blank");
+                window.open(
+                  (file as any).url || (file as any).thumbUrl,
+                  "_blank",
+                );
               }}
               onChange={({ fileList: fl }) => setFileList(fl)}
               onRemove={(file) => {
                 setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-              }}  // ✅ แก้จาก })} เป็น }}
+              }} // ✅ แก้จาก })} เป็น }}
               beforeUpload={(file) => {
                 const isImage = file.type?.startsWith("image/");
-                if (!isImage) message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
+                if (!isImage)
+                  message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
                 return false; // ไม่อัปโหลดทันที ให้รวมส่งตอน submit
               }}
               maxCount={3}
