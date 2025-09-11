@@ -51,8 +51,8 @@ const router = createBrowserRouter([
 
 
       // ✅ Report
-      { path: "/report", element: <ReportPage /> },
-      { path: "/report/success", element: <ReportSuccessPage /> },
+      //{ path: "/report", element: <ReportPage /> },
+      //{ path: "/report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
       { path: "information/Add", element: <Add /> },

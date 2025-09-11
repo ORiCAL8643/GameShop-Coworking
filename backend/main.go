@@ -70,6 +70,7 @@ func main() {
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
+		// ✅ ลงทะเบียนครั้งเดียวพอ (แก้ปัญหา panic: handlers are already registered)
 		router.POST("/upload/game", controllers.UploadGame)
 
 		// -------- Threads --------
@@ -154,10 +155,9 @@ func main() {
 		router.DELETE("/reports/:id", controllers.DeleteReport)
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
 
-		// ==อย่าทำอันนี้หายไม่งั้นรูปเกมไม่ขึ้น
-		router.POST("/upload/game", controllers.UploadGame)
+		// ❌ (ลบอันที่ซ้ำออก) ห้ามลงทะเบียน /upload/game ซ้ำ
+		// router.POST("/upload/game", controllers.UploadGame)
 
-		//request
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
@@ -184,17 +184,18 @@ func main() {
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
-		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler ตามเหมาะสม
+		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 	}
 
 	// 5) Run server
+	// ใช้ localhost ตามเดิมเพื่อไม่กระทบสภาพแวดล้อมอื่น
 	r.Run("localhost:" + PORT)
 }
 
 // ---------------------- Middlewares ----------------------
 
-// CORS แบบผ่อนคลาย (คงเดิม)
+// CORS แบบผ่อนคลาย
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -225,7 +226,7 @@ func AuthRequired() gin.HandlerFunc {
 			if raw != "" {
 				secret := []byte(os.Getenv("JWT_SECRET"))
 				if len(secret) == 0 {
-					secret = []byte("secret") // fallback ให้ตรงกับตอน Login ถ้าคุณใช้ค่าคงที่
+					secret = []byte("secret") // fallback ให้ตรงกับตอน Login ถ้าใช้ค่าคงที่
 				}
 				if token, _ := jwt.Parse(raw, func(t *jwt.Token) (interface{}, error) {
 					return secret, nil
@@ -255,7 +256,7 @@ func AuthRequired() gin.HandlerFunc {
 		}
 
 		// 2) สำรอง: X-User-ID
-	if userID == 0 {
+		if userID == 0 {
 			if v := c.GetHeader("X-User-ID"); v != "" {
 				if n, err := strconv.Atoi(v); err == nil && n > 0 {
 					userID = uint(n)
@@ -292,11 +293,6 @@ func AuthRequired() gin.HandlerFunc {
 
 // getRoleField ดึงค่า role_id ออกมา รองรับ model ที่ประกาศ role เป็น *uint หรือ uint
 func getRoleField(u entity.User) interface{} {
-	// ถ้ามีฟิลด์เป็น pointer:
-	//   type User struct { ... RoleID *uint `gorm:"column:role_id"` ... }
-	// หรือถ้าเป็นค่า:
-	//   type User struct { ... RoleID uint  `gorm:"column:role_id"` ... }
-	// ตรงนี้ใช้ type switch เอาตามที่คอมไพล์จริง
 	return any(u.RoleID)
 }
 
