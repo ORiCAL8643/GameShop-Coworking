@@ -1,21 +1,21 @@
+// entity/payment.go
 package entity
 
-import "gorm.io/gorm"
+import (
+	"time"
 
-type PaymentStatus string
-
-const (
-	PaymentPending  PaymentStatus = "PENDING"
-	PaymentApproved PaymentStatus = "APPROVED"
-	PaymentRejected PaymentStatus = "REJECTED"
+	"gorm.io/gorm"
 )
 
 type Payment struct {
 	gorm.Model
-	OrderID      uint          `json:"order_id"`
-	Order        Order         `json:"order"` // ต้องมี entity.Order อยู่แล้ว (UserID, TotalAmount, OrderStatus)
-	Amount       float64       `json:"amount"`
-	Status       PaymentStatus `json:"status"`
-	RejectReason *string       `json:"reject_reason"` // ใช้ *string เพื่อให้ null ได้
-	SlipPath     string        `json:"slip_path"`     // path ใต้ ./uploads
+	PaymentDate  time.Time `json:"payment_date"`
+	Status       string    `json:"status"`
+	Amount       float64   `json:"amount"`
+	RejectReason string    `json:"reject_reason"`
+
+	OrderID uint   `json:"order_id"`
+	Order   *Order `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+
+
 }
