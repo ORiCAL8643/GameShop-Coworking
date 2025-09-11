@@ -21,6 +21,7 @@ import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
 import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
+import RequirePermission from "../components/RequirePermission.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -102,16 +103,31 @@ const router = createBrowserRouter([
             ),
           },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
-          { path: "/Admin/RolePage", element: <RoleManagement /> },
+          {
+            path: "/Admin/RolePage",
+            element: (
+              <RequirePermission anyOf={["roles.manage"]}>
+                <RoleManagement />
+              </RequirePermission>
+            ),
+          },
         ],
       },
       {
         path: "/roles",
-        element: <RoleManagement />
+        element: (
+          <RequirePermission anyOf={["roles.read", "roles.manage"]}>
+            <RoleManagement />
+          </RequirePermission>
+        ),
       },
       {
         path: "/roles/:id",
-        element: <RoleEdit />
+        element: (
+          <RequirePermission anyOf={["roles.manage"]}>
+            <RoleEdit />
+          </RequirePermission>
+        ),
       }
     ],
   },
