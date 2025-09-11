@@ -1,25 +1,20 @@
 import { Layout, Menu } from "antd";
 import type { MenuProps } from "antd";
-import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { PlusOutlined } from "@ant-design/icons";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { PlusOutlined, BugOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 
 const { Sider } = Layout;
-type GroupItem = Required<MenuProps>["items"][number];
+type ItemType = Required<MenuProps>["items"][number];
 
-const items: GroupItem[] = [
-  {
-    key: "/home",
-    label: "หน้าแรก",
-  },
-  {
-    key: "/request",
-    label: "รีเควสเกม",
-  },
-  {
-    key: "/requestinfo",
-    label: "ข้อมูลรีเควส",
-  },
+const items: ItemType[] = [
+  { key: "/home", label: "หน้าแรก" },
+  { key: "/request", label: "รีเควสเกม" },
+  { key: "/requestinfo", label: "ข้อมูลรีเควส" },
+
+  // ✅ เมนูรีพอร์ตปัญหา (หน้า user ส่งคำร้อง)
+  { key: "/report", label: "รีพอร์ตปัญหา", icon: <BugOutlined /> },
+
   {
     key: "/information",
     label: "จัดการข้อมูลเกม",
@@ -37,37 +32,30 @@ const items: GroupItem[] = [
     ],
   },
 
+  { key: "/workshop", label: "Workshop" },
+  { key: "/promotion", label: "Promotion" },
+  { key: "/refund", label: "การคืนเงินผู้ใช้" },
+
   {
-    key: "/workshop",
-    label: "Workshop",
-  },
-    {
-    key: '/promotion',
-    label:'Promotion',
-  },
-  {
-    key: '/refund',
-    label:'การคืนเงินผู้ใช้',
-  },
-  {
-    key: '/Admin',
-    label:'Admin',
+    key: "/Admin",
+    label: "Admin",
     children: [
-        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
-        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
-        { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
+      { key: "/Admin/Page", label: "Page", icon: <PlusOutlined /> },
+      // (ถ้าคุณใช้หน้าจัดการรีพอร์ตฝั่งแอดมินแบบที่เราทำไว้)
+      { key: "/Admin/Reports", label: "Report (Open)", icon: <PlusOutlined /> },
+      { key: "/Admin/ResolvedReports", label: "Resolved Reports", icon: <PlusOutlined /> },
+      { key: "/Admin/PaymentReviewPage", label: "PaymentReview", icon: <PlusOutlined /> },
+      { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
     ],
   },
 ];
 
-const Sidebar = () => {
+export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // เส้นทางที่เป็น "กลุ่ม" (มี children)
-  const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
-
-  // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
+  // กลุ่มเมนูหลักที่มี children (ใช้เพื่อควบคุม open/close)
+  const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
   const selectedKey = location.pathname;
 
   const computeOpenKeys = (path: string) =>
@@ -76,12 +64,10 @@ const Sidebar = () => {
   const [openKeys, setOpenKeys] = useState<string[]>(computeOpenKeys(selectedKey));
 
   useEffect(() => {
-    // เปลี่ยนหน้าแล้วให้เปิดเมนูย่อยที่ตรงกับ path ปัจจุบัน
     setOpenKeys(computeOpenKeys(selectedKey));
   }, [selectedKey]);
 
   const onOpenChange: MenuProps["onOpenChange"] = (keys) => {
-    // อนุญาตเปิดได้หลายกลุ่มพร้อมกัน (ถ้าอยากเปิดทีละกลุ่ม ให้คอมเมนต์โค้ดนี้แล้วใช้ logic แบบ antd ตัวอย่าง)
     setOpenKeys(keys as string[]);
   };
 
@@ -94,7 +80,7 @@ const Sidebar = () => {
             fontSize: 20,
             textAlign: "center",
             padding: "16px 0",
-            fontWeight: 600,
+            fontWeight: 700,
           }}
         >
           GAME STORE
@@ -110,11 +96,7 @@ const Sidebar = () => {
           onClick={({ key }) => navigate(String(key))}
         />
       </Sider>
-
-      {/* เนื้อหาหลัก */}
       <Outlet />
     </Layout>
   );
-};
-
-export default Sidebar;
+}

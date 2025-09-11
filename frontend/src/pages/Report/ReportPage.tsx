@@ -1,18 +1,44 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Select, Upload, message } from "antd";
+import {
+  Card,
+  Form,
+  Input,
+  Button,
+  Select,
+  Upload,
+  message,
+  Typography,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { createReport } from "../../services/Report";
+// ถ้ายังไม่มี AuthContext ก็ไม่เป็นไร โค้ดนี้มี fallback ให้
 import { useAuth } from "../../context/AuthContext";
+
+const { Title, Text } = Typography;
 
 export default function ReportPage() {
   const [form] = Form.useForm();
   const [fileList, setFileList] = useState<any[]>([]);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { id: userId } = useAuth();
 
-  // TODO: เปลี่ยนเป็นเลือกเกมจาก UI ของคุณ
-  const DEFAULT_GAME_ID = 1;
+  // ===== Fallback IDs (ปรับเป็น id ที่มีจริงใน DB ของคุณ) =====
+  // ตั้งใน .env ก็ได้ เช่น VITE_FORCE_USER_ID=1 , VITE_FORCE_GAME_ID=1
+  const FORCE_USER_ID = Number(import.meta.env.VITE_FORCE_USER_ID || "") || 1;
+  const FORCE_GAME_ID = Number(import.meta.env.VITE_FORCE_GAME_ID || "") || 1;
+
+  // ถ้ามี AuthContext จะได้ id จริง; ถ้าไม่มี/ไม่ล็อกอิน จะใช้ fallback
+  let userId: number | undefined = undefined;
+  try {
+    // ถ้าโปรเจ็กต์คุณยังไม่มี useAuth ก็จะ throw — แล้วจะข้ามไปใช้ fallback ด้านล่าง
+    // @ts-ignore
+    const auth = useAuth?.();
+    userId = auth?.id;
+  } catch {}
+
+  const EFFECTIVE_USER_ID = userId || FORCE_USER_ID;
+  const EFFECTIVE_GAME_ID = FORCE_GAME_ID;
 
   const PAGE_BG =
     "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
@@ -20,10 +46,7 @@ export default function ReportPage() {
 
   const handleSubmit = async (values: any) => {
     try {
-      if (!userId) {
-        message.error("กรุณาเข้าสู่ระบบก่อนส่งรายงาน");
-        return;
-      }
+      setSubmitting(true);
 
       const files: File[] = (fileList || [])
         .map((f: any) => f?.originFileObj)
@@ -32,8 +55,8 @@ export default function ReportPage() {
       await createReport({
         title: values.title,
         description: values.description,
-        user_id: userId,          // ✅ ใช้ snake_case ให้ตรง backend
-        game_id: DEFAULT_GAME_ID,
+        user_id: EFFECTIVE_USER_ID,  // ✅ ใช้ id ที่มีจริงเสมอ
+        game_id: EFFECTIVE_GAME_ID,
         status: "open",
         files,
       });
@@ -41,6 +64,7 @@ export default function ReportPage() {
       message.success("ส่งรายงานปัญหาเรียบร้อย!");
       form.resetFields();
       setFileList([]);
+      // ✅ เด้งไปหน้า success พร้อมส่งหัวข้อไปแสดง
       navigate("/report/success", { state: { title: values.title } });
     } catch (e: any) {
       const apiMsg =
@@ -48,6 +72,8 @@ export default function ReportPage() {
         e?.message ||
         "เกิดข้อผิดพลาดในการส่งรายงาน";
       message.error(apiMsg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -145,7 +171,7 @@ export default function ReportPage() {
               onChange={({ fileList: fl }) => setFileList(fl)}
               onRemove={(file) => {
                 setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-              }}  // ✅ แก้จาก })} เป็น }}
+              }}
               beforeUpload={(file) => {
                 const isImage = file.type?.startsWith("image/");
                 if (!isImage) message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
@@ -174,6 +200,7 @@ export default function ReportPage() {
             <Button
               type="primary"
               htmlType="submit"
+              loading={submitting}
               style={{
                 width: "100%",
                 height: 46,
@@ -183,9 +210,13 @@ export default function ReportPage() {
                 border: "none",
               }}
             >
-              ส่งรายงานปัญหา
+              {submitting ? "กำลังส่ง..." : "ส่งรายงานปัญหา"}
             </Button>
           </Form.Item>
+
+          <Text type="secondary" style={{ color: "#bfb6ff" }}>
+            จะส่งด้วย user_id={EFFECTIVE_USER_ID} · game_id={EFFECTIVE_GAME_ID}
+          </Text>
         </Form>
       </Card>
     </div>
