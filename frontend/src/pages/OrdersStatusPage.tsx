@@ -1,5 +1,5 @@
 // src/pages/OrdersStatusPage.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Row, Col, Card, Tag, Typography, Space, Button, message, Empty } from "antd";
 import { ReloadOutlined, HomeOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import { useAuth } from "../context/AuthContext";
@@ -21,41 +21,53 @@ type Order = {
   OrderCreate?: string; order_create?: string;
 };
 
-const formatTHB = (n: number) =>
-  `฿${(n || 0).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatTHB = (n: number | undefined) =>
+  `฿${((n ?? 0)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function OrdersStatusPage() {
-  const { id } = useAuth();            // ✅ ใช้เฉพาะ id ตามที่คุณต้องการ
+  const { id: userId, token } = useAuth() as { id: number | null; token?: string };
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<Order[]>([]);
   const navigate = useNavigate();
 
+  // ✅ รวม header ยืนยันตัวตน (รองรับทั้ง JWT และ X-User-ID)
+  const authHeaders = useMemo(() => {
+    const h: Record<string, string> = {};
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    if (userId) h["X-User-ID"] = String(userId);
+    return h;
+  }, [token, userId]);
+
   const fetchOrders = async () => {
-    if (!id) {
+    if (!userId) {
       message.warning("กรุณาเข้าสู่ระบบ");
+      setRows([]);
       return;
     }
     setLoading(true);
     try {
-      // ✅ กรองเฉพาะคำสั่งซื้อของผู้ใช้ที่ล็อกอินด้วย query user_id
-      // (สอดคล้องกับ main.go ที่รองรับ ?user_id= แล้ว)
-      const res = await fetch(`${API}/orders?user_id=${id}`);
+      // ใช้ mine=1 ก็ได้ หรือจะไม่ใส่ก็ได้เพราะ backend จะบังคับเป็นของตัวเองอยู่ดี
+      const res = await fetch(`${API}/orders?mine=1`, { headers: authHeaders });
+      if (res.status === 401) {
+        throw new Error("Unauthorized");
+      }
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setRows(Array.isArray(data) ? data : []);
     } catch (e) {
       console.error(e);
       message.error("โหลดสถานะคำสั่งซื้อไม่สำเร็จ");
+      setRows([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ❌ ลบ fetch() ที่อยู่นอก useEffect ออก (เดิมอยู่ใต้ const { id } = useAuth();)
   useEffect(() => {
-    setRows([]);     // reset เมื่อเปลี่ยน user
+    setRows([]);
     fetchOrders();
-  }, [id]);          // เรียกใหม่เมื่อเปลี่ยนผู้ใช้
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, token]);
 
   const colorOf = (st: string) => {
     switch ((st || "").toUpperCase()) {
@@ -95,7 +107,10 @@ export default function OrdersStatusPage() {
       {/* Content */}
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {rows.length === 0 ? (
-          <Card style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 12 }}>
+          <Card
+            style={{ background: CARD_DARK, borderColor: BORDER, borderRadius: 12 }}
+            styles={{ body: { padding: 24 } }}   // ✅ แทน bodyStyle
+          >
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={<span style={{ color: TEXT_SUB }}>ยังไม่มีคำสั่งซื้อ</span>}
@@ -108,16 +123,22 @@ export default function OrdersStatusPage() {
               const status = (o.OrderStatus ?? o.order_status ?? "").toUpperCase();
               const total = o.TotalAmount ?? o.total_amount ?? 0;
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
-              const created = createdRaw ? new Date(createdRaw).toLocaleString() : "-";
+              const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
 
               return (
                 <Col key={oid} xs={24} sm={12} md={8} lg={6} xl={6}>
                   <Card
                     hoverable
                     style={{ height: "100%", background: CARD_DARK, borderColor: BORDER, borderRadius: 16 }}
-                    bodyStyle={{ padding: 16 }}
+                    styles={{ body: { padding: 16 } }}   // ✅ แทน bodyStyle
                     actions={[
-                      <span key="detail" style={{ color: THEME_PRIMARY, fontWeight: 600 }}>รายละเอียด</span>,
+                      <span
+                        key="detail"
+                        style={{ color: THEME_PRIMARY, fontWeight: 600 }}
+                        onClick={() => navigate(`/orders/${oid}`)} // ถ้ายังไม่มีหน้า detail ให้คอมเมนต์ได้
+                      >
+                        รายละเอียด
+                      </span>,
                     ]}
                   >
                     <Space direction="vertical" size={8} style={{ width: "100%" }}>
