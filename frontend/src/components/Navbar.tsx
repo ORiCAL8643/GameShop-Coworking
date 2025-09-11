@@ -58,7 +58,7 @@ const Navbar = () => {
           <>
             <span style={{ color: "white" }}>{username}</span>
             <Button onClick={logout}>Logout</Button>
-            <Avatar src="https://i.pravatar.cc/300" />
+            
           </>
         ) : (
           <Button type="primary" onClick={() => setOpenAuth(true)}>
