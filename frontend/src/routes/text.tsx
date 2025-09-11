@@ -69,8 +69,8 @@ const router = createBrowserRouter([
       },
 
       { path: "/workshop", element: <WorkshopMain /> },
-      { path: "/workshop/:title", element: <WorkshopDetail /> },
-      { path: "/mod/:title", element: <ModDetail /> },
+      { path: "/workshop/:id", element: <WorkshopDetail /> },
+      { path: "/mod/:id", element: <ModDetail /> },
       { path: "/upload", element: <Workshop /> },
 
       { path: "/promotion", element: <PromotionManager /> },
@@ -89,20 +89,24 @@ const router = createBrowserRouter([
             element: (
               <AdminPage
                 refunds={refunds}
-                setRefunds={() => {}}
+                setRefunds={() => { }}
                 addNotification={addNotification}
                 addRefundUpdate={addRefundUpdate}
               />
             ),
           },
-          // ✅ หน้าเก็บปัญหาที่แก้ไขแล้ว
-          { path: "/Admin/Resolved", element: <ResolvedReportsPage /> },
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
           { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
-
-      { path: "/roles/:id", element: <RoleEdit /> },
+      {
+        path: "/roles",
+        element: <RoleManagement />
+      },
+      {
+        path: "/roles/:id",
+        element: <RoleEdit />
+      }
     ],
   },
 ]);

@@ -1,5 +1,5 @@
 import { Card, Table, Typography, Select, Button, message } from "antd";
-import { Col, Row } from "antd";
+import { Col, Row , Result} from 'antd';
 import type { ColumnsType } from "antd/es/table";
 import axios from "axios";
 import { useState, useEffect } from "react";
@@ -62,24 +62,24 @@ export default function Requestinfo() {
     GetRequest();
   }, []);
 
-  async function GetGame() {
-    try {
-      const response = await axios.get(`${base_url}/game`);
-      Setgame(response.data);
-      console.log(response.data);
-    } catch (err) {
-      console.log("get game error", err);
-    }
-  }
+    async function GetGame() {
+        try {
+        const response = await axios.get(`${base_url}/game`)
+        Setgame(response.data)
+        console.log(response.data)
+        } catch(err) {
+        console.log('get game error',err)
+        }  
+}
+    useEffect(() =>{
+        GetGame()
+    }, [])
 
-  useEffect(() => {
-    GetGame();
-  }, []);
+    const pendingGames = game ? game.filter(g => g.status === "pending") : [];
 
-  const pendingGames = game.filter((game) => game.status === "pending");
 
-  return (
-    <div style={{ padding: 16, background: "#141414", minHeight: "100vh" }}>
+  return (<div>{(game || pendingGames.length !== 0) ? (
+    <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
         bodyStyle={{ padding: 20 }}
         style={{
@@ -135,6 +135,7 @@ export default function Requestinfo() {
           </Button>
         </Col>
       </Row>
-    </div>
+    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist."</div>} extra={<Button type="primary" style={{justifyContent: "center", color:'#ffffffff'}}>Back Home</Button>}/>)
+  }</div>
   );
 }

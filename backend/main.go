@@ -30,11 +30,37 @@ func main() {
 		router.GET("/users/:id", controllers.FindUserByID)
 		router.PUT("/users/:id", controllers.UpdateUser)
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
+		router.PATCH("/users/:id/role", controllers.UpdateUserRole)
+
+		// ===== Roles =====
+		router.GET("/roles", controllers.GetRoles)
+		router.GET("/roles/:id", controllers.GetRoleById)
+		router.POST("/roles", controllers.CreateRole)
+		router.PATCH("/roles/:id", controllers.UpdateRole)
+		router.DELETE("/roles/:id", controllers.DeleteRole)
+
+		// ===== Permissions =====
+		router.GET("/permissions", controllers.GetPermissions)
+		router.GET("/permissions/:id", controllers.GetPermissionById)
+		router.POST("/permissions", controllers.CreatePermission)
+		router.PATCH("/permissions/:id", controllers.UpdatePermission)
+		router.DELETE("/permissions/:id", controllers.DeletePermission)
+
+		// ===== RolePermissions =====
+		router.GET("/rolepermissions", controllers.GetRolePermissions)
+		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
+		router.POST("/rolepermissions", controllers.CreateRolePermission)
+		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
+		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
 
 		// ===== Games =====
-		router.POST("/games", controllers.CreateGame)
-		router.GET("/games", controllers.FindGames)
-		router.GET("/game", controllers.FindGames) // alias เก่า
+		router.POST("/new-game", controllers.CreateGame)
+		router.GET("/game", controllers.FindGames)
+		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
+		router.POST("/upload/game", controllers.UploadGame)
+		/*router.GET("/games/:id", controllers.FindGameByID)
+		router.PUT("/games/:id", controllers.UpdateGame)
+		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -104,15 +130,55 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
-		// ===== Problem Reports =====
-		router.POST("/reports", controllers.CreateReport)
-		router.GET("/reports", controllers.FindReports)
-		router.GET("/reports/:id", controllers.GetReportByID)
-		router.PUT("/reports/:id", controllers.UpdateReport)
-		router.DELETE("/reports/:id", controllers.DeleteReport)
-		router.POST("/reports/:id/reply", controllers.ReplyReport)
+		//request routes
+		router.POST("/new-request", controllers.CreateRequest)
+		router.GET("/request", controllers.FindRequest)
+
+		// ===== Orders =====
+		router.POST("/orders", controllers.CreateOrder)
+		router.GET("/orders", controllers.FindOrders)
+		router.GET("/orders/:id", controllers.FindOrderByID)
+		router.PUT("/orders/:id", controllers.UpdateOrder)
+		router.DELETE("/orders/:id", controllers.DeleteOrder)
+		// ===== Order Items =====
+		router.POST("/order-items", controllers.CreateOrderItem)
+		router.GET("/order-items", controllers.FindOrderItems)
+		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
+		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+
+		// ===== Payments =====
+		router.POST("/payments", controllers.CreatePayment)
+		router.GET("/payments", controllers.FindPayments)
+		router.PATCH("/payments/:id", controllers.UpdatePayment)
+		router.DELETE("/payments/:id", controllers.DeletePayment)
+		router.POST("/payments/:id/approve", controllers.ApprovePayment)
+		router.POST("/payments/:id/reject", controllers.RejectPayment)
+
+		// ===== Mods =====
+		router.GET("/mods", controllers.GetMods)
+		router.GET("/mods/:id", controllers.GetModById)
+		router.POST("/mods", controllers.CreateMod)
+		router.PATCH("/mods/:id", controllers.UpdateMod)
+		router.DELETE("/mods/:id", controllers.DeleteMod)
+
+		// ===== Mod Ratings =====
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
+		router.PATCH("/modratings/:id", controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+
+		// ===== Mod Tags =====
+		router.GET("/modtags", controllers.GetModTags)
+		router.GET("/modtags/:id", controllers.GetModTagById)
+		router.POST("/modtags", controllers.CreateModTag)
+		router.PATCH("/modtags/:id", controllers.UpdateModTag)
+		router.DELETE("/modtags/:id", controllers.DeleteModTag)
+
 	}
 
+	// Run the server
+	// แก้สเปซตรง "localhost:" ให้ถูกต้อง
 	r.Run("localhost:" + PORT)
 }
 
@@ -121,9 +187,9 @@ func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers",
-			"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return

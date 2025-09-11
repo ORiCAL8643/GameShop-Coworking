@@ -1,9 +1,10 @@
 import { Row, Col } from "antd";
 //import AddProductCard from "./AddProductCard";
 import { useNavigate } from "react-router-dom";
-import { Card, Button } from "antd";
+import { Card, Button, Modal} from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
+import { MoreOutlined } from "@ant-design/icons";
 
 const base_url = "http://localhost:8088";
 
@@ -11,7 +12,7 @@ interface ProductGridProps {
   userId: number | null;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
+const ProductGrid: React.FC<ProductGridProps> = () => {
   interface Game {
     ID: number;
     game_name: string;
@@ -26,6 +27,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
     status: string;
     minimum_spec_id: number;
   }
+  type game = {
+  id: number;
+  game_name: string;
+  release_date?: string;
+  age_rating?: number | string;
+  categories: { title: string };
+};
 
   // แปลง img_src ให้เป็น absolute URL เสมอ
   const resolveImgUrl = (src?: string) => {
@@ -47,6 +55,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
 
   const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
+  const [selected, setSelected] = useState<Game | null>(null); //usestate
+  const open = !!selected;
+
+  const showModal = (item: Game) => setSelected(item);
+  const handleCancel = () => setSelected(null);
 
   async function GetGame() {
     try {
@@ -101,12 +114,32 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
                 <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
               }
             >
-              <Card.Meta
-                title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
-                description={
-                  <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
-                }
-              />
+            <Row>
+                <Col span={21}>
+                  <Card.Meta
+                    title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
+                    description={
+                      <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
+                    }
+                  />
+                </Col>
+                <Col >
+                  <div>
+                    <Button onClick={() => showModal(c)} type="text" shape="circle" size="small" style={{background: "#1f1f1f"}} icon={<MoreOutlined style={{fontSize:"18px" , color: "#fffcfcff"}}/>} />
+                    <Modal
+                        title={selected?.game_name}
+                        open={open}
+                        onCancel={handleCancel}
+                        onOk={handleCancel}
+                        okText="ปิด"
+                        closable>
+                          <p>หมวดหมู่: {selected?.categories.title}</p>
+                          <p>วันวางขาย: {selected?.release_date ?? "-"}</p>
+                          <p>อายุขั้นต่ำ: {selected?.age_rating ?? "-"}</p>
+                    </Modal>
+                  </div>
+                </Col>
+            </Row>
               <div style={{ marginTop: 10, color: "#9254de" }}>
                 {hasDiscount ? (
                   <>

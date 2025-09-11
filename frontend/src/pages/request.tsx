@@ -1,6 +1,6 @@
 import { Layout, Space, Button, Select } from 'antd';
 import Navbar from "../components/Navbar";
-import { Typography, Input, DatePicker } from "antd";
+import { Typography, Input, DatePicker, Result } from "antd";
 import { Col, Row } from 'antd';
 import  axios  from 'axios';
 import type { Game } from '../interfaces';
@@ -24,8 +24,8 @@ const Request = () => {
             const response = await axios.post(`${base_url}/new-request`, {
                 reason: reason,
                 release_date: date,
-                user: id,
-                game: gameid,
+                user: id, 
+                game: gameid, 
         });
             console.log("เพิ่มรีเควสสำเร็จ:", response.data)
         } catch(err) {
@@ -45,8 +45,8 @@ const Request = () => {
         GetGame()
     }, [])
 
-    const pendingGames = game.filter(game => game.status === "pending");
-    return(
+    const pendingGames = game ? game.filter(g => g.status === "pending") : [];
+    return(<div>{(game || pendingGames.length !== 0) ? (
         <Layout>
             <Layout style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
                 <Navbar />
@@ -79,7 +79,8 @@ const Request = () => {
                     </Row>
                 </div>
             </Layout>
-        </Layout>
+        </Layout> ) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist."</div>} extra={<Button type="primary" style={{justifyContent: "center", color:'#ffffffff'}}>Back Home</Button>}/>)
+        }</div>
     );
 };
 
