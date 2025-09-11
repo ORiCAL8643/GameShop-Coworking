@@ -228,7 +228,10 @@ func ToggleReviewLike(c *gin.Context) {
 	liked := true
 	if err == nil {
 		// มีแล้ว => ลบ (unlike)
-		_ = db.Delete(&like).Error
+		if err := db.Unscoped().Delete(&like).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
+			return
+		}
 		liked = false
 	} else if err != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
