@@ -107,7 +107,7 @@ const WorkshopDetail: React.FC = () => {
     }
 
     // เป็นเจ้าของ → ไปหน้าอัปโหลด
-    navigate(`/upload?gameId=${gid}`);
+       navigate(`/workshop/upload?gameId=${gid}`);
   };
 
   const handleSearch = (value: string) => {

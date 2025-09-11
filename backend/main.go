@@ -146,6 +146,7 @@ func main() {
 		// -------- MinimumSpec --------
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
+		router.GET("/games/:id/minimumspec", controllers.FindMinimumSpecByGameID)
 
 		// ===== Problem Reports =====
 		router.POST("/reports", controllers.CreateReport)

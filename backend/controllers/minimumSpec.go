@@ -18,6 +18,17 @@ func FindMinimumSpec(c *gin.Context) {
 	c.JSON(http.StatusOK, minimum_specs)
 }
 
+// GET /games/:id/minimumspec
+func FindMinimumSpecByGameID(c *gin.Context) {
+	id := c.Param("id")
+
+	var ms entity.MinimumSpec
+	if err := configs.DB().Where("game_id = ?", id).First(&ms).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "minimum spec not found"})
+		return
+	}
+	c.JSON(http.StatusOK, ms)
+}
 func CreateMinimumSpec(c *gin.Context) {
 	var minimum_specs entity.MinimumSpec
 	if err := c.ShouldBindJSON(&minimum_specs); err != nil {

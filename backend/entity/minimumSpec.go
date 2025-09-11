@@ -12,4 +12,5 @@ type MinimumSpec struct {
 	Graphics  string `json:"graphics" gorm:"type:varchar(20)"`
 	Storage   string `json:"storage" gorm:"type:varchar(20)"`
 	Game      Game   `json:"game"`
+	GameID 	  uint   `gorm:"index"` // ✅ ช่วยให้ค้นด้วย game_id เร็ว
 }

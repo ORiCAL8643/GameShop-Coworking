@@ -1,7 +1,6 @@
 import { Row, Col } from "antd";
-//import AddProductCard from "./AddProductCard";
 import { useNavigate } from "react-router-dom";
-import { Card, Button, Modal} from "antd";
+import { Card, Button, Modal, message } from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { MoreOutlined } from "@ant-design/icons";
@@ -12,12 +11,12 @@ interface ProductGridProps {
   userId: number | null;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = () => {
+const ProductGrid: React.FC<ProductGridProps> = ({ userId }) => {
   interface Game {
     ID: number;
     game_name: string;
     key_id: number;
-    categories: { ID: number; title: string };
+    categories: { ID: number; title: string } | null;
     release_date: string;
     base_price: number;
     /** Price after applying promotion. Undefined when no promotion */
@@ -27,58 +26,51 @@ const ProductGrid: React.FC<ProductGridProps> = () => {
     status: string;
     minimum_spec_id: number;
   }
-  type game = {
-  id: number;
-  game_name: string;
-  release_date?: string;
-  age_rating?: number | string;
-  categories: { title: string };
-};
 
   // แปลง img_src ให้เป็น absolute URL เสมอ
   const resolveImgUrl = (src?: string) => {
     if (!src) return "";
-    if (src.startsWith("blob:")) return "";
     if (src.startsWith("data:image/")) return src;
-    // ถ้าเป็น blob: เดิม จะมักใช้ไม่ได้ในหน้าอื่น — ควรแก้ฝั่ง backend ให้ส่ง URL ถาวร
-    if (
-      src.startsWith("http://") ||
-      src.startsWith("https://") ||
-      src.startsWith("blob:")
-    ) {
-      return src;
-    }
-    // ถ้า backend ส่งเป็น "uploads/xxx.jpg" หรือ "/uploads/xxx.jpg"
+    if (src.startsWith("http://") || src.startsWith("https://")) return src;
     const clean = src.startsWith("/") ? src.slice(1) : src;
     return `${base_url}/${clean}`;
   };
 
-  const [game, Setgame] = useState<Game[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<Game | null>(null); //usestate
+  const [selected, setSelected] = useState<Game | null>(null);
   const open = !!selected;
 
-  const showModal = (item: Game) => setSelected(item);
+  const showModal = (e: React.MouseEvent, item: Game) => {
+    e.stopPropagation(); // กันไม่ให้คลิกการ์ดแล้วเด้งไปหน้า detail
+    setSelected(item);
+  };
   const handleCancel = () => setSelected(null);
 
-  async function GetGame() {
+  async function fetchGames() {
     try {
       const response = await axios.get(`${base_url}/game`);
-      Setgame(Array.isArray(response.data) ? response.data : []);
-      console.log(response.data);
+      setGames(Array.isArray(response.data) ? response.data : []);
     } catch (err) {
       console.log("get game error", err);
+      setGames([]);
     }
   }
   useEffect(() => {
-    GetGame();
+    fetchGames();
   }, []);
 
-  const handleAddToCart = async (g: Game) => {
+  const handleAddToCart = async (e: React.MouseEvent, g: Game) => {
+    e.stopPropagation(); // กันคลิกการ์ด
     try {
+      if (!userId) {
+        message.warning("กรุณาเข้าสู่ระบบก่อนเพิ่มสินค้า");
+        navigate("/login");
+        return;
+      }
       const price = g.discounted_price ?? g.base_price;
       const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
+        user_id: Number(userId),
         total_amount: price,
         order_status: "PENDING",
         order_items: [
@@ -96,68 +88,102 @@ const ProductGrid: React.FC<ProductGridProps> = () => {
       navigate("/category/Payment");
     } catch (err) {
       console.error("add to cart error", err);
+      message.error("ไม่สามารถเพิ่มลงตะกร้าได้");
     }
   };
 
-  const approveGames = game.filter((g) => g.status === "approve");
+  const goDetail = (g: Game) => {
+    const gid = g?.ID ?? (g as any)?.id;
+    if (gid) navigate(`/game/${gid}`);
+  };
+
+  const approveGames = games.filter((g) => g.status === "approve");
+
   return (
     <Row gutter={[16, 16]}>
-      {approveGames?.map((c) => {
+      {approveGames.map((c) => {
         const hasDiscount =
-          c.discounted_price !== undefined &&
-          c.discounted_price < c.base_price;
+          c.discounted_price !== undefined && c.discounted_price < c.base_price;
+
         return (
-          <Col xs={24} sm={12} md={8} lg={6}>
+          <Col xs={24} sm={12} md={8} lg={6} key={c.ID}>
             <Card
-              style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
+              hoverable
+              onClick={() => goDetail(c)}
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && goDetail(c)}
+              style={{
+                background: "#1f1f1f",
+                color: "white",
+                borderRadius: 10,
+                cursor: "pointer",
+              }}
               cover={
-                <img src={resolveImgUrl(c.img_src)} style={{ height: 150 }} />
+                <img
+                  src={resolveImgUrl(c.img_src)}
+                  alt={c.game_name}
+                  style={{ height: 180, objectFit: "cover" }}
+                />
               }
             >
-            <Row>
+              <Row align="top">
                 <Col span={21}>
                   <Card.Meta
-                    title={<div style={{ color: "#ffffffff" }}>{c.game_name}</div>}
+                    title={<div style={{ color: "#fff" }}>{c.game_name}</div>}
                     description={
-                      <div style={{ color: "#ffffffff" }}>{c.categories.title}</div>
+                      <div style={{ color: "#fff" }}>
+                        {c.categories?.title ?? "-"}
+                      </div>
                     }
                   />
                 </Col>
-                <Col >
-                  <div>
-                    <Button onClick={() => showModal(c)} type="text" shape="circle" size="small" style={{background: "#1f1f1f"}} icon={<MoreOutlined style={{fontSize:"18px" , color: "#fffcfcff"}}/>} />
-                    <Modal
-                        title={selected?.game_name}
-                        open={open}
-                        onCancel={handleCancel}
-                        onOk={handleCancel}
-                        okText="ปิด"
-                        closable>
-                          <p>หมวดหมู่: {selected?.categories.title}</p>
-                          <p>วันวางขาย: {selected?.release_date ?? "-"}</p>
-                          <p>อายุขั้นต่ำ: {selected?.age_rating ?? "-"}</p>
-                    </Modal>
-                  </div>
+                <Col span={3} style={{ textAlign: "right" }}>
+                  <Button
+                    onClick={(e) => showModal(e, c)}
+                    type="text"
+                    shape="circle"
+                    size="small"
+                    style={{ background: "#1f1f1f" }}
+                    icon={
+                      <MoreOutlined style={{ fontSize: "18px", color: "#fff" }} />
+                    }
+                  />
+                  <Modal
+                    title={selected?.game_name}
+                    open={open}
+                    onCancel={handleCancel}
+                    onOk={handleCancel}
+                    okText="ปิด"
+                    closable
+                  >
+                    <p>หมวดหมู่: {selected?.categories?.title ?? "-"}</p>
+                    <p>วันวางขาย: {selected?.release_date ?? "-"}</p>
+                    <p>อายุขั้นต่ำ: {selected?.age_rating ?? "-"}</p>
+                  </Modal>
                 </Col>
-            </Row>
+              </Row>
+
               <div style={{ marginTop: 10, color: "#9254de" }}>
                 {hasDiscount ? (
                   <>
                     <span
                       style={{ textDecoration: "line-through", color: "#ccc" }}
                     >
-                      {c.base_price}
+                      {c.base_price.toLocaleString()}
                     </span>
-                    <span style={{ marginLeft: 8 }}>{c.discounted_price}</span>
+                    <span style={{ marginLeft: 8 }}>
+                      {c.discounted_price!.toLocaleString()}
+                    </span>
                   </>
                 ) : (
-                  c.base_price
+                  c.base_price.toLocaleString()
                 )}
               </div>
+
               <Button
                 block
                 style={{ marginTop: 10 }}
-                onClick={() => handleAddToCart(c)}
+                onClick={(e) => handleAddToCart(e, c)}
               >
                 Add to Cart
               </Button>
