@@ -184,6 +184,7 @@ func main() {
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
+		authList.GET("/payments", controllers.FindPayments)
 		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 	}
