@@ -110,7 +110,7 @@ const Reviewpage: React.FC = () => {
             </span>
           </h1>
 
-          <p className="text-gray-400">All reviews for this game</p>
+          
         </div>
       </div>
 

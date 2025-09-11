@@ -5,8 +5,13 @@ import {
 } from "antd";
 import { Heart, Pencil, Trash2, Plus } from "lucide-react";
 import { UserOutlined } from "@ant-design/icons";
+import axios from "axios";
+
 import { ReviewsAPI, type ReviewItem } from "../services/reviews";
 import { useAuth } from "../context/AuthContext";
+
+/** ===== config ===== */
+const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8088";
 
 export type ReviewSectionProps = {
   gameId: number;
@@ -14,11 +19,27 @@ export type ReviewSectionProps = {
   className?: string;
 };
 
+/** ให้ rating เป็นจำนวนเต็ม 1–5 */
 const clampIntRating = (v: any) => {
   const n = Math.round(Number(v || 0));
   if (Number.isNaN(n)) return 1;
   return Math.min(5, Math.max(1, n));
 };
+
+/** ดึงชื่อจาก user id (ลองหลาย field ตามที่ backend อาจใช้) */
+async function fetchUsernameById(id: number) {
+  try {
+    const { data } = await axios.get(`${BASE}/users/${id}`);
+    const name =
+      data?.username ||
+      data?.name ||
+      data?.display_name ||
+      (typeof data?.email === "string" ? data.email.split("@")[0] : undefined);
+    return name as string | undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = true, className }) => {
   const { id: authId, token } = useAuth();
@@ -30,18 +51,46 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   const [editing, setEditing] = useState<ReviewItem | null>(null);
   const [form] = Form.useForm<{ title?: string; content: string; rating: number }>();
 
+  /** ------- โหลดรีวิว + เติมชื่อผู้ใช้ -------- */
   const load = async () => {
     try {
       setLoading(true);
+
       const list = await ReviewsAPI.listByGame(gameId, token || undefined);
-      const normalized = (list || []).map((r) => ({
+      let normalized = (list || []).map((r) => ({
         ...r,
-        // ปลอดภัยไว้ก่อน ถ้ามีข้อมูลเก่าเป็นทศนิยมจะถูกปัดเป็นเต็มดวง
         rating: clampIntRating(r.rating),
         likes: typeof r.likes === "number" ? r.likes : 0,
         likedByMe: typeof r.likedByMe === "boolean" ? r.likedByMe : false,
       }));
+
+      // sort ล่าสุดขึ้นก่อน
       normalized.sort((a, b) => (b.UpdatedAt || "").localeCompare(a.UpdatedAt || ""));
+
+      // หา user_id ที่ยังไม่มี username แล้วดึงชื่อมาเติม
+      const missingIds = Array.from(
+        new Set(
+          normalized
+            .filter((r) => !r.username && typeof r.user_id === "number")
+            .map((r) => r.user_id as number)
+        )
+      );
+
+      if (missingIds.length) {
+        const pairs = await Promise.all(
+          missingIds.map(async (id) => [id, await fetchUsernameById(id)] as const)
+        );
+        const nameMap = Object.fromEntries(pairs.filter(([, name]) => !!name)) as Record<number, string>;
+
+        if (Object.keys(nameMap).length) {
+          normalized = normalized.map((r) =>
+            r.username || !nameMap[r.user_id as number]
+              ? r
+              : { ...r, username: nameMap[r.user_id as number] }
+          );
+        }
+      }
+
       setItems(normalized);
     } catch {
       message.error("โหลดรีวิวไม่สำเร็จ");
@@ -50,14 +99,18 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
     }
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [gameId]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
 
+  /** ------- actions ------- */
   const canCreate = allowCreate && !!userId;
 
   const onCreate = () => {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ rating: 5 }); // ค่าตั้งต้นเป็นเต็มดวงก็ได้
+    form.setFieldsValue({ rating: 5 });
     setShowForm(true);
   };
 
@@ -84,28 +137,45 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   const onSubmit = async () => {
     try {
       const values = await form.validateFields();
-      const rating = clampIntRating(values.rating); // ✅ บังคับจำนวนเต็ม 1–5
-      const payload = {
-        review_title: values.title,
-        review_text: values.content,
-        rating,
-      };
+      const rating = clampIntRating(values.rating);
 
       if (editing) {
         const saved = await ReviewsAPI.updateJson(
           editing.ID,
-          { ...payload, game_id: editing.game_id, user_id: editing.user_id },
+          {
+            game_id: editing.game_id,
+            user_id: editing.user_id,
+            review_title: values.title,
+            review_text: values.content,
+            rating,
+          },
           token || undefined
         );
         setItems((prev) => prev.map((it) => (it.ID === editing.ID ? { ...it, ...saved, rating } : it)));
         message.success("อัปเดตรีวิวแล้ว");
       } else {
-        if (!userId) { message.info("กรุณาเข้าสู่ระบบ"); return; }
+        if (!userId) {
+          message.info("กรุณาเข้าสู่ระบบ");
+          return;
+        }
         const created = await ReviewsAPI.createJson(
-          { ...payload, game_id: gameId, user_id: userId },
+          {
+            game_id: gameId,
+            user_id: userId,
+            review_title: values.title,
+            review_text: values.content,
+            rating,
+          },
           token || undefined
         );
-        setItems((prev) => [{ ...created, rating }, ...prev]);
+
+        // เติมชื่อทันทีหลังสร้าง (ถ้าคุณมีชื่อใน auth context ใส่แทน created.username ได้)
+        const createdWithName = { ...created } as ReviewItem;
+        if (!createdWithName.username) {
+          createdWithName.username = await fetchUsernameById(userId);
+        }
+
+        setItems((prev) => [createdWithName, ...prev]);
         message.success("สร้างรีวิวแล้ว");
       }
 
@@ -113,20 +183,25 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       setEditing(null);
       form.resetFields();
     } catch {
-      // antd จัดการ validate เอง
+      /* antd handle validation */
     }
   };
 
+  /** ------- like (optimistic) ------- */
   const handleToggleLike = (r: ReviewItem) => {
-    if (!userId) { message.info("กรุณาเข้าสู่ระบบเพื่อกดถูกใจ"); return; }
+    if (!userId) {
+      message.info("กรุณาเข้าสู่ระบบเพื่อกดถูกใจ");
+      return;
+    }
     const latest = items.find((it) => it.ID === r.ID);
     const alreadyLiked = !!latest?.likedByMe;
     const currentLikes = latest?.likes ?? 0;
 
-    // optimistic
     setItems((prev) =>
       prev.map((it) =>
-        it.ID === r.ID ? { ...it, likedByMe: !alreadyLiked, likes: Math.max(0, currentLikes + (alreadyLiked ? -1 : 1)) } : it
+        it.ID === r.ID
+          ? { ...it, likedByMe: !alreadyLiked, likes: Math.max(0, currentLikes + (alreadyLiked ? -1 : 1)) }
+          : it
       )
     );
 
@@ -141,6 +216,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
     });
   };
 
+  /** ------- header ------- */
   const header = useMemo(
     () => (
       <Space style={{ width: "100%", justifyContent: "space-between" }}>
@@ -174,9 +250,13 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 </Space>,
                 userId === r.user_id ? (
                   <Space key="edit-del">
-                    <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>แก้ไข</Button>
+                    <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>
+                      แก้ไข
+                    </Button>
                     <Popconfirm title="ลบรีวิวนี้?" okText="ลบ" cancelText="ยกเลิก" onConfirm={() => onDelete(r)}>
-                      <Button size="small" danger icon={<Trash2 size={14} />}>ลบ</Button>
+                      <Button size="small" danger icon={<Trash2 size={14} />}>
+                        ลบ
+                      </Button>
                     </Popconfirm>
                   </Space>
                 ) : null,
@@ -187,13 +267,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 title={
                   <Space>
                     <strong>{r.title || "ไม่มีหัวข้อ"}</strong>
-                    {/* ✅ แสดงเฉพาะเต็มดวง */}
                     <Rate disabled value={clampIntRating(r.rating)} allowHalf={false} />
                   </Space>
                 }
                 description={
                   <span style={{ color: "#888" }}>
-                    โดย {r.username || `user#${r.user_id}`} · {new Date(r.UpdatedAt || r.CreatedAt || Date.now()).toLocaleString()}
+                    {/* ✅ ใช้ชื่อจริงแทน user_id ถ้ามี */}
+                    โดย <span style={{ color: "#bbb" }}>{r.username || `user#${r.user_id}`}</span> ·{" "}
+                    {new Date(r.UpdatedAt || r.CreatedAt || Date.now()).toLocaleString()}
                   </span>
                 }
               />
@@ -207,7 +288,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
         <Modal
           styles={{ body: { background: "#1a1a1a", color: "#fff" } }}
           open={showForm}
-          onCancel={() => { setShowForm(false); setEditing(null); form.resetFields(); }}
+          onCancel={() => {
+            setShowForm(false);
+            setEditing(null);
+            form.resetFields();
+          }}
           onOk={onSubmit}
           okText={editing ? "บันทึก" : "สร้าง"}
           cancelText="ยกเลิก"
@@ -225,11 +310,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
             >
               <Input.TextArea rows={5} placeholder="เล่าประสบการณ์ของคุณ" />
             </Form.Item>
-
             <Form.Item
               label="ให้คะแนน"
               name="rating"
-              // ✅ แปลงค่าจาก Rate ให้เป็นจำนวนเต็มเสมอ
               getValueFromEvent={(v) => clampIntRating(v)}
               rules={[
                 { required: true, message: "กรุณาให้คะแนน" },
@@ -241,7 +324,6 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 },
               ]}
             >
-              {/* ✅ ปิดครึ่งดวง + ห้ามเคลียร์เป็น 0 */}
               <Rate allowHalf={false} allowClear={false} />
             </Form.Item>
           </Form>
