@@ -102,7 +102,7 @@ const Reviewpage: React.FC = () => {
           <h1 className="text-xl md:text-2xl font-semibold flex items-center">
             <span className="truncate">{game.name}</span>
 
-            <span className="inline-flex items-center ml-4 md:ml-10">
+            <span className="inline-flex items-center ml-6 md:ml-12">
               <Rate disabled allowHalf value={avgRating ?? 0} />
               <span className="ml-4 text-lg md:text-xl text-gray-200">
                 {avgRating?.toFixed(1) ?? "-"}
