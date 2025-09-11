@@ -1,15 +1,25 @@
 import { Layout, Menu } from "antd";
 import type { MenuProps } from "antd";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
+import { useEffect, useMemo, useState } from "react";
 
 const { Sider, Content } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
 
 const items: GroupItem[] = [
-  { key: "/home", label: "หน้าแรก" },
-  { key: "/request", label: "รีเควสเกม" },
-  { key: "/requestinfo", label: "ข้อมูลรีเควส" },
+  {
+    key: "/home",
+    label: "หน้าแรก",
+  },
+  {
+    key: "/request",
+    label: "รีเควสเกม",
+  },
+  {
+    key: "/requestinfo",
+    label: "ข้อมูลรีเควส",
+  },
   {
     key: "/information",
     label: "จัดการข้อมูลเกม",
@@ -26,54 +36,83 @@ const items: GroupItem[] = [
       { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined /> },
     ],
   },
-  { key: "/workshop", label: "Workshop" },
-  { key: "/promotion", label: "Promotion" },
-  { key: "/refund", label: "การคืนเงินผู้ใช้" },
+
+  {
+    key: "/workshop",
+    label: "Workshop",
+  },
+    {
+    key: '/promotion',
+    label:'Promotion',
+  },
+  {
+    key: '/refund',
+    label:'การคืนเงินผู้ใช้',
+  },
   {
     key: "/Admin",
     label: "Admin",
     children: [
-      { key: "/Admin/Page", label: "Page", icon: <PlusOutlined /> },
-      { key: "/Admin/PaymentReviewPage", label: "PaymentReview", icon: <PlusOutlined /> },
-      { key: "/Admin/RolePage", label: "Report", icon: <PlusOutlined /> },
+        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
+        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
+        { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
     ],
   },
 ];
 
 const Sidebar = () => {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const location = useLocation();
+
+  // เส้นทางที่เป็น "กลุ่ม" (มี children)
+  const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
+
+  // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
+  const selectedKey = location.pathname;
+
+  const computeOpenKeys = (path: string) =>
+    rootSubmenuKeys.filter((k) => path.startsWith(k));
+
+  const [openKeys, setOpenKeys] = useState<string[]>(computeOpenKeys(selectedKey));
+
+  useEffect(() => {
+    // เปลี่ยนหน้าแล้วให้เปิดเมนูย่อยที่ตรงกับ path ปัจจุบัน
+    setOpenKeys(computeOpenKeys(selectedKey));
+  }, [selectedKey]);
+
+  const onOpenChange: MenuProps["onOpenChange"] = (keys) => {
+    // อนุญาตเปิดได้หลายกลุ่มพร้อมกัน (ถ้าอยากเปิดทีละกลุ่ม ให้คอมเมนต์โค้ดนี้แล้วใช้ logic แบบ antd ตัวอย่าง)
+    setOpenKeys(keys as string[]);
+  };
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
-      {/* LEFT: เมนู */}
-      <Sider theme="dark" width={220} breakpoint="lg" collapsedWidth={64}>
-        <div style={{ color: "#9254de", fontSize: 20, textAlign: "center", padding: "16px 0" }}>
+      <Sider theme="dark" width={220}>
+        <div
+          style={{
+            color: "#9254de",
+            fontSize: 20,
+            textAlign: "center",
+            padding: "16px 0",
+            fontWeight: 600,
+          }}
+        >
           GAME STORE
         </div>
+
         <Menu
           theme="dark"
           mode="inline"
           items={items}
-          selectedKeys={[pathname]}
-          onClick={({ key }) => navigate(key)}
+          selectedKeys={[selectedKey]}
+          openKeys={openKeys}
+          onOpenChange={onOpenChange}
+          onClick={({ key }) => navigate(String(key))}
         />
       </Sider>
 
-      {/* RIGHT: พื้นที่คอนเทนต์ (สกรอลล์หลักเพียงตัวเดียว) */}
-      <Layout>
-        <Content
-          style={{
-            height: "100vh",
-            overflow: "auto",
-            background: "#0d0d0d",
-            color: "#fff",
-          }}
-        >
-          {/* ให้เพจเป็นคนกำหนด padding เอง (Reviewpage มี p-6 แล้ว) */}
-          <Outlet />
-        </Content>
-      </Layout>
+      {/* เนื้อหาหลัก */}
+      <Outlet />
     </Layout>
   );
 };

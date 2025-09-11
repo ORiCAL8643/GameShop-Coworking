@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   Row,
@@ -11,42 +11,77 @@ import {
 } from "antd";
 import { PictureOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { listGames, listUserGames, listMods } from "../../services/workshop";
+import type { Game, Mod } from "../../interfaces";
+import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider } = Layout;
 const { Text } = Typography;
 const { Search } = Input;
 
-interface WorkshopItem {
-  id: string;
-  title: string;
-  items: number;
-  image?: string;
-}
-
 const WorkshopMain: React.FC = () => {
   const [search, setSearch] = useState("");
-  const [activeMenu, setActiveMenu] = useState("all"); // 👈 เก็บเมนูปัจจุบัน
+  const [activeMenu, setActiveMenu] = useState<"all" | "your-games">("all");
+  const [games, setGames] = useState<Game[]>([]);          // ✅ เริ่มเป็น []
+  const [yourGames, setYourGames] = useState<number[]>([]);
+  const [modCounts, setModCounts] = useState<Record<number, number>>({});
+
   const navigate = useNavigate();
+  const { id: userId } = useAuth();
 
-  const workshops: WorkshopItem[] = [
-    { id: "1", title: "Magneta Box", items: 9, image: "" },
-    { id: "2", title: "Carbrix", items: 2, image: "" },
-    { id: "3", title: "New Day", items: 81, image: "" },
-    { id: "4", title: "Exospace", items: 6, image: "" },
-    { id: "5", title: "Your Boy", items: 6, image: "" },
-    { id: "6", title: "Nijima", items: 20, image: "" },
-    { id: "7", title: "Centoo Rescue", items: 8, image: "" },
-    { id: "8", title: "Tamako", items: 6, image: "" },
-  ];
+  useEffect(() => {
+    // ดึงรายชื่อเกม
+    listGames()
+      .then((data: any) => setGames(Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [])) // ✅ normalize
+      .catch((e) => {
+        console.warn("listGames failed:", e);
+        setGames([]); // fallback
+      });
 
-  // สมมุติว่าเกมที่ผู้ใช้มีจริง ๆ คือ id 1,3,5
-  const yourGamesIds = ["1", "3", "5"];
+    // ดึงม็อดทั้งหมดแล้วนับต่อเกม
+    listMods()
+      .then((mods: Mod[]) => {
+        const arr = Array.isArray(mods) ? mods : Array.isArray((mods as any)?.items) ? (mods as any).items : [];
+        const counts: Record<number, number> = {};
+        for (const m of arr) {
+          const gid = Number((m as any)?.game_id ?? (m as any)?.gameId ?? (m as any)?.GameID);
+          if (Number.isFinite(gid)) counts[gid] = (counts[gid] || 0) + 1;
+        }
+        setModCounts(counts);
+      })
+      .catch((e) => {
+        console.warn("listMods failed or not implemented:", e);
+        setModCounts({});
+      });
 
-  // filter ข้อมูล
-  const filtered = workshops.filter((w) => {
-    const matchesSearch = w.title.toLowerCase().includes(search.toLowerCase());
+    // เกมของผู้ใช้
+    if (userId) {
+      listUserGames(Number(userId))
+        .then((rows: any[]) => {
+          const arr = Array.isArray(rows) ? rows : [];
+          const ids = arr
+            .map((r) => Number(r.game_id ?? r.gameId ?? r.GameID))
+            .filter((n) => Number.isFinite(n)) as number[];
+          setYourGames(ids);
+        })
+        .catch((e) => {
+          console.warn("listUserGames failed:", e);
+          setYourGames([]);
+        });
+    } else {
+      setYourGames([]); // guest
+    }
+  }, [userId]);
+
+  // ✅ เผื่อกรณี games ไม่ใช่อาเรย์
+  const baseGames: Game[] = Array.isArray(games) ? games : [];
+
+  const filtered = baseGames.filter((g) => {
+    const name = (g as any)?.game_name ?? (g as any)?.name ?? "";
+    const matchesSearch = String(name).toLowerCase().includes(search.toLowerCase());
     if (activeMenu === "your-games") {
-      return yourGamesIds.includes(w.id) && matchesSearch;
+      const gid = Number((g as any).ID ?? (g as any).id);
+      return yourGames.includes(gid) && matchesSearch;
     }
     return matchesSearch;
   });
@@ -69,44 +104,151 @@ const WorkshopMain: React.FC = () => {
         </div>
 
         <Row gutter={[16, 16]}>
-          {filtered.map((w) => (
-            <Col xs={24} sm={12} md={8} lg={6} key={w.id}>
-              <Card
-                hoverable
-                onClick={() => navigate(`/workshop/${w.id}`, { state: w })}
-                style={{ background: "#1f1f1f", borderRadius: 8 }}
-                cover={
-                  w.image ? (
-                    <img
-                      alt={w.title}
-                      src={w.image}
-                      style={{ height: 120, objectFit: "cover" }}
-                    />
-                  ) : (
+          {filtered.map((g) => {
+            const gid = (g as any).ID ?? (g as any).id;
+            const count = modCounts[gid] ?? 0;
+            const img = g.img_src || ""; // ถ้าไม่มี จะใช้ placeholder box ด้านล่างแทน
+
+            return (
+              <Col xs={24} sm={12} md={8} lg={6} key={gid}>
+                <Card
+                  hoverable
+                  onClick={() => navigate(`/workshop/${gid}`)}
+                  style={{
+                    background: "#1a1a1a",
+                    borderRadius: 12,
+                    overflow: "hidden",
+                    border: "1px solid #262626",
+                    boxShadow: "0 6px 18px rgba(0,0,0,0.25)",
+                  }}
+                  bodyStyle={{ padding: 0 }}
+                  cover={
+                    img ? (
+                      <div
+                        style={{
+                          height: 220, // ✅ ภาพใหญ่ขึ้น
+                          position: "relative",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <img
+                          alt={g.game_name}
+                          src={img}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                            transform: "scale(1.05)",
+                            transition: "transform .35s ease",
+                          }}
+                          onLoad={(e) => {
+                            // ปรับลด scale หลังโหลดเพื่อให้โฮเวอร์ดู smooth
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.0)";
+                          }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.03)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.transform = "scale(1.0)";
+                          }}
+                        />
+                        {/* เงาด้านล่างเพื่ออ่านชื่อชัด */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            background:
+                              "linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.55) 80%, rgba(0,0,0,0.7) 100%)",
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          height: 220, // ✅ ความสูงเท่ากันแม้ไม่มีรูป
+                          background:
+                            "linear-gradient(135deg, #2b2b2b 0%, #1f1f1f 100%)",
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          color: "#888",
+                          fontSize: 40,
+                        }}
+                      >
+                        <PictureOutlined />
+                      </div>
+                    )
+                  }
+                >
+                  {/* ✅ เนื้อหาพร้อมพื้นหลังรูปแบบจางๆ + เบลอ สไตล์ Steam */}
+                  <div
+                    style={{
+                      position: "relative",
+                      padding: "14px 16px 16px",
+                      minHeight: 84,
+                      overflow: "hidden",
+                      borderTop: "1px solid #262626",
+                    }}
+                  >
+                    {/* ชั้นพื้นหลัง: ใช้รูปเดิมแบบเบลอและจาง */}
                     <div
+                      aria-hidden
                       style={{
-                        height: 120,
-                        background: "#2a2a2a",
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        color: "#888",
-                        fontSize: 24,
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage: img ? `url(${img})` : undefined,
+                        backgroundSize: "cover",
+                        backgroundPosition: "center",
+                        filter: "blur(14px)",
+                        transform: "scale(1.2)",
+                        opacity: 0.28,
                       }}
-                    >
-                      <PictureOutlined />
+                    />
+                    {/* ไล่เฉดทับอีกชั้นให้อ่านง่าย */}
+                    <div
+                      aria-hidden
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(0deg, rgba(20,20,20,0.95) 0%, rgba(20,20,20,0.85) 60%, rgba(20,20,20,0.6) 100%)",
+                      }}
+                    />
+
+                    {/* เนื้อหาจริง */}
+                    <div style={{ position: "relative", zIndex: 1 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#fff",
+                            fontWeight: 600,
+                            fontSize: 16,
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {g.game_name}
+                        </Text>
+                      </div>
+
+                      <Text
+                        type="secondary"
+                        style={{ color: "#bfbfbf", fontSize: 12 }}
+                      >
+                        {count} {count === 1 ? "item" : "items"}
+                      </Text>
                     </div>
-                  )
-                }
-              >
-                <Text style={{ color: "white" }}>{w.title}</Text>
-                <br />
-                <Text type="secondary" style={{ color: "#aaa" }}>
-                  {w.items} items
-                </Text>
-              </Card>
-            </Col>
-          ))}
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
         </Row>
 
         <div style={{ marginTop: 20, textAlign: "center" }}>
@@ -126,8 +268,8 @@ const WorkshopMain: React.FC = () => {
         <h3 style={{ color: "white" }}>Menu</h3>
         <List
           dataSource={[
-            { name: "All Workshops", key: "all" },
-            { name: "Your Games", key: "your-games" },
+            { name: "All Workshops", key: "all" as const },
+            { name: "Your Games", key: "your-games" as const },
           ]}
           renderItem={(item) => (
             <List.Item
@@ -139,12 +281,14 @@ const WorkshopMain: React.FC = () => {
                 marginBottom: 4,
                 borderRadius: 6,
                 background:
-                  activeMenu === item.key ? "#1890ff33" : "transparent", // highlight
+                  activeMenu === item.key ? "#1890ff33" : "transparent",
                 borderLeft:
-                  activeMenu === item.key ? "3px solid #1890ff" : "3px solid transparent", // กรอบข้างซ้าย
+                  activeMenu === item.key
+                    ? "3px solid #1890ff"
+                    : "3px solid transparent",
                 transition: "all 0.2s",
               }}
-              onClick={() => setActiveMenu(item.key)} // 👈 เปลี่ยนเมนู
+              onClick={() => setActiveMenu(item.key)}
             >
               {item.name}
             </List.Item>

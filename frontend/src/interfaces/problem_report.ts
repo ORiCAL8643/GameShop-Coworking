@@ -1,40 +1,33 @@
 import type { ProblemAttachment } from "./problem_attachment";
+import type { User } from "./User";
+import type { Game } from "./Game";
 
+/**
+ * รูปแบบ ProblemReport ตาม backend (gorm.Model)
+ * - ID: number (พิมพ์ใหญ่เพราะ GORM คืนมาเป็น "ID")
+ * - field อื่นเป็น lower_case ตาม json
+ */
 export interface ProblemReport {
-  ID: number;
-  Title: string;
-  Description: string;
-  CreatedAt?: string;    // ใช้ ? เพราะอาจยังไม่ได้เซ็ต
-  ResolvedAt?: string;   // ใช้ ? เพราะอาจยังไม่ได้แก้ปัญหา
-  Status: string;
+  ID: number;             // primary key
 
-  UserID: number;
-  GameID: number;
+  title: string;
+  description: string;
+  status: string;         // "pending" | "resolved"
 
-  Attachments?: ProblemAttachment[]; // optional เพื่อให้โหลดเฉพาะตอนต้องการ
-}
+  created_at?: string;
+  resolved_at?: string;
 
-// สำหรับสร้างใหม่ผ่าน API
-export interface CreateProblemReportRequest {
-  Title: string;
-  Description: string;
-  CreatedAt?: string;
-  Status: string;
-  UserID: number;
-  GameID: number;
-}
+  // foreign keys
+  user_id: number;        // ✅ ใช้ตัวนี้ตอน createNotification
+  game_id: number;
 
-// สำหรับ backward compatibility หรือการใช้งานเก่า
-export interface ProblemReportInterface {
-  ID: number;
-  Title: string;
-  Description: string;
-  CreatedAt?: string;
-  ResolvedAt?: string;
-  Status: string;
+  // preload relations
+  user?: User;
+  game?: Game;
 
-  UserID: number;
-  GameID: number;
+  // admin reply
+  reply?: string;
 
-  Attachments?: ProblemAttachment[];
+  // attachments
+  attachments?: ProblemAttachment[];
 }
