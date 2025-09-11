@@ -5,6 +5,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	//"example.com/sa-gameshop/entity"
 	"example.com/sa-gameshop/controllers"
+	"example.com/sa-gameshop/middlewares"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,55 +28,55 @@ func main() {
 		router.POST("/login", controllers.Login)
 		// ===== Users =====
 		router.POST("/users", controllers.CreateUser)
-		router.GET("/users", controllers.FindUsers)
-		router.GET("/users/:id", controllers.FindUserByID)
-		router.PUT("/users/:id", controllers.UpdateUser)
-		router.DELETE("/users/:id", controllers.DeleteUserByID)
-		router.PATCH("/users/:id/role", controllers.UpdateUserRole)
+		router.GET("/users", middlewares.Authorize("users.manage"), controllers.FindUsers)
+		router.GET("/users/:id", middlewares.Authorize("users.manage"), controllers.FindUserByID)
+		router.PUT("/users/:id", middlewares.Authorize("users.manage"), controllers.UpdateUser)
+		router.DELETE("/users/:id", middlewares.Authorize("users.manage"), controllers.DeleteUserByID)
+		router.PATCH("/users/:id/role", middlewares.Authorize("users.manage"), controllers.UpdateUserRole)
 
 		// ===== Roles =====
-		router.GET("/roles", controllers.GetRoles)
-		router.GET("/roles/:id", controllers.GetRoleById)
-		router.POST("/roles", controllers.CreateRole)
-		router.PATCH("/roles/:id", controllers.UpdateRole)
-		router.DELETE("/roles/:id", controllers.DeleteRole)
+		router.GET("/roles", middlewares.Authorize("roles.manage"), controllers.GetRoles)
+		router.GET("/roles/:id", middlewares.Authorize("roles.manage"), controllers.GetRoleById)
+		router.POST("/roles", middlewares.Authorize("roles.manage"), controllers.CreateRole)
+		router.PATCH("/roles/:id", middlewares.Authorize("roles.manage"), controllers.UpdateRole)
+		router.DELETE("/roles/:id", middlewares.Authorize("roles.manage"), controllers.DeleteRole)
 
 		// ===== Permissions =====
-		router.GET("/permissions", controllers.GetPermissions)
-		router.GET("/permissions/:id", controllers.GetPermissionById)
-		router.POST("/permissions", controllers.CreatePermission)
-		router.PATCH("/permissions/:id", controllers.UpdatePermission)
-		router.DELETE("/permissions/:id", controllers.DeletePermission)
+		router.GET("/permissions", middlewares.Authorize("roles.manage"), controllers.GetPermissions)
+		router.GET("/permissions/:id", middlewares.Authorize("roles.manage"), controllers.GetPermissionById)
+		router.POST("/permissions", middlewares.Authorize("roles.manage"), controllers.CreatePermission)
+		router.PATCH("/permissions/:id", middlewares.Authorize("roles.manage"), controllers.UpdatePermission)
+		router.DELETE("/permissions/:id", middlewares.Authorize("roles.manage"), controllers.DeletePermission)
 
 		// ===== RolePermissions =====
-		router.GET("/rolepermissions", controllers.GetRolePermissions)
-		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
-		router.POST("/rolepermissions", controllers.CreateRolePermission)
-		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
-		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
+		router.GET("/rolepermissions", middlewares.Authorize("roles.manage"), controllers.GetRolePermissions)
+		router.GET("/rolepermissions/:id", middlewares.Authorize("roles.manage"), controllers.GetRolePermissionById)
+		router.POST("/rolepermissions", middlewares.Authorize("roles.manage"), controllers.CreateRolePermission)
+		router.PATCH("/rolepermissions/:id", middlewares.Authorize("roles.manage"), controllers.UpdateRolePermission)
+		router.DELETE("/rolepermissions/:id", middlewares.Authorize("roles.manage"), controllers.DeleteRolePermission)
 
 		// ===== Games =====
-		router.POST("/new-game", controllers.CreateGame)
-		router.GET("/game", controllers.FindGames)
-		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		router.POST("/upload/game", controllers.UploadGame)
+		router.POST("/new-game", middlewares.Authorize("games.manage"), controllers.CreateGame)
+		router.GET("/game", middlewares.Authorize("games.read"), controllers.FindGames)
+		router.PUT("/update-game/:id", middlewares.Authorize("games.manage"), controllers.UpdateGamebyID)
+		router.POST("/upload/game", middlewares.Authorize("games.manage"), controllers.UploadGame)
 		/*router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/games/:id", controllers.UpdateGame)
 		router.DELETE("/games/:id", controllers.DeleteGameByID)*/
 
 		// ===== Threads =====
-		router.POST("/threads", controllers.CreateThread)
-		router.GET("/threads", controllers.FindThreads)
-		router.GET("/threads/:id", controllers.FindThreadByID)
-		router.PUT("/threads/:id", controllers.UpdateThread)
-		router.DELETE("/threads/:id", controllers.DeleteThreadByID)
+		router.POST("/threads", middlewares.Authorize("community.read"), controllers.CreateThread)
+		router.GET("/threads", middlewares.Authorize("community.read"), controllers.FindThreads)
+		router.GET("/threads/:id", middlewares.Authorize("community.read"), controllers.FindThreadByID)
+		router.PUT("/threads/:id", middlewares.Authorize("community.moderate"), controllers.UpdateThread)
+		router.DELETE("/threads/:id", middlewares.Authorize("community.moderate"), controllers.DeleteThreadByID)
 
 		// ===== Comments =====
-		router.POST("/comments", controllers.CreateComment)
-		router.GET("/comments", controllers.FindComments)
-		router.GET("/comments/:id", controllers.FindCommentByID)
-		router.PUT("/comments/:id", controllers.UpdateComment)
-		router.DELETE("/comments/:id", controllers.DeleteCommentByID)
+		router.POST("/comments", middlewares.Authorize("community.read"), controllers.CreateComment)
+		router.GET("/comments", middlewares.Authorize("community.read"), controllers.FindComments)
+		router.GET("/comments/:id", middlewares.Authorize("community.read"), controllers.FindCommentByID)
+		router.PUT("/comments/:id", middlewares.Authorize("community.moderate"), controllers.UpdateComment)
+		router.DELETE("/comments/:id", middlewares.Authorize("community.moderate"), controllers.DeleteCommentByID)
 
 		// ===== UserGames (สิทธิ์การเป็นเจ้าของเกม) =====
 		router.POST("/user-games", controllers.CreateUserGame)
@@ -106,13 +107,13 @@ func main() {
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
 
 		// ===== Promotions
-		router.POST("/promotions", controllers.CreatePromotion)
-		router.GET("/promotions", controllers.FindPromotions)
-		router.GET("/promotions/:id", controllers.GetPromotionByID)
-		router.PUT("/promotions/:id", controllers.UpdatePromotion)
-		router.DELETE("/promotions/:id", controllers.DeletePromotion)
-		router.POST("/promotions/:id/games", controllers.SetPromotionGames)
-		router.GET("/promotions-active", controllers.FindActivePromotions)
+		router.POST("/promotions", middlewares.Authorize("promotions.manage"), controllers.CreatePromotion)
+		router.GET("/promotions", middlewares.Authorize("promotions.read"), controllers.FindPromotions)
+		router.GET("/promotions/:id", middlewares.Authorize("promotions.read"), controllers.GetPromotionByID)
+		router.PUT("/promotions/:id", middlewares.Authorize("promotions.manage"), controllers.UpdatePromotion)
+		router.DELETE("/promotions/:id", middlewares.Authorize("promotions.manage"), controllers.DeletePromotion)
+		router.POST("/promotions/:id/games", middlewares.Authorize("promotions.manage"), controllers.SetPromotionGames)
+		router.GET("/promotions-active", middlewares.Authorize("promotions.read"), controllers.FindActivePromotions)
 
 		// ===== Reviews
 		router.POST("/reviews", controllers.CreateReview)
@@ -135,35 +136,35 @@ func main() {
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
 		//request routes
-		router.POST("/new-request", controllers.CreateRequest)
-		router.GET("/request", controllers.FindRequest)
+		router.POST("/new-request", middlewares.Authorize("requests.create"), controllers.CreateRequest)
+		router.GET("/request", middlewares.Authorize("requests.read"), controllers.FindRequest)
 
 		// ===== Orders =====
-		router.POST("/orders", controllers.CreateOrder)
-		router.GET("/orders", controllers.FindOrders)
-		router.GET("/orders/:id", controllers.FindOrderByID)
-		router.PUT("/orders/:id", controllers.UpdateOrder)
-		router.DELETE("/orders/:id", controllers.DeleteOrder)
+		router.POST("/orders", middlewares.Authorize("orders.create"), controllers.CreateOrder)
+		router.GET("/orders", middlewares.Authorize("orders.manage"), controllers.FindOrders)
+		router.GET("/orders/:id", middlewares.Authorize("orders.manage"), controllers.FindOrderByID)
+		router.PUT("/orders/:id", middlewares.Authorize("orders.manage"), controllers.UpdateOrder)
+		router.DELETE("/orders/:id", middlewares.Authorize("orders.manage"), controllers.DeleteOrder)
 		// ===== Order Items =====
-		router.POST("/order-items", controllers.CreateOrderItem)
-		router.GET("/order-items", controllers.FindOrderItems)
-		router.PUT("/order-items/:id", controllers.UpdateOrderItem)
-		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+		router.POST("/order-items", middlewares.Authorize("orders.manage"), controllers.CreateOrderItem)
+		router.GET("/order-items", middlewares.Authorize("orders.manage"), controllers.FindOrderItems)
+		router.PUT("/order-items/:id", middlewares.Authorize("orders.manage"), controllers.UpdateOrderItem)
+		router.DELETE("/order-items/:id", middlewares.Authorize("orders.manage"), controllers.DeleteOrderItem)
 
 		// ===== Payments =====
-		router.POST("/payments", controllers.CreatePayment)
-		router.GET("/payments", controllers.FindPayments)
-		router.PATCH("/payments/:id", controllers.UpdatePayment)
-		router.DELETE("/payments/:id", controllers.DeletePayment)
-		router.POST("/payments/:id/approve", controllers.ApprovePayment)
-		router.POST("/payments/:id/reject", controllers.RejectPayment)
+		router.POST("/payments", middlewares.Authorize("payments.create"), controllers.CreatePayment)
+		router.GET("/payments", middlewares.Authorize("payments.manage"), controllers.FindPayments)
+		router.PATCH("/payments/:id", middlewares.Authorize("payments.manage"), controllers.UpdatePayment)
+		router.DELETE("/payments/:id", middlewares.Authorize("payments.manage"), controllers.DeletePayment)
+		router.POST("/payments/:id/approve", middlewares.Authorize("payments.manage"), controllers.ApprovePayment)
+		router.POST("/payments/:id/reject", middlewares.Authorize("payments.manage"), controllers.RejectPayment)
 
 		// ===== Mods =====
-		router.GET("/mods", controllers.GetMods)
-		router.GET("/mods/:id", controllers.GetModById)
-		router.POST("/mods", controllers.CreateMod)
-		router.PATCH("/mods/:id", controllers.UpdateMod)
-		router.DELETE("/mods/:id", controllers.DeleteMod)
+		router.GET("/mods", middlewares.Authorize("workshop.read"), controllers.GetMods)
+		router.GET("/mods/:id", middlewares.Authorize("workshop.read"), controllers.GetModById)
+		router.POST("/mods", middlewares.Authorize("workshop.create"), controllers.CreateMod)
+		router.PATCH("/mods/:id", middlewares.Authorize("workshop.moderate"), controllers.UpdateMod)
+		router.DELETE("/mods/:id", middlewares.Authorize("workshop.moderate"), controllers.DeleteMod)
 
 		// ===== Mod Ratings =====
 		router.GET("/modratings", controllers.GetModRatings)

@@ -21,6 +21,7 @@ import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import RoleEdit from "../pages/role/RoleEdit.tsx";
 import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
+import RequirePermission from "../components/RequirePermission.tsx";
 // 🟣 Mock Refund Data
 const refunds: Refund[] = [
   {
@@ -89,6 +90,7 @@ const router = createBrowserRouter([
       // 🟣 Admin
       {
         path: "/Admin",
+        element: <RequirePermission permission="roles.manage" />,
         children: [
           {
             path: "/Admin/Page",

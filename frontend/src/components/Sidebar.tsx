@@ -1,8 +1,9 @@
-import { Layout, Menu } from "antd";
+import { Layout, Menu, message } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "../context/AuthContext";
 
 const { Sider } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -63,6 +64,7 @@ const items: GroupItem[] = [
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { permissions } = useAuth();
 
   // เส้นทางที่เป็น "กลุ่ม" (มี children)
   const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
@@ -107,7 +109,14 @@ const Sidebar = () => {
           selectedKeys={[selectedKey]}
           openKeys={openKeys}
           onOpenChange={onOpenChange}
-          onClick={({ key }) => navigate(String(key))}
+          onClick={({ key }) => {
+            const path = String(key);
+            if (path.startsWith("/Admin") && !permissions.includes("roles.manage")) {
+              message.warning("คุณไม่มีสิทธิ์เข้าถึง");
+              return;
+            }
+            navigate(path);
+          }}
         />
       </Sider>
 

@@ -32,7 +32,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         return;
       }
 
-      login(result.id, result.token, result.username ?? values.username);
+      login(
+        result.id,
+        result.token,
+        result.username ?? values.username,
+        result.permissions || []
+      );
       const notification = {
         ID: Date.now(),
         title: 'ระบบ',
@@ -78,7 +83,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         return;
       }
 
-      login(loginData.id, loginData.token, loginData.username ?? values.username);
+      login(
+        loginData.id,
+        loginData.token,
+        loginData.username ?? values.username,
+        loginData.permissions || []
+      );
       onClose();
     } catch (error) {
       console.error(error);

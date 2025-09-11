@@ -37,7 +37,7 @@ export default function PromotionManager() {
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
-  const { userId: currentUserId, token } = useAuth();
+  const { id: currentUserId, token } = useAuth();
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 

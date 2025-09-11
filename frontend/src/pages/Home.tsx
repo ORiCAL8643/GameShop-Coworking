@@ -6,7 +6,7 @@ import { Button, Space, Typography } from "antd";
 const { Title } = Typography;
 
 const Home = () => {
-  const { userId } = useAuth();
+  const { id: userId } = useAuth();
   return (
     <div style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
       <Navbar />
