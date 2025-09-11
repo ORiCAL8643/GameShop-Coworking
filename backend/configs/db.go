@@ -396,11 +396,7 @@ func SetupDatabase() {
 	if err := db.AutoMigrate(
 		&entity.Game{},
 		&entity.KeyGame{},
-		&entity.Thread{},
 		&entity.UserGame{},
-		&entity.Comment{},
-		&entity.Reaction{},
-		&entity.Attachment{},
 		&entity.Notification{},
 		&entity.Order{},
 		&entity.OrderItem{},
@@ -412,6 +408,13 @@ func SetupDatabase() {
 		&entity.Promotion_Game{},
 		&entity.Mod{},
 		&entity.ModRating{},
+		&entity.Thread{},
+		&entity.ThreadImage{},
+		&entity.Comment{},
+		&entity.ThreadLike{},
+
+
+
 	); err != nil {
 		log.Fatal("auto migrate (others) failed: ", err)
 	}

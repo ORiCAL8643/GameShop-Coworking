@@ -2,114 +2,99 @@ package controllers
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
-// POST /comments
+// POST /threads/:id/comments
+type createCommentBody struct {
+	UserID  *uint  `json:"user_id"` // optional
+	Content string `json:"content" binding:"required"`
+}
 func CreateComment(c *gin.Context) {
-	var body entity.Comment
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
+	var body createCommentBody
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Content) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "content required"})
 		return
 	}
 
 	db := configs.DB()
-
-	// เช็ค User
-	var user entity.User
-	if tx := db.Where("id = ?", body.UserID).First(&user); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
+	var th entity.Thread
+	if tx := db.First(&th, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
 		return
 	}
 
-	// เช็ค Thread
-	var thread entity.Thread
-	if tx := db.Where("id = ?", body.ThreadID).First(&thread); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "thread_id not found"})
-		return
-	}
-
-	// เช็ค Parent (ถ้ามี)
-	if body.ParentCommentID != nil {
-		var parent entity.Comment
-		if tx := db.Where("id = ?", *body.ParentCommentID).First(&parent); tx.RowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "parent_comment_id not found"})
+	// ถ้ามี user_id -> เช็คว่ามีจริง (optional)
+	if body.UserID != nil && *body.UserID > 0 {
+		var u entity.User
+		if tx := db.First(&u, *body.UserID); tx.RowsAffected == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
 			return
 		}
 	}
 
-	if err := db.Create(&body).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	row := entity.Comment{
+		Content:  strings.TrimSpace(body.Content),
+		ThreadID: th.ID,
+		UserID:   body.UserID,
+	}
+	if err := db.Create(&row).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, body)
+
+	// เพิ่มตัวนับคอมเมนต์
+	_ = db.Model(&entity.Thread{}).Where("id = ?", th.ID).Update("comment_count", th.CommentCount+1).Error
+
+	_ = db.Preload("User").Preload("Thread").First(&row, row.ID)
+	c.JSON(http.StatusCreated, row)
 }
 
-// GET /comments  (optional: ?thread_id=...  ?user_id=... ?parent_id=...)
-func FindComments(c *gin.Context) {
-	var comments []entity.Comment
-	db := configs.DB()
-
-	threadID := c.Query("thread_id")
-	userID := c.Query("user_id")
-	parentID := c.Query("parent_id")
-
-	tx := db.Preload("User").Preload("Thread").Preload("Parent").Model(&entity.Comment{})
-	if threadID != "" {
-		tx = tx.Where("thread_id = ?", threadID)
+// GET /threads/:id/comments?limit=&offset=
+func FindCommentsByThread(c *gin.Context) {
+	var th entity.Thread
+	if tx := configs.DB().First(&th, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
+		return
 	}
-	if userID != "" {
-		tx = tx.Where("user_id = ?", userID)
-	}
-	if parentID != "" {
-		tx = tx.Where("parent_comment_id = ?", parentID)
-	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
-	if err := tx.Find(&comments).Error; err != nil {
+	var rows []entity.Comment
+	if err := configs.DB().
+		Preload("User").
+		Where("thread_id = ?", th.ID).
+		Order("id ASC"). // เรียงบนลงล่าง
+		Limit(limit).Offset(offset).
+		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, comments)
-}
-
-// GET /comments/:id
-func FindCommentByID(c *gin.Context) {
-	var cm entity.Comment
-	if tx := configs.DB().Preload("User").Preload("Thread").Preload("Parent").First(&cm, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
-		return
-	}
-	c.JSON(http.StatusOK, cm)
-}
-
-// PUT /comments/:id
-func UpdateComment(c *gin.Context) {
-	var payload entity.Comment
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	db := configs.DB()
-	var cm entity.Comment
-	if tx := db.First(&cm, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
-		return
-	}
-	if err := db.Model(&cm).Updates(payload).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
+	c.JSON(http.StatusOK, rows)
 }
 
 // DELETE /comments/:id
-func DeleteCommentByID(c *gin.Context) {
-	if tx := configs.DB().Exec("DELETE FROM comments WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
+func DeleteComment(c *gin.Context) {
+	db := configs.DB()
+
+	var row entity.Comment
+	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
+	if err := db.Delete(&row).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	// ลดตัวนับคอมเมนต์
+	_ = db.Model(&entity.Thread{}).
+		Where("id = ?", row.ThreadID).
+		Update("comment_count", gormExprDecrement("comment_count", 1)).Error
+
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
 }

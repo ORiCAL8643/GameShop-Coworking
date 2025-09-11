@@ -1,122 +1,169 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
-// POST /threads
+// POST /threads  (multipart/form-data)
+// fields: title, content, game_id, user_id
+// files: images (หลายไฟล์ได้)
 func CreateThread(c *gin.Context) {
-	var body entity.Thread
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request body"})
+	title := strings.TrimSpace(c.PostForm("title"))
+	content := strings.TrimSpace(c.PostForm("content"))
+	gameIDStr := c.PostForm("game_id")
+	userIDStr := c.PostForm("user_id")
+
+	if title == "" || content == "" || gameIDStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title, content, game_id required"})
 		return
 	}
 
 	db := configs.DB()
-	// เช็ค FK: UserID
-	var user entity.User
-	if tx := db.Where("id = ?", body.UserID).First(&user); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
-		return
-	}
-	// เช็ค FK: GameID
-	var game entity.Game
-	if tx := db.Where("id = ?", body.GameID).First(&game); tx.RowsAffected == 0 {
+
+	// ตรวจเกม
+	var g entity.Game
+	if tx := db.First(&g, gameIDStr); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id not found"})
 		return
 	}
 
-	if err := db.Create(&body).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	// แปลง user_id (optional)
+	var userID *uint
+	if userIDStr != "" {
+		if v, err := strconv.Atoi(userIDStr); err == nil && v > 0 {
+			uu := uint(v)
+			// เช็คว่ามีผู้ใช้จริงไหม (optional แต่ดี)
+			var u entity.User
+			if tx := db.First(&u, uu); tx.RowsAffected == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
+				return
+			}
+			userID = &uu
+		}
+	}
+
+	th := entity.Thread{
+		Title:     title,
+		Content:   content,
+		GameID:    g.ID,
+		UserID:    userID,
+		PostedAt:  time.Now(),
+	}
+
+	if err := db.Create(&th).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusCreated, body)
+
+	// บันทึกรูป (แนบได้เฉพาะตอนสร้างเธรด)
+	form, err := c.MultipartForm()
+	if err == nil && form != nil {
+		files := form.File["images"]
+		if len(files) > 0 {
+			_ = os.MkdirAll("uploads/thread_images", 0755)
+			for _, f := range files {
+				// กันชื่อชนกัน
+				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(f.Filename))
+				path := filepath.Join("uploads", "thread_images", name)
+				if err := c.SaveUploadedFile(f, path); err != nil {
+					continue // ข้ามไฟล์ที่บันทึกไม่สำเร็จ
+				}
+				img := entity.ThreadImage{
+					ThreadID: th.ID,
+					FileURL:  "/" + path,
+					AltText:  "",
+				}
+				_ = db.Create(&img).Error
+			}
+		}
+	}
+
+	_ = db.Preload("ThreadImages").Preload("Game").Preload("User").First(&th, th.ID)
+	c.JSON(http.StatusCreated, th)
 }
 
-// GET /threads  (optional: ?user_id=...  ?game_id=...  ?sort=likes|comments|latest)
+// GET /threads?game_id=&q=&limit=&offset=
 func FindThreads(c *gin.Context) {
-	type ThreadWithCounts struct {
-		entity.Thread
-		LikesCount    int64 `json:"likes" gorm:"column:likes_count"`
-		CommentsCount int64 `json:"comments" gorm:"column:comments_count"`
+	db := configs.DB().Preload("ThreadImages").Preload("User").Preload("Game")
+	if gid := c.Query("game_id"); gid != "" {
+		db = db.Where("game_id = ?", gid)
 	}
-
-	var threads []ThreadWithCounts
-	db := configs.DB()
-
-	userID := c.Query("user_id")
-	gameID := c.Query("game_id")
-	sort := c.DefaultQuery("sort", "latest")
-
-	tx := db.Model(&entity.Thread{}).
-		Select("threads.*, COUNT(DISTINCT r.id) AS likes_count, COUNT(DISTINCT c.id) AS comments_count").
-		Joins("LEFT JOIN reactions r ON r.target_id = threads.id AND r.target_type = ? AND r.type = ?", "thread", "like").
-		Joins("LEFT JOIN comments c ON c.thread_id = threads.id").
-		Preload("User").
-		Preload("Game").
-		Group("threads.id")
-
-	if userID != "" {
-		tx = tx.Where("threads.user_id = ?", userID)
+	if q := strings.TrimSpace(c.Query("q")); q != "" {
+		db = db.Where("title LIKE ? OR content LIKE ?", "%"+q+"%", "%"+q+"%")
 	}
-	if gameID != "" {
-		tx = tx.Where("threads.game_id = ?", gameID)
-	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	db = db.Order("id DESC").Limit(limit).Offset(offset)
 
-	switch sort {
-	case "likes":
-		tx = tx.Order("likes_count DESC")
-	case "comments":
-		tx = tx.Order("comments_count DESC")
-	default:
-		tx = tx.Order("threads.created_at DESC")
-	}
-
-	if err := tx.Find(&threads).Error; err != nil {
+	var rows []entity.Thread
+	if err := db.Find(&rows).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, threads)
+	c.JSON(http.StatusOK, rows)
 }
 
 // GET /threads/:id
 func FindThreadByID(c *gin.Context) {
-	var thread entity.Thread
-	id := c.Param("id")
-	if tx := configs.DB().Preload("User").Preload("Game").First(&thread, id); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
+	var row entity.Thread
+	if tx := configs.DB().Preload("ThreadImages").Preload("User").Preload("Game").First(&row, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
-	c.JSON(http.StatusOK, thread)
+	c.JSON(http.StatusOK, row)
 }
 
-// PUT /threads/:id
+// PUT /threads/:id  (แก้เฉพาะ title/content)
+type updateThreadBody struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
 func UpdateThread(c *gin.Context) {
-	var payload entity.Thread
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var body updateThreadBody
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad request"})
 		return
 	}
+
 	db := configs.DB()
-	var thread entity.Thread
-	if tx := db.First(&thread, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
+	var row entity.Thread
+	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}
-	if err := db.Model(&thread).Updates(payload).Error; err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+
+	updates := map[string]interface{}{}
+	if strings.TrimSpace(body.Title) != "" {
+		updates["title"] = strings.TrimSpace(body.Title)
+	}
+	if strings.TrimSpace(body.Content) != "" {
+		updates["content"] = strings.TrimSpace(body.Content)
+	}
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no changes"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
+	if err := db.Model(&row).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	_ = db.Preload("ThreadImages").Preload("User").Preload("Game").First(&row, row.ID)
+	c.JSON(http.StatusOK, row)
 }
 
 // DELETE /threads/:id
-func DeleteThreadByID(c *gin.Context) {
-	if tx := configs.DB().Exec("DELETE FROM threads WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
+func DeleteThread(c *gin.Context) {
+	if tx := configs.DB().Delete(&entity.Thread{}, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
 		return
 	}

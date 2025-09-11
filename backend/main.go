@@ -73,20 +73,20 @@ func main() {
 		// ✅ ลงทะเบียนครั้งเดียวพอ (แก้ปัญหา panic: handlers are already registered)
 		router.POST("/upload/game", controllers.UploadGame)
 
-		// -------- Threads --------
-		router.POST("/threads", controllers.CreateThread)
-		router.GET("/threads", controllers.FindThreads)
+		// ===== Threads =====
+		router.POST("/threads", controllers.CreateThread)             // multipart: title, content, game_id, user_id, images[]
+		router.GET("/threads", controllers.FindThreads)               // ?game_id=&q=
 		router.GET("/threads/:id", controllers.FindThreadByID)
-		router.PUT("/threads/:id", controllers.UpdateThread)
-		router.DELETE("/threads/:id", controllers.DeleteThreadByID)
+		router.PUT("/threads/:id", controllers.UpdateThread)          // แก้ title/content
+		router.DELETE("/threads/:id", controllers.DeleteThread)
 
-		// -------- Comments --------
-		router.POST("/comments", controllers.CreateComment)
-		router.GET("/comments", controllers.FindComments) // ?thread_id=&user_id=
-		router.GET("/comments/:id", controllers.FindCommentByID)
-		router.PUT("/comments/:id", controllers.UpdateComment)
-		router.DELETE("/comments/:id", controllers.DeleteCommentByID)
+		// ===== Comments (flat) =====
+		router.POST("/threads/:id/comments", controllers.CreateComment)
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)
+		router.DELETE("/comments/:id", controllers.DeleteComment)
 
+// ===== Thread Likes =====
+router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
 		router.GET("/user-games", controllers.FindUserGames) // ?user_id=
@@ -184,6 +184,7 @@ func main() {
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
+		authList.GET("/payments", controllers.FindPayments)
 		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 	}

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image,
-  App, Tooltip, Select
+  App, Tooltip, Select, message as antdMessage
 } from "antd";
 import {
   CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
@@ -37,7 +37,7 @@ const formatTHB = (n: number) =>
 
 const BASE_URL = "http://localhost:8088";
 
-// แปลง/ทำความสะอาดข้อมูลจาก backend ให้เป็นรูปแบบที่ปุ่มจะไม่โดน disable ผิด
+// ปรับข้อมูลจาก backend ให้เป็นรูปเดียวกัน
 function normalizeRow(r: any): ReviewablePayment {
   const statusRaw = (r.status ?? r.Status ?? "PENDING").toString().toUpperCase();
   const orderStatusRaw = (r.order_status ?? r.OrderStatus ?? "").toString().toUpperCase();
@@ -49,14 +49,15 @@ function normalizeRow(r: any): ReviewablePayment {
     amount: Number(r.amount ?? r.Amount ?? 0),
     slip_url: r.slip_url ?? r.SlipURL ?? r.slip_path ?? r.SlipPath ?? "",
     uploaded_at: r.uploaded_at ?? r.UploadedAt ?? r.created_at ?? r.CreatedAt ?? "",
-    status: (["PENDING","APPROVED","REJECTED"].includes(statusRaw) ? statusRaw : "PENDING") as PaymentStatus,
+    status: (["PENDING", "APPROVED", "REJECTED"].includes(statusRaw) ? statusRaw : "PENDING") as PaymentStatus,
     reject_reason: r.reject_reason ?? r.RejectReason ?? null,
     order_status: orderStatusRaw || "-",
   };
 }
 
 export default function AdminPaymentReviewPage() {
-  const { modal, message } = App.useApp();
+  const appCtx = App.useApp?.();
+  const message = appCtx?.message ?? antdMessage;
 
   const { id: userId, token } = useAuth() as { id: number | null; token?: string };
 
@@ -71,7 +72,6 @@ export default function AdminPaymentReviewPage() {
   const [previewSrc, setPreviewSrc] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState<{ open: boolean; id?: number }>({ open: false });
   const [rejectText, setRejectText] = useState("");
-
   const [statusFilter, setStatusFilter] = useState<PaymentStatus | "ALL">("ALL");
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -105,8 +105,9 @@ export default function AdminPaymentReviewPage() {
     );
   }, [rows, keyword]);
 
+  // ---- อนุมัติ: ใช้ POST /payments/:id/approve (fallback เป็น PATCH ถ้าจำเป็น) ----
   const approve = (id: number) => {
-    modal.confirm({
+    Modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
       icon: <ExclamationCircleOutlined />,
       okText: "อนุมัติ",
@@ -114,17 +115,21 @@ export default function AdminPaymentReviewPage() {
       okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
       onOk: async () => {
         try {
+          // พยายามยิง /approve ก่อน
           await axios.post(`${BASE_URL}/payments/${id}/approve`, null, { headers: authHeaders });
-          setRows(prev =>
-            prev.map(p =>
-              p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "PAID" } : p,
-            ),
-          );
-          message.success("อนุมัติการชำระเงินแล้ว");
-        } catch (e) {
-          console.error(e);
-          message.error("ไม่สามารถอนุมัติได้");
+        } catch (e: any) {
+          // ถ้า 404 (โปรเจ็กต์บางอันไม่ผูก /approve) ให้ fallback ไป PATCH
+          if (e?.response?.status === 404) {
+            await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" }, { headers: authHeaders });
+          } else {
+            throw e;
+          }
         }
+        // อัปเดตแถวในตารางทันที
+        setRows(prev =>
+          prev.map(p => (p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "PAID" } : p)),
+        );
+        message.success("อนุมัติการชำระเงินแล้ว");
       },
     });
   };
@@ -138,17 +143,14 @@ export default function AdminPaymentReviewPage() {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
-      // ส่งได้ทั้ง reason และ reject_reason เพื่อเข้ากันได้หลาย backend
       await axios.post(
         `${BASE_URL}/payments/${id}/reject`,
-        { reason: rejectText.trim(), reject_reason: rejectText.trim() },
+        { reject_reason: rejectText.trim() },
         { headers: authHeaders },
       );
       setRows(prev =>
         prev.map(p =>
-          p.id === id
-            ? { ...p, status: "REJECTED", reject_reason: rejectText.trim(), order_status: "CANCELLED" }
-            : p,
+          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim(), order_status: "CANCELLED" } : p,
         ),
       );
       message.success("ปฏิเสธการชำระเงินแล้ว");
@@ -186,12 +188,7 @@ export default function AdminPaymentReviewPage() {
             prefix={<SearchOutlined />}
             placeholder="ค้นหาเลขออเดอร์หรือชื่อผู้ใช้"
             onChange={(e) => setKeyword(e.target.value)}
-            style={{
-              width: 280,
-              background: BG_DARK,
-              color: TEXT_MAIN,
-              borderColor: BORDER,
-            }}
+            style={{ width: 280, background: BG_DARK, color: TEXT_MAIN, borderColor: BORDER }}
           />
           <Button onClick={() => fetchPayments(statusFilter)} loading={loading}>รีเฟรช</Button>
         </Space>
@@ -277,7 +274,8 @@ export default function AdminPaymentReviewPage() {
                   <Button
                     type="primary"
                     icon={<CheckCircleOutlined />}
-                    onClick={() => approve(r.id)}
+                    // หยุด bubbling ป้องกันเคสคลิกแล้ว event ถูกตารางกิน
+                    onClick={(e) => { e.stopPropagation(); approve(r.id); }}
                     disabled={r.status !== "PENDING"}
                     style={{ background: THEME_PRIMARY, borderColor: THEME_PRIMARY }}
                   >
@@ -286,7 +284,7 @@ export default function AdminPaymentReviewPage() {
                   <Button
                     danger
                     icon={<CloseCircleOutlined />}
-                    onClick={() => reject(r.id)}
+                    onClick={(e) => { e.stopPropagation(); reject(r.id); }}
                     disabled={r.status !== "PENDING"}
                   >
                     ปฏิเสธ
@@ -298,7 +296,6 @@ export default function AdminPaymentReviewPage() {
         />
       </Card>
 
-      {/* Preview Slip */}
       <Modal
         open={!!previewSrc}
         onCancel={() => setPreviewSrc(null)}
@@ -316,7 +313,6 @@ export default function AdminPaymentReviewPage() {
         )}
       </Modal>
 
-      {/* Reject Reason */}
       <Modal
         title={<span style={{ color: THEME_PRIMARY }}>ปฏิเสธการชำระเงิน</span>}
         open={rejectOpen.open}
