@@ -29,12 +29,12 @@ export const normalizeReview = (r: any): ReviewItem => ({
   UpdatedAt: r?.UpdatedAt ?? r?.updatedAt ?? r?.updated_at ?? "",
   DeletedAt: r?.DeletedAt ?? r?.deletedAt ?? r?.deleted_at ?? null,
 
-  title: r?.ReviewTitle ?? r?.title ?? "",
-  content: r?.ReviewText ?? r?.content ?? "",
-  rating: Number(r?.Rating ?? r?.rating ?? 0),
+  title: r?.review_title ?? r?.ReviewTitle ?? r?.title ?? "",
+  content: r?.review_text ?? r?.ReviewText ?? r?.content ?? "",
+  rating: Number(r?.rating ?? r?.Rating ?? 0),
 
-  game_id: Number(r?.GameID ?? r?.game_id ?? r?.gameId),
-  user_id: Number(r?.UserID ?? r?.user_id ?? r?.userId),
+  game_id: Number(r?.game_id ?? r?.GameID ?? r?.gameId),
+  user_id: Number(r?.user_id ?? r?.UserID ?? r?.userId),
 
   username: r?.username,
   likes: typeof r?.likes === "number" ? r.likes : 0,
@@ -51,14 +51,14 @@ export const ReviewsAPI = {
     return arr.map(normalizeReview);
   },
 
-  /** POST /reviews  — ต้องส่งชื่อฟิลด์ให้ตรง backend */
+  /** POST /reviews */
   async createJson(
     payload: {
-      GameID: number;
-      UserID: number;
-      ReviewTitle?: string;
-      ReviewText: string;
-      Rating: number;
+      game_id: number;
+      user_id: number;
+      review_title?: string;
+      review_text: string;
+      rating: number;
     },
     token?: string
   ): Promise<ReviewItem> {
@@ -75,9 +75,11 @@ export const ReviewsAPI = {
   async updateJson(
     id: number,
     payload: {
-      ReviewTitle?: string;
-      ReviewText: string;
-      Rating: number;
+      game_id: number;
+      user_id: number;
+      review_title?: string;
+      review_text: string;
+      rating: number;
     },
     token?: string
   ): Promise<ReviewItem> {
