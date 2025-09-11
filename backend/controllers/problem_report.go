@@ -1,3 +1,4 @@
+// controllers/report_controller.go
 package controllers
 
 import (
@@ -66,7 +67,7 @@ func CreateReport(c *gin.Context) {
 		return
 	}
 
-	// แนบไฟล์
+	// แนบไฟล์ (ของผู้ใช้) → uploads/reports/yyyymmdd/...
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
 		if len(files) == 0 {
@@ -77,7 +78,6 @@ func CreateReport(c *gin.Context) {
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
-
 				dst := filepath.Join(dir, name)
 				relPath := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
 
@@ -136,13 +136,13 @@ func FindReports(c *gin.Context) {
 		q = q.Where("game_id = ?", gameID)
 	}
 
-	var total int64
-	_ = q.Count(&total).Error
-
 	var items []entity.ProblemReport
-	if err := q.Preload("User").Preload("Attachments").
+	if err := q.
+		Preload("User").
+		Preload("Attachments").
 		Order("created_at DESC").
-		Offset(offset).Limit(limit).
+		Offset(offset).
+		Limit(limit).
 		Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -239,6 +239,7 @@ func DeleteReport(c *gin.Context) {
 }
 
 // ✅ POST /reports/:id/reply
+// ส่งข้อความ/ไฟล์ตอบกลับ แล้ว "สร้าง/อัปเดต" Notification ให้เหลือเพียงเรคคอร์ดเดียวเสมอ ต่อ (user_id, type, report_id)
 func ReplyReport(c *gin.Context) {
 	db := configs.DB()
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -260,7 +261,7 @@ func ReplyReport(c *gin.Context) {
 		rp.Reply = text
 	}
 
-	// ✅ แนบไฟล์ถ้ามี
+	// ✅ แนบไฟล์จากแอดมิน (เก็บไว้ที่ uploads/replies/yyyymmdd/...)
 	attachCount := 0
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
@@ -270,7 +271,6 @@ func ReplyReport(c *gin.Context) {
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
-
 				dst := filepath.Join(dir, name)
 				relPath := filepath.ToSlash(filepath.Join("uploads", "replies", time.Now().Format("20060102"), name))
 
@@ -285,7 +285,7 @@ func ReplyReport(c *gin.Context) {
 		}
 	}
 
-	// ✅ ยิง Notification ให้เจ้าของ report แม้ว่าจะไม่มีข้อความก็ตาม
+	// ✅ ทำข้อความแจ้งเตือน
 	msg := text
 	if msg == "" {
 		if attachCount > 0 {
@@ -296,17 +296,35 @@ func ReplyReport(c *gin.Context) {
 	} else if attachCount > 0 {
 		msg = fmt.Sprintf("%s (แนบไฟล์ %d ไฟล์)", msg, attachCount)
 	}
-	_ = db.Create(&entity.Notification{
-		Title:   fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
-		Message: msg,
-		Type:    "report_reply",
-		UserID:  rp.UserID,
-		IsRead:  false,
-	}).Error
 
+	// ✅ สร้าง/อัปเดตแจ้งเตือนให้มีเพียงเรคคอร์ดเดียว ต่อ (user_id, type, report_id)
+	var noti entity.Notification
+	err := db.Where("user_id = ? AND type = ? AND report_id = ?", rp.UserID, "report_reply", rp.ID).
+		First(&noti).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// ยังไม่มี → สร้างใหม่
+		_ = db.Create(&entity.Notification{
+			Title:    fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
+			Message:  msg,
+			Type:     "report_reply",
+			UserID:   rp.UserID,
+			ReportID: &rp.ID,
+			IsRead:   false,
+		}).Error
+	} else if err == nil {
+		// มีอยู่แล้ว → อัปเดตเนื้อหา + ทำสถานะเป็นยังไม่อ่าน
+		noti.Title = fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID)
+		noti.Message = msg
+		noti.IsRead = false
+		_ = db.Save(&noti).Error
+	} else {
+		// error อื่น ๆ ไม่ให้ล้ม flow หลัก
+	}
+
+	// ✅ ปิดงานเป็น resolved
 	rp.Status = "resolved"
 	rp.ResolvedAt = time.Now()
-
 	if err := db.Save(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

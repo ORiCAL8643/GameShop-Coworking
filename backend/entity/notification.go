@@ -1,16 +1,19 @@
 package entity
 
-import (
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 type Notification struct {
 	gorm.Model
-	Title   string `json:"title"`              // หัวข้อแจ้งเตือน
-	Type    string `json:"type"`               // เช่น "report", "refund", "system"
-	Message string `json:"message"`            // ข้อความแจ้งเตือน
-	UserID  uint   `json:"user_id"`            // ID ของผู้ใช้ที่ได้รับแจ้งเตือน
-	User    *User  `gorm:"foreignKey:UserID" json:"user"`
+	Title   string `json:"title"`
+	Type    string `json:"type"`    // เช่น "report_reply", "refund", "system"
+	Message string `json:"message"`
 
-	IsRead bool `json:"is_read" gorm:"default:false"` // สถานะการอ่าน
+	UserID uint  `json:"user_id"`
+	User   *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
+
+	IsRead bool `json:"is_read" gorm:"default:false"`
+
+	// ✅ อ้างอิงคำร้อง เพื่อให้หน้า UI เปิดดูรายละเอียด/ไฟล์แนบได้
+	ReportID *uint          `json:"report_id"`
+	Report   *ProblemReport `gorm:"foreignKey:ReportID" json:"report,omitempty"`
 }

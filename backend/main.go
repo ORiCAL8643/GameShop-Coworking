@@ -1,4 +1,3 @@
-// main.go
 package main
 
 import (
@@ -13,14 +12,12 @@ func main() {
 	configs.ConnectionDB()
 	configs.SetupDatabase()
 
-	// ใช้ New แล้วผูก middleware เอง เพื่อลดโอกาสซ้ำซ้อน
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery(), CORSMiddleware())
 
-	// ✅ ประกาศ static สำหรับไฟล์อัพโหลด "ครั้งเดียว" ที่นี่
+	// static uploads
 	r.Static("/uploads", "./uploads")
 
-	// health check
 	r.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
 
 	router := r.Group("/")
@@ -74,15 +71,13 @@ func main() {
 		router.PUT("/attachments/:id", controllers.UpdateAttachment)
 		router.DELETE("/attachments/:id", controllers.DeleteAttachmentByID)
 
-		// ===== Notifications =====
-
-		r.POST("/notifications", controllers.CreateNotification)
-		r.GET("/notifications", controllers.FindNotifications)
-		r.GET("/notifications/:id", controllers.FindNotificationByID)
-		r.PUT("/notifications/:id/read", controllers.MarkNotificationRead)
-		r.PUT("/notifications/read-all", controllers.MarkAllNotificationsRead)
-		r.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
-
+		// ===== Notifications ===== (ย้ายมาไว้ใน group เดียวกัน)
+		router.POST("/notifications", controllers.CreateNotification)
+		router.GET("/notifications", controllers.FindNotifications)
+		router.GET("/notifications/:id", controllers.FindNotificationByID)
+		router.PUT("/notifications/:id/read", controllers.MarkNotificationRead)
+		router.PUT("/notifications/read-all", controllers.MarkAllNotificationsRead)
+		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
 
 		// ===== Promotions =====
 		router.POST("/promotions", controllers.CreatePromotion)
@@ -109,17 +104,13 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
-				// ===== Problem Reports =====
+		// ===== Problem Reports =====
 		router.POST("/reports", controllers.CreateReport)
 		router.GET("/reports", controllers.FindReports)
 		router.GET("/reports/:id", controllers.GetReportByID)
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
-		router.POST("/reports/:id/reply", controllers.ReplyReport) // ✅ เพิ่มตรงนี้
-		
-
-
-
+		router.POST("/reports/:id/reply", controllers.ReplyReport)
 	}
 
 	r.Run("localhost:" + PORT)

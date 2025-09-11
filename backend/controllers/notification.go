@@ -17,18 +17,17 @@ func CreateNotification(c *gin.Context) {
 		return
 	}
 
-	// ตรวจสอบว่ามี user_id นี้จริงไหม
+	// ตรวจว่ามี user นี้จริง
 	var user entity.User
 	if tx := configs.DB().Where("id = ?", body.UserID).First(&user); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
 		return
 	}
 
-	// default type ถ้าไม่ส่งมา
+	// default type
 	if body.Type == "" {
 		body.Type = "system"
 	}
-	// เริ่มต้นให้ยังไม่อ่าน
 	body.IsRead = false
 
 	if err := configs.DB().Create(&body).Error; err != nil {
@@ -36,8 +35,8 @@ func CreateNotification(c *gin.Context) {
 		return
 	}
 
-	log.Printf("📥 CreateNotification: user_id=%d title=%q message=%q type=%q",
-		body.UserID, body.Title, body.Message, body.Type)
+	log.Printf("📥 CreateNotification: user_id=%d title=%q message=%q type=%q report_id=%v",
+		body.UserID, body.Title, body.Message, body.Type, body.ReportID)
 
 	c.JSON(http.StatusCreated, body)
 }
@@ -53,6 +52,8 @@ func FindNotifications(c *gin.Context) {
 	var rows []entity.Notification
 	if err := configs.DB().
 		Preload("User").
+		Preload("Report").
+		Preload("Report.Attachments").
 		Where("user_id = ?", uid).
 		Order("created_at DESC").
 		Find(&rows).Error; err != nil {
@@ -67,14 +68,18 @@ func FindNotifications(c *gin.Context) {
 // GET /notifications/:id
 func FindNotificationByID(c *gin.Context) {
 	var row entity.Notification
-	if tx := configs.DB().Preload("User").First(&row, c.Param("id")); tx.RowsAffected == 0 {
+	if tx := configs.DB().
+		Preload("User").
+		Preload("Report").
+		Preload("Report.Attachments").
+		First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "notification not found"})
 		return
 	}
 	c.JSON(http.StatusOK, row)
 }
 
-// PUT /notifications/:id/read → อ่านแล้ว (เดี่ยว)
+// PUT /notifications/:id/read
 func MarkNotificationRead(c *gin.Context) {
 	id := c.Param("id")
 	db := configs.DB()
@@ -91,7 +96,7 @@ func MarkNotificationRead(c *gin.Context) {
 	c.JSON(http.StatusOK, row)
 }
 
-// PUT /notifications/read-all → อ่านแล้วทั้งหมด
+// PUT /notifications/read-all
 func MarkAllNotificationsRead(c *gin.Context) {
 	var body struct {
 		UserID uint `json:"user_id"`
