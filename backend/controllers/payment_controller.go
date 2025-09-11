@@ -289,9 +289,9 @@ func RejectPayment(c *gin.Context) {
 
 // helper สำหรับเรียก UpdatePayment ด้วย body ที่เตรียมไว้
 func updateWithInjectedBody(c *gin.Context, body patchPaymentBody) {
-	// สร้าง context ใหม่ชั่วคราวเพื่อยัด body เข้าไป
-	c.Request.Method = http.MethodPatch
-	UpdatePayment(c.CopyWithContext(c.Request.Context()))
+        // สร้าง context ใหม่ชั่วคราวเพื่อยัด body เข้าไป
+        c.Request.Method = http.MethodPatch
+        UpdatePayment(c.Copy())
 }
 
 func strPtr(s string) *string { return &s }

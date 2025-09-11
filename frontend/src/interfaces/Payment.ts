@@ -3,7 +3,7 @@ import type { PaymentSlip } from "./PaymentSlip";
 
 export interface Payment {
   ID: number;
-  payment_date: string; // ISO datetime
+  uploaded_at: string; // ISO datetime
   status: string;       // e.g., "pending", "verifying", "approved", "rejected"
   amount: number;
 
@@ -14,7 +14,7 @@ export interface Payment {
 }
 
 export interface CreatePaymentRequest {
-  payment_date?: string;
+  uploaded_at?: string;
   status: string;
   amount: number;
   order_id: number;
@@ -22,7 +22,7 @@ export interface CreatePaymentRequest {
 
 export interface UpdatePaymentRequest {
   ID: number;
-  payment_date?: string;
+  uploaded_at?: string;
   status?: string;
   amount?: number;
 }
