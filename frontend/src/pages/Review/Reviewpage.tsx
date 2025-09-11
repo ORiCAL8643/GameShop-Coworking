@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import { Rate } from "antd";
 import ReviewSection from "../../components/ReviewSection";
+import { ReviewsAPI } from "../../services/reviews";
 
 type RawGame = {
   ID?: number;
@@ -34,6 +36,8 @@ const Reviewpage: React.FC = () => {
   const { gameId } = useParams();
   const [loading, setLoading] = useState(true);
   const [game, setGame] = useState<{ id: number; name: string; img?: string } | null>(null);
+  const [avgRating, setAvgRating] = useState<number | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -58,6 +62,27 @@ const Reviewpage: React.FC = () => {
 
   const cover = useMemo(() => resolveImgUrl(game?.img), [game]);
 
+  useEffect(() => {
+    async function fetchReviews() {
+      if (!gameId) return;
+      try {
+        const list = await ReviewsAPI.listByGame(Number(gameId));
+        if (list.length > 0) {
+          const avg = list.reduce((sum, r) => sum + r.rating, 0) / list.length;
+          setAvgRating(avg);
+          setReviewCount(list.length);
+        } else {
+          setAvgRating(null);
+          setReviewCount(0);
+        }
+      } catch {
+        setAvgRating(null);
+        setReviewCount(0);
+      }
+    }
+    fetchReviews();
+  }, [gameId]);
+
   // ✅ ลดระยะให้พอดี: padding ซ้าย–ขวา 24px (ไม่มี margin-left 220 อีกแล้ว)
   const shellStyle: React.CSSProperties = {
     padding: "16px 24px 24px 24px",
@@ -78,7 +103,17 @@ const Reviewpage: React.FC = () => {
           />
         )}
         <div className="p-4">
-          <h1 className="text-xl md:text-2xl font-semibold">{game.name}</h1>
+          <h1 className="text-xl md:text-2xl font-semibold flex items-center">
+            {game.name}
+            {reviewCount > 0 ? (
+              <span className="ml-2 inline-flex items-center">
+                <Rate disabled allowHalf value={avgRating ?? 0} />
+                <span className="ml-1 text-sm text-gray-400">{avgRating?.toFixed(1)}</span>
+              </span>
+            ) : (
+              <span className="ml-2 text-sm text-gray-400">–</span>
+            )}
+          </h1>
           <p className="text-gray-400">All reviews for this game</p>
         </div>
       </div>
