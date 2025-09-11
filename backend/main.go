@@ -161,6 +161,20 @@ func main() {
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
+
+		// ===== Mods =====
+		router.GET("/mods", controllers.GetMods)
+		router.GET("/mods/:id", controllers.GetModById)
+		router.POST("/mods", controllers.CreateMod)
+		router.PATCH("/mods/:id", controllers.UpdateMod)
+		router.DELETE("/mods/:id", controllers.DeleteMod)
+
+		// ===== Mod Ratings =====
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
+		router.PATCH("/modratings/:id", controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", controllers.DeleteModRating)
 	}
 
 	// -------- Routes ที่ต้อง Auth --------

@@ -75,7 +75,8 @@ const router = createBrowserRouter([
       { path: "workshop", element: <WorkshopMain /> },
       { path: "workshop/:id", element: <WorkshopDetail /> },
       { path: "mod/:id", element: <ModDetail /> },
-      { path: "upload", element: <Workshop /> },
+      // ชี้หน้าอัปโหลดให้เป็นเส้นทางย่อยของ Workshop
+      { path: "workshop/upload", element: <Workshop /> },
 
       // === promotion
       { path: "promotion", element: <PromotionManager /> },
@@ -94,13 +95,15 @@ const router = createBrowserRouter([
         element: (
           <AdminPage
             refunds={refunds}
-            setRefunds={() => {}}
+            setRefunds={() => { }}
             addNotification={addNotification}
             addRefundUpdate={addRefundUpdate}
           />
         ),
       },
       { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+
+      { path: "Admin/RolePage", element: <RoleManagement /> },
 
       // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
       { path: "orders-status", element: <OrdersStatusPage /> },
