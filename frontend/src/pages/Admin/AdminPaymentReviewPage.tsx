@@ -3,7 +3,12 @@ import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image, App, Tooltip, Select
 } from "antd";
 import {
-  CheckCircleOutlined, CloseCircleOutlined, EyeOutlined, ExclamationCircleOutlined, SearchOutlined
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  EyeOutlined,
+  ExclamationCircleOutlined,
+  SearchOutlined,
+  UndoOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
 
@@ -69,6 +74,11 @@ export default function AdminPaymentReviewPage() {
     });
   }, [rows, keyword]);
 
+  const updateStatus = async (id: number, data: { status: PaymentStatus; reject_reason?: string }) => {
+    await axios.patch(`${BASE_URL}/payments/${id}`, data);
+    await fetchPayments(statusFilter);
+  };
+
   const approve = (id: number) => {
     modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
@@ -78,10 +88,7 @@ export default function AdminPaymentReviewPage() {
       okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
       onOk: async () => {
         try {
-          await axios.post(`${BASE_URL}/payments/${id}/approve`);
-          setRows(prev =>
-            prev.map(p => (p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "FULFILLED" } : p)),
-          );
+          await updateStatus(id, { status: "APPROVED" });
           message.success("อนุมัติการชำระเงินแล้ว");
         } catch {
           message.error("ไม่สามารถอนุมัติได้");
@@ -99,19 +106,33 @@ export default function AdminPaymentReviewPage() {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
-      await axios.post(`${BASE_URL}/payments/${id}/reject`, {
+      await updateStatus(id, {
+        status: "REJECTED",
         reject_reason: rejectText.trim(),
       });
-      setRows(prev =>
-        prev.map(p =>
-          p.id === id ? { ...p, status: "REJECTED", reject_reason: rejectText.trim(), order_status: "CANCELLED" } : p,
-        ),
-      );
       message.success("ปฏิเสธการชำระเงินแล้ว");
       setRejectOpen({ open: false });
     } catch {
       message.error("ไม่สามารถปฏิเสธได้");
     }
+  };
+
+  const markPending = (id: number) => {
+    modal.confirm({
+      title: "เปลี่ยนสถานะกลับเป็นรอตรวจสอบ?",
+      icon: <ExclamationCircleOutlined />,
+      okText: "ยืนยัน",
+      cancelText: "ยกเลิก",
+      okButtonProps: { style: { background: THEME_PRIMARY, borderColor: THEME_PRIMARY } },
+      onOk: async () => {
+        try {
+          await updateStatus(id, { status: "PENDING" });
+          message.success("เปลี่ยนเป็นรอตรวจสอบแล้ว");
+        } catch {
+          message.error("ไม่สามารถเปลี่ยนสถานะได้");
+        }
+      },
+    });
   };
 
   return (
@@ -232,6 +253,11 @@ export default function AdminPaymentReviewPage() {
                   >
                     ปฏิเสธ
                   </Button>
+                  {r.status !== "PENDING" && (
+                    <Button icon={<UndoOutlined />} onClick={() => markPending(r.id)}>
+                      ตั้งเป็นรอตรวจสอบ
+                    </Button>
+                  )}
                 </Space>
               ),
             },
