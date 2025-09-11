@@ -74,10 +74,10 @@ func main() {
 		router.POST("/upload/game", controllers.UploadGame)
 
 		// ===== Threads =====
-		router.POST("/threads", controllers.CreateThread)             // multipart: title, content, game_id, user_id, images[]
-		router.GET("/threads", controllers.FindThreads)               // ?game_id=&q=
+		router.POST("/threads", controllers.CreateThread) // multipart: title, content, game_id, user_id, images[]
+		router.GET("/threads", controllers.FindThreads)   // ?game_id=&q=
 		router.GET("/threads/:id", controllers.FindThreadByID)
-		router.PUT("/threads/:id", controllers.UpdateThread)          // แก้ title/content
+		router.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
 		router.DELETE("/threads/:id", controllers.DeleteThread)
 
 		// ===== Comments (flat) =====
@@ -85,8 +85,8 @@ func main() {
 		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)
 		router.DELETE("/comments/:id", controllers.DeleteComment)
 
-// ===== Thread Likes =====
-router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
+		// ===== Thread Likes =====
+		router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
 		router.GET("/user-games", controllers.FindUserGames) // ?user_id=
@@ -184,7 +184,6 @@ router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
-		authList.GET("/payments", controllers.FindPayments)
 		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 	}
