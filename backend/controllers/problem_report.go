@@ -96,7 +96,7 @@ func CreateReport(c *gin.Context) {
 	c.JSON(http.StatusCreated, report)
 }
 
-// GET /reports?user_id=&game_id=&page=&limit=
+// GET /reports?user_id=&game_id=&status=&page=&limit=
 func FindReports(c *gin.Context) {
 	db := configs.DB()
 
@@ -105,6 +105,7 @@ func FindReports(c *gin.Context) {
 		page           = 1
 		limit          = 20
 	)
+
 	if v := c.Query("user_id"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			userID = uint(n)
@@ -115,6 +116,10 @@ func FindReports(c *gin.Context) {
 			gameID = uint(n)
 		}
 	}
+
+	// ✅ รองรับการกรองสถานะ open/resolved (หรือค่าอื่น ๆ)
+	status := strings.TrimSpace(c.Query("status"))
+
 	if v := c.Query("page"); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {
 			page = n
@@ -134,6 +139,9 @@ func FindReports(c *gin.Context) {
 	}
 	if gameID > 0 {
 		q = q.Where("game_id = ?", gameID)
+	}
+	if status != "" {
+		q = q.Where("status = ?", status)
 	}
 
 	var items []entity.ProblemReport
@@ -303,7 +311,6 @@ func ReplyReport(c *gin.Context) {
 		First(&noti).Error
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// ยังไม่มี → สร้างใหม่
 		_ = db.Create(&entity.Notification{
 			Title:    fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
 			Message:  msg,
@@ -313,7 +320,6 @@ func ReplyReport(c *gin.Context) {
 			IsRead:   false,
 		}).Error
 	} else if err == nil {
-		// มีอยู่แล้ว → อัปเดตเนื้อหา + ทำสถานะเป็นยังไม่อ่าน
 		noti.Title = fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID)
 		noti.Message = msg
 		noti.IsRead = false
