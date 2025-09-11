@@ -158,23 +158,17 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // ✅ แสดงเฉพาะไฟล์แนบที่ "แอดมิน" ส่ง (กรอง path ที่อยู่ใต้ /replies/)
-  const renderReportAttachments = () => {
-    if (!viewReport?.attachments || viewReport.attachments.length === 0) return null;
-
-    const adminOnly = viewReport.attachments.filter((att) => {
-      const raw = (att as any).file_path ?? (att as any).FilePath ?? "";
-      return /(^|\/)uploads\/replies\//i.test(raw) || raw.toLowerCase().includes("/replies/");
-    });
-
-    if (adminOnly.length === 0) return null;
+  // Attachments from first admin reply
+  const renderReplyAttachments = () => {
+    const reply = viewReport?.replies && viewReport.replies[0];
+    if (!reply || !reply.attachments || reply.attachments.length === 0) return null;
 
     return (
       <>
         <Text strong>ไฟล์แนบจากแอดมิน:</Text>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
-          {adminOnly.map((att) => {
-            const rawPath = (att as any).file_path ?? (att as any).FilePath ?? "";
+          {reply.attachments.map((att) => {
+            const rawPath = (att as any).file_path || "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
 
@@ -240,13 +234,12 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   {viewNoti?.type === "report_reply" && viewReport && (
     <>
-      {/* ✅ คงเส้นคั่นและส่วนที่เหลือไว้ */}
       <Divider style={{ margin: "10px 0" }} />
       <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
       <Paragraph style={{ whiteSpace: "pre-line" }}>
-        {viewReport.reply || "-"}
+        {viewReport.replies?.[0]?.message || "-"}
       </Paragraph>
-      {renderReportAttachments()}
+      {renderReplyAttachments()}
     </>
   )}
 </Modal>

@@ -25,24 +25,15 @@ export default function ReportPage() {
   const navigate = useNavigate();
   const auth = useAuth();
 
-  // ===== FORCE IDs (แก้ให้ตรง DB ของคุณ) =====
-  // แนะนำตั้งใน .env
-  // VITE_FORCE_USER_ID=1
-  // VITE_FORCE_GAME_ID=1
+  // ===== FORCE ID (แก้ให้ตรง DB ของคุณ) =====
+  // แนะนำตั้งใน .env เช่น VITE_FORCE_USER_ID=1
   const ENV_FORCE_USER_ID = Number(import.meta.env.VITE_FORCE_USER_ID || "");
-  const ENV_FORCE_GAME_ID = Number(import.meta.env.VITE_FORCE_GAME_ID || "");
-
   // ใช้ user id จาก auth ถ้ามี; ถ้าไม่มี ใช้ ENV; ถ้าไม่มีอีก fallback เป็น 1
   const userId =
     (auth as any)?.id ??
     (Number.isFinite(ENV_FORCE_USER_ID) && ENV_FORCE_USER_ID > 0
       ? ENV_FORCE_USER_ID
       : 1);
-
-  const gameId =
-    Number.isFinite(ENV_FORCE_GAME_ID) && ENV_FORCE_GAME_ID > 0
-      ? ENV_FORCE_GAME_ID
-      : 1;
 
   // ===== Theme =====
   const PAGE_BG =
@@ -66,17 +57,16 @@ export default function ReportPage() {
       console.log("[Report] will POST /reports with:", {
         title: values.title,
         description: values.description,
+        category: values.category,
         user_id: userId,
-        game_id: gameId,
         filesCount: files.length,
       });
 
       await createReport({
         title: values.title,
         description: values.description,
-        user_id: userId, // ✅ ส่งไปแน่ๆ (มี fallback)
-        game_id: gameId, // ✅ ส่งไปแน่ๆ (มี fallback)
-        status: "open",
+        category: values.category,
+        user_id: userId,
         files,
       });
 
@@ -96,10 +86,6 @@ export default function ReportPage() {
       if (/user not found/i.test(apiMsg)) {
         message.error(
           `ไม่พบผู้ใช้ในฐานข้อมูล (user_id=${userId}) — โปรดสร้างผู้ใช้นี้ใน DB หรือเปลี่ยน VITE_FORCE_USER_ID`
-        );
-      } else if (/game not found/i.test(apiMsg)) {
-        message.error(
-          `ไม่พบเกมในฐานข้อมูล (game_id=${gameId}) — โปรดสร้างเกมนี้ใน DB หรือเปลี่ยน VITE_FORCE_GAME_ID`
         );
       } else {
         message.error(apiMsg);

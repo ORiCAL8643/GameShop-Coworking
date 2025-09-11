@@ -9,10 +9,7 @@ export default function AdminPageBadge() {
   const load = async () => {
     try {
       const items: ProblemReport[] = await fetchReports();
-      // นับเฉพาะที่ยังไม่ resolved
-      const pending = (items || []).filter((r) => r.status !== "resolved")
-        .length;
-      setCount(pending);
+      setCount((items || []).length);
     } catch (e) {
       console.error("[AdminPageBadge] fetchReports error:", e);
     }

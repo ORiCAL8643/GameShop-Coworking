@@ -1,4 +1,3 @@
-// controllers/report_controller.go
 package controllers
 
 import (
@@ -17,25 +16,23 @@ import (
 	"gorm.io/gorm"
 )
 
-// POST /reports (multipart/form-data)
+// POST /reports
+// Create a new problem report from user. Supports file attachments via
+// multipart/form-data with field name "attachments".
 func CreateReport(c *gin.Context) {
 	db := configs.DB()
 
 	title := strings.TrimSpace(c.PostForm("title"))
 	desc := strings.TrimSpace(c.PostForm("description"))
-	status := strings.TrimSpace(c.PostForm("status"))
-	if status == "" {
-		status = "open"
-	}
+	category := strings.TrimSpace(c.PostForm("category"))
 	userID, _ := strconv.Atoi(c.PostForm("user_id"))
-	gameID, _ := strconv.Atoi(c.PostForm("game_id"))
 
-	if title == "" || desc == "" || userID <= 0 || gameID <= 0 {
+	if title == "" || desc == "" || category == "" || userID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 		return
 	}
 
-	// ตรวจ FK user / game
+	// ensure user exists
 	var u entity.User
 	if err := db.First(&u, userID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -45,29 +42,20 @@ func CreateReport(c *gin.Context) {
 		}
 		return
 	}
-	var g entity.Game
-	if err := db.First(&g, gameID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
-	}
 
-	report := entity.ProblemReport{
+	rp := entity.ProblemReport{
 		Title:       title,
 		Description: desc,
-		Status:      status,
+		Category:    category,
+		Status:      "pending",
 		UserID:      uint(userID),
-		GameID:      uint(gameID),
 	}
-	if err := db.Create(&report).Error; err != nil {
+	if err := db.Create(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// แนบไฟล์ (ของผู้ใช้) → uploads/reports/yyyymmdd/...
+	// attachments
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
 		if len(files) == 0 {
@@ -79,175 +67,65 @@ func CreateReport(c *gin.Context) {
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
 				dst := filepath.Join(dir, name)
-				relPath := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
-
-				if err := c.SaveUploadedFile(f, dst); err != nil {
-					continue
+				rel := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
+				if err := c.SaveUploadedFile(f, dst); err == nil {
+					db.Create(&entity.ProblemAttachment{FilePath: rel, ReportID: rp.ID})
 				}
-				_ = db.Create(&entity.ProblemAttachment{
-					FilePath: relPath,
-					ReportID: report.ID,
-				}).Error
 			}
 		}
 	}
 
-	_ = db.Preload("User").Preload("Attachments").First(&report, report.ID).Error
-	c.JSON(http.StatusCreated, report)
+	db.Preload("Attachments").Preload("Replies.Attachments").First(&rp, rp.ID)
+	c.JSON(http.StatusCreated, rp)
 }
 
-// GET /reports?user_id=&game_id=&status=&page=&limit=
-func FindReports(c *gin.Context) {
-	db := configs.DB()
-
-	var (
-		userID, gameID uint
-		page           = 1
-		limit          = 20
-	)
-
-	if v := c.Query("user_id"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			userID = uint(n)
-		}
-	}
-	if v := c.Query("game_id"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			gameID = uint(n)
-		}
-	}
-
-	// ✅ รองรับการกรองสถานะ open/resolved (หรือค่าอื่น ๆ)
-	status := strings.TrimSpace(c.Query("status"))
-
-	if v := c.Query("page"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			page = n
-		}
-	}
-	if v := c.Query("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
-			limit = n
-		}
-	}
-
-	offset := (page - 1) * limit
-
-	q := db.Model(&entity.ProblemReport{})
-	if userID > 0 {
-		q = q.Where("user_id = ?", userID)
-	}
-	if gameID > 0 {
-		q = q.Where("game_id = ?", gameID)
-	}
-	if status != "" {
-		q = q.Where("status = ?", status)
-	}
-
+// GET /reports - list all pending reports
+func GetPendingReports(c *gin.Context) {
 	var items []entity.ProblemReport
-	if err := q.
-		Preload("User").
+	if err := configs.DB().Where("status = ?", "pending").
 		Preload("Attachments").
+		Preload("Replies.Attachments").
 		Order("created_at DESC").
-		Offset(offset).
-		Limit(limit).
 		Find(&items).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, items)
 }
 
-// GET /reports/:id
+// GET /reports/resolved - list resolved reports
+func GetResolvedReports(c *gin.Context) {
+	var items []entity.ProblemReport
+	if err := configs.DB().Where("status = ?", "resolved").
+		Preload("Attachments").
+		Preload("Replies.Attachments").
+		Order("updated_at DESC").
+		Find(&items).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, items)
+}
+
+// GET /reports/:id - get single report with attachments and replies
 func GetReportByID(c *gin.Context) {
-	db := configs.DB()
 	id, _ := strconv.Atoi(c.Param("id"))
-
 	var rp entity.ProblemReport
-	if err := db.Preload("User").Preload("Attachments").First(&rp, id).Error; err != nil {
+	if err := configs.DB().
+		Preload("Attachments").
+		Preload("Replies.Attachments").
+		First(&rp, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, rp)
-}
-
-type updateReportInput struct {
-	Title       *string `json:"title,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Status      *string `json:"status,omitempty"`
-	Resolve     *bool   `json:"resolve,omitempty"`
-}
-
-// PUT /reports/:id
-func UpdateReport(c *gin.Context) {
-	db := configs.DB()
-	id, _ := strconv.Atoi(c.Param("id"))
-
-	var rp entity.ProblemReport
-	if err := db.First(&rp, id).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	var in updateReportInput
-	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload", "detail": err.Error()})
-		return
-	}
-
-	if in.Title != nil {
-		rp.Title = strings.TrimSpace(*in.Title)
-	}
-	if in.Description != nil {
-		rp.Description = strings.TrimSpace(*in.Description)
-	}
-	if in.Status != nil {
-		rp.Status = strings.TrimSpace(*in.Status)
-	}
-	if in.Resolve != nil {
-		if *in.Resolve {
-			rp.ResolvedAt = time.Now()
-			if rp.Status == "open" {
-				rp.Status = "resolved"
-			}
 		} else {
-			rp.ResolvedAt = time.Time{}
-			if rp.Status == "resolved" {
-				rp.Status = "open"
-			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
-	}
-
-	if err := db.Save(&rp).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
 	c.JSON(http.StatusOK, rp)
 }
 
-// DELETE /reports/:id
-func DeleteReport(c *gin.Context) {
-	db := configs.DB()
-	id, _ := strconv.Atoi(c.Param("id"))
-	if err := db.Delete(&entity.ProblemReport{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.Status(http.StatusNoContent)
-}
-
-// ✅ POST /reports/:id/reply
-// ส่งข้อความ/ไฟล์ตอบกลับ แล้ว "สร้าง/อัปเดต" Notification ให้เหลือเพียงเรคคอร์ดเดียวเสมอ ต่อ (user_id, type, report_id)
+// POST /reports/:id/reply - admin replies to a report (text + optional files)
 func ReplyReport(c *gin.Context) {
 	db := configs.DB()
 	id, _ := strconv.Atoi(c.Param("id"))
@@ -256,86 +134,98 @@ func ReplyReport(c *gin.Context) {
 	if err := db.First(&rp, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
-			return
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
+		return
+	}
+
+	adminID, _ := strconv.Atoi(c.PostForm("admin_id"))
+	msg := strings.TrimSpace(c.PostForm("message"))
+	form, _ := c.MultipartForm()
+	if adminID <= 0 && msg == "" && (form == nil || (len(form.File["attachments"]) == 0 && len(form.File["file"]) == 0)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid reply"})
+		return
+	}
+
+	reply := entity.ProblemReply{
+		ReportID: rp.ID,
+		AdminID:  uint(adminID),
+		Message:  msg,
+	}
+	if err := db.Create(&reply).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	text := strings.TrimSpace(c.PostForm("text"))
-
-	// ✅ บันทึกข้อความตอบกลับลงใน report
-	if text != "" {
-		rp.Reply = text
-	}
-
-	// ✅ แนบไฟล์จากแอดมิน (เก็บไว้ที่ uploads/replies/yyyymmdd/...)
-	attachCount := 0
-	if form, _ := c.MultipartForm(); form != nil {
+	if form != nil {
 		files := form.File["attachments"]
-		attachCount = len(files)
-		if attachCount > 0 {
+		if len(files) == 0 {
+			files = form.File["file"]
+		}
+		if len(files) > 0 {
 			dir := filepath.Join("uploads", "replies", time.Now().Format("20060102"))
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
 				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
 				dst := filepath.Join(dir, name)
-				relPath := filepath.ToSlash(filepath.Join("uploads", "replies", time.Now().Format("20060102"), name))
-
-				if err := c.SaveUploadedFile(f, dst); err != nil {
-					continue
+				rel := filepath.ToSlash(filepath.Join("uploads", "replies", time.Now().Format("20060102"), name))
+				if err := c.SaveUploadedFile(f, dst); err == nil {
+					db.Create(&entity.ProblemReplyAttachment{FilePath: rel, ReplyID: reply.ID})
 				}
-				_ = db.Create(&entity.ProblemAttachment{
-					FilePath: relPath,
-					ReportID: rp.ID,
-				}).Error
 			}
 		}
 	}
 
-	// ✅ ทำข้อความแจ้งเตือน
-	msg := text
-	if msg == "" {
-		if attachCount > 0 {
-			msg = "แอดมินได้ตอบกลับพร้อมไฟล์แนบ"
+	// create notification for user
+	msgNoti := msg
+	if msgNoti == "" {
+		msgNoti = "มีการตอบกลับจากผู้ดูแล"
+	}
+	_ = db.Create(&entity.Notification{
+		Title:    fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
+		Message:  msgNoti,
+		Type:     "report_reply",
+		UserID:   rp.UserID,
+		ReportID: &rp.ID,
+	}).Error
+
+	db.Preload("Attachments").Preload("Replies.Attachments").First(&rp, rp.ID)
+	c.JSON(http.StatusOK, rp)
+}
+
+// PUT /reports/:id/resolve - mark report as resolved
+func ResolveReport(c *gin.Context) {
+	db := configs.DB()
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	var rp entity.ProblemReport
+	if err := db.First(&rp, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 		} else {
-			msg = "แอดมินได้ตอบกลับคำร้องของคุณ"
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		}
-	} else if attachCount > 0 {
-		msg = fmt.Sprintf("%s (แนบไฟล์ %d ไฟล์)", msg, attachCount)
+		return
 	}
 
-	// ✅ สร้าง/อัปเดตแจ้งเตือนให้มีเพียงเรคคอร์ดเดียว ต่อ (user_id, type, report_id)
-	var noti entity.Notification
-	err := db.Where("user_id = ? AND type = ? AND report_id = ?", rp.UserID, "report_reply", rp.ID).
-		First(&noti).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		_ = db.Create(&entity.Notification{
-			Title:    fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
-			Message:  msg,
-			Type:     "report_reply",
-			UserID:   rp.UserID,
-			ReportID: &rp.ID,
-			IsRead:   false,
-		}).Error
-	} else if err == nil {
-		noti.Title = fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID)
-		noti.Message = msg
-		noti.IsRead = false
-		_ = db.Save(&noti).Error
-	} else {
-		// error อื่น ๆ ไม่ให้ล้ม flow หลัก
-	}
-
-	// ✅ ปิดงานเป็น resolved
+	now := time.Now()
 	rp.Status = "resolved"
-	rp.ResolvedAt = time.Now()
+	rp.ResolvedAt = &now
 	if err := db.Save(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
-	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
+	db.Preload("Attachments").Preload("Replies.Attachments").First(&rp, rp.ID)
 	c.JSON(http.StatusOK, rp)
+}
+
+// DELETE /reports/:id
+func DeleteReport(c *gin.Context) {
+	id, _ := strconv.Atoi(c.Param("id"))
+	if err := configs.DB().Delete(&entity.ProblemReport{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

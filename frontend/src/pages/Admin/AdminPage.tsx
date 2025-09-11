@@ -20,6 +20,7 @@ import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useNavigate } from "react-router-dom";
 import { markReportsSeen } from "../../hooks/useReportNewCount";
+import { useAuth } from "../../context/AuthContext";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -44,6 +45,14 @@ export default function AdminPage({
   setRefunds,
 }: AdminPageProps) {
   const navigate = useNavigate();
+  const auth = useAuth();
+
+  const ENV_FORCE_ADMIN_ID = Number(import.meta.env.VITE_FORCE_ADMIN_ID || "");
+  const adminId =
+    (auth as any)?.id ??
+    (Number.isFinite(ENV_FORCE_ADMIN_ID) && ENV_FORCE_ADMIN_ID > 0
+      ? ENV_FORCE_ADMIN_ID
+      : 1);
 
   const [problems, setProblems] = useState<ProblemReport[]>([]);
   const [activeTab, setActiveTab] = useState<"refunds" | "problems">("problems");
@@ -57,8 +66,7 @@ export default function AdminPage({
     const load = async () => {
       try {
         const items = await fetchReports();
-        const pending = (items || []).filter((it) => it.status !== "resolved");
-        setProblems(pending);
+        setProblems(items || []);
 
         // ✅ ตั้ง "เวลาที่เห็นล่าสุด" = created_at ที่ใหม่ที่สุดในชุดข้อมูล (หรือเวลาปัจจุบันถ้าไม่มี)
         const latestTs = (items || []).reduce((max, r) => {
@@ -81,7 +89,6 @@ export default function AdminPage({
     message.success(`Refund #${id} ${action} successfully!`);
   };
 
-  // ✅ ตอบกลับแล้ว ย้ายการ์ดออก (ถือว่าแก้แล้ว)
   const handleSendReply = async (rep: ProblemReport) => {
     const reply = replies[rep.ID];
     if (!reply || (!reply.text && (reply.fileList?.length ?? 0) === 0)) {
@@ -98,9 +105,8 @@ export default function AdminPage({
         )
         .filter((f: File | null): f is File => f !== null);
 
-      await replyReport(rep.ID, reply.text, files);
-      setProblems((prev) => prev.filter((p) => p.ID !== rep.ID)); // เอาออกจากหน้ารอแก้
-      message.success("ตอบกลับลูกค้าสำเร็จ (ย้ายไปหน้ารายการที่แก้แล้ว)");
+      await replyReport(rep.ID, adminId, reply.text, files);
+      message.success("ตอบกลับลูกค้าสำเร็จ");
     } catch (e: any) {
       console.error("❌ Error while sending reply:", e);
       const detail = e?.response?.data?.error || e?.message || String(e);
