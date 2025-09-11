@@ -5,6 +5,7 @@ import Sidebar from "../../components/Sidebar";
 import type { Promotion } from "../../interfaces/Promotion";
 import type { Game } from "../../interfaces/Game";
 import { getPromotion } from "../../services/promotions";
+import { useAuth } from "../../context/AuthContext";
 import dayjs from "dayjs";
 
 const { Content } = Layout;
@@ -14,6 +15,7 @@ const base_url = import.meta.env.VITE_API_URL || "http://localhost:8088";
 
 export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
+  const { token } = useAuth();
   const [promotion, setPromotion] = useState<Promotion | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const navigate = useNavigate();
@@ -37,7 +39,7 @@ export default function PromotionDetail() {
     const load = async () => {
       if (!id) return;
       try {
-        const data = await getPromotion(Number(id), true);
+        const data = await getPromotion(Number(id), true, token || undefined);
         setPromotion(data);
         if (data.games) {
           setGames(data.games);

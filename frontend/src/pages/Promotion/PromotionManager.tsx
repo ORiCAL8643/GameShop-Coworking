@@ -37,7 +37,8 @@ export default function PromotionManager() {
   const [games, setGames] = useState<GameLite[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [promoFile, setPromoFile] = useState<File | null>(null);
-  const { id: currentUserId, token } = useAuth();
+  const { id: currentUserId, token, permissions } = useAuth();
+  const can = (k: string) => permissions.includes(k);
   const isEdit = useMemo(() => editingId !== null, [editingId]);
   const discountType = Form.useWatch("discount_type", form);
 
@@ -60,8 +61,8 @@ export default function PromotionManager() {
     const load = async () => {
       try {
         const [gameRows, promoRows] = await Promise.all([
-          listGames(),
-          listPromotions(true),
+          listGames(token || undefined),
+          listPromotions(true, token || undefined),
         ]);
         setGames(
           gameRows.map(g => ({
@@ -179,6 +180,7 @@ export default function PromotionManager() {
       render: (_: any, r: Promotion) => (
         <Space>
           <Button
+            disabled={!can('promotions.manage')}
             onClick={() => {
               setEditingId(r.ID);
               form.setFieldsValue({
@@ -201,8 +203,9 @@ export default function PromotionManager() {
             cancelText="ยกเลิก"
             okButtonProps={{ danger: true }}
             onConfirm={() => onDelete(r.ID)}
+            disabled={!can('promotions.manage')}
           >
-            <Button danger>ลบ</Button>
+            <Button danger disabled={!can('promotions.manage')}>ลบ</Button>
           </Popconfirm>
         </Space>
       ),
@@ -297,10 +300,10 @@ export default function PromotionManager() {
               </Form.Item>
 
               <Space>
-                <Button type="primary" onClick={onSubmit}>
+                <Button type="primary" onClick={onSubmit} disabled={!can('promotions.manage')}>
                   {isEdit ? "บันทึกการแก้ไข" : "สร้างโปรโมชัน"}
                 </Button>
-                <Button onClick={() => { form.resetFields(); setEditingId(null); }}>
+                <Button onClick={() => { form.resetFields(); setEditingId(null); }} disabled={!can('promotions.manage')}>
                   ล้างฟอร์ม
                 </Button>
               </Space>

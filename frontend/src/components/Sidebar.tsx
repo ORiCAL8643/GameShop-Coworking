@@ -4,26 +4,27 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import type { ReactNode } from "react";
 
 const { Sider } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
 
-const items: GroupItem[] = [
-  {
-    key: "/home",
-    label: "หน้าแรก",
-  },
-  {
-    key: "/request",
-    label: "รีเควสเกม",
-  },
-  {
-    key: "/requestinfo",
-    label: "ข้อมูลรีเควส",
-  },
+type MenuItem = {
+  key: string;
+  label: string;
+  need?: string;
+  icon?: ReactNode;
+  children?: MenuItem[];
+};
+
+const menuItems: MenuItem[] = [
+  { key: "/home", label: "หน้าแรก", need: "games.read" },
+  { key: "/request", label: "รีเควสเกม", need: "requests.create" },
+  { key: "/requestinfo", label: "ข้อมูลรีเควส", need: "requests.read" },
   {
     key: "/information",
     label: "จัดการข้อมูลเกม",
+    need: "games.manage",
     children: [
       { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
       { key: "/information/Edit", label: "แก้ไขข้อมูลเกม", icon: <PlusOutlined /> },
@@ -33,30 +34,21 @@ const items: GroupItem[] = [
     key: "/category",
     label: "หมวดหมู่",
     children: [
-      { key: "/category/Community", label: "ชุมชน", icon: <PlusOutlined /> },
-      { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined /> },
+      { key: "/category/Community", label: "ชุมชน", icon: <PlusOutlined />, need: "community.read" },
+      { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined />, need: "payments.create" },
     ],
   },
-
+  { key: "/workshop", label: "Workshop", need: "workshop.read" },
+  { key: "/promotion", label: "Promotion", need: "promotions.manage" },
+  { key: "/refund", label: "การคืนเงินผู้ใช้", need: "refunds.manage" },
   {
-    key: "/workshop",
-    label: "Workshop",
-  },
-    {
-    key: '/promotion',
-    label:'Promotion',
-  },
-  {
-    key: '/refund',
-    label:'การคืนเงินผู้ใช้',
-  },
-  {
-    key: '/Admin',
-    label:'Admin',
+    key: "/Admin",
+    label: "Admin",
+    need: "roles.manage",
     children: [
-        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
-        { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
-        { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
+      { key: "/Admin/Page", label: "Page", icon: <PlusOutlined /> },
+      { key: "/Admin/PaymentReviewPage", label: "PaymentReview", icon: <PlusOutlined />, need: "payments.manage" },
+      { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
     ],
   },
 ];
@@ -65,9 +57,22 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { permissions } = useAuth();
+  const can = (k: string) => permissions.includes(k);
+
+  const filterMenu = (items: MenuItem[]): GroupItem[] =>
+    items
+      .filter((it) => !it.need || can(it.need))
+      .map((it) => ({
+        key: it.key,
+        label: it.label,
+        icon: it.icon,
+        children: it.children ? filterMenu(it.children) : undefined,
+      }));
+
+  const items = useMemo(() => filterMenu(menuItems), [permissions]);
 
   // เส้นทางที่เป็น "กลุ่ม" (มี children)
-  const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
+  const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
 
   // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
   const selectedKey = location.pathname;
@@ -111,7 +116,18 @@ const Sidebar = () => {
           onOpenChange={onOpenChange}
           onClick={({ key }) => {
             const path = String(key);
-            if (path.startsWith("/Admin") && !permissions.includes("roles.manage")) {
+            const findItem = (list: MenuItem[]): MenuItem | undefined => {
+              for (const it of list) {
+                if (it.key === path) return it;
+                if (it.children) {
+                  const f = findItem(it.children);
+                  if (f) return f;
+                }
+              }
+              return undefined;
+            };
+            const target = findItem(menuItems);
+            if (target?.need && !can(target.need)) {
               message.warning("คุณไม่มีสิทธิ์เข้าถึง");
               return;
             }
