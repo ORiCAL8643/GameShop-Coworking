@@ -7,9 +7,9 @@ export type ReviewItem = {
   UpdatedAt?: string;
   DeletedAt?: string | null;
 
-  // ⚠️ Backend เก็บชื่อ ReviewTitle/ReviewText เรา map เป็นชื่อที่ UI ใช้:
-  title?: string;      // ← ReviewTitle
-  content: string;     // ← ReviewText
+  // ⚠️ Backend อาจส่งชื่อฟิลด์แบบ snake_case หรือ PascalCase เรา map เป็นชื่อที่ UI ใช้:
+  title?: string;      // ← review_title / ReviewTitle
+  content: string;     // ← review_text / ReviewText
   rating: number;      // ← Rating
 
   game_id: number;     // ← GameID
@@ -29,7 +29,9 @@ export const normalizeReview = (r: any): ReviewItem => ({
   UpdatedAt: r?.UpdatedAt ?? r?.updatedAt ?? r?.updated_at ?? "",
   DeletedAt: r?.DeletedAt ?? r?.deletedAt ?? r?.deleted_at ?? null,
 
+  // รองรับทั้ง review_title และ ReviewTitle
   title: r?.review_title ?? r?.ReviewTitle ?? r?.title ?? "",
+  // รองรับทั้ง review_text และ ReviewText
   content: r?.review_text ?? r?.ReviewText ?? r?.content ?? "",
   rating: Number(r?.rating ?? r?.Rating ?? 0),
 
