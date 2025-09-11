@@ -1,5 +1,5 @@
 import { Card, Table, Typography, Select, Button } from "antd";
-import { Col, Row } from 'antd';
+import { Col, Row , Result} from 'antd';
 import type { ColumnsType } from "antd/es/table";
 import axios from "axios";
 import { useState, useEffect } from "react";
@@ -71,10 +71,10 @@ export default function Requestinfo() {
         GetGame()
     }, [])
 
-    const pendingGames = game.filter(game => game.status === "pending");
+    const pendingGames = game ? game.filter(g => g.status === "pending") : [];
 
 
-  return (
+  return (<div>{(game || pendingGames.length !== 0) ? (
     <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
         bodyStyle={{ padding: 20 }}
@@ -100,6 +100,7 @@ export default function Requestinfo() {
         <Select placeholder="กรุณาเลือกเกม" style={{ width: 500}} options={pendingGames.map(c => ({ value: c.ID, label: c.game_name }))} value={gameid ?? undefined} onChange={(val, option) => {console.log("onChange val:", val);console.log("onChange option:", option);SetgameID(val);}}/>
         <Col offset={1}><Button type="primary" onClick={() => {UpdateGame(gameid,{ status: "approve"})}}>ยืนยัน</Button></Col>
       </Row>
-    </div>
+    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist."</div>} extra={<Button type="primary" style={{justifyContent: "center", color:'#ffffffff'}}>Back Home</Button>}/>)
+  }</div>
   );
 }
