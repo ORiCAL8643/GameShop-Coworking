@@ -1,82 +1,122 @@
-// backend/controllers/reviews.go
 package controllers
 
 import (
+	"errors"
 	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
-	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
-// ==== Review Controllers ====
+// ---- DTO ----
+
+type reviewCreateDTO struct {
+	GameID      uint   `json:"game_id" binding:"required"`
+	UserID      uint   `json:"user_id" binding:"required"`
+	ReviewTitle string `json:"review_title"`
+	ReviewText  string `json:"review_text" binding:"required"`
+	Rating      int    `json:"rating" binding:"required"`
+}
+
+type reviewUpdateDTO struct {
+	ReviewTitle *string `json:"review_title"`
+	ReviewText  *string `json:"review_text"`
+	Rating      *int    `json:"rating"`
+}
+
+// ---- Helpers ----
+
+func clampRating(n int) int {
+	if n < 1 {
+		return 1
+	}
+	if n > 5 {
+		return 5
+	}
+	return n
+}
+
+// ---- Handlers ----
 
 // POST /reviews
 func CreateReview(c *gin.Context) {
-	var body entity.Review
-	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
+	var in reviewCreateDTO
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_payload"})
 		return
 	}
-	// minimal validation
-	if body.UserID == 0 || body.GameID == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id and game_id are required"})
-		return
-	}
-	if body.Rating < 0 || body.Rating > 10 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "rating must be 0-10"})
-		return
-	}
+	in.Rating = clampRating(in.Rating)
+
 	db := configs.DB()
-	var existing entity.Review
-	if err := db.Where("user_id = ? AND game_id = ?", body.UserID, body.GameID).First(&existing).Error; err == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ผู้ใช้เคยรีวิวเกมนี้แล้ว"})
+
+	// กันซ้ำแบบเร็ว (ก่อนชน unique)
+	var exists entity.Review
+	if err := db.Where("user_id = ? AND game_id = ?", in.UserID, in.GameID).First(&exists).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":   "already_reviewed",
+			"message": "คุณได้รีวิวเกมนี้แล้ว กรุณาแก้ไขรีวิวเดิม",
+		})
 		return
 	} else if err != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if err := db.Create(&body).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "create failed: " + err.Error()})
+
+	r := entity.Review{
+		GameID:      in.GameID,
+		UserID:      in.UserID,
+		ReviewTitle: in.ReviewTitle,
+		ReviewText:  in.ReviewText,
+		Rating:      in.Rating,
+	}
+	if err := db.Create(&r).Error; err != nil {
+		// map duplicate เป็น 409 (กันกรณีเล็ดรอดมาชน unique)
+		if errors.Is(err, gorm.ErrDuplicatedKey) ||
+			strings.Contains(strings.ToLower(err.Error()), "unique") {
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "already_reviewed",
+				"message": "คุณได้รีวิวเกมนี้แล้ว กรุณาแก้ไขรีวิวเดิม",
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "create_failed"})
 		return
 	}
-	// reload
-	var row entity.Review
-	if err := db.Preload("User").Preload("Game").First(&row, body.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "reload failed: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusCreated, row)
+
+	var out entity.Review
+	_ = db.Preload("User").Preload("Game").First(&out, r.ID).Error
+	c.JSON(http.StatusCreated, out)
 }
 
 // GET /reviews
-// optional: ?game_id=&user_id=
 func FindReviews(c *gin.Context) {
-	db := configs.DB().Model(&entity.Review{}).Preload("User").Preload("Game")
-	if gid := c.Query("game_id"); gid != "" {
-		db = db.Where("game_id = ?", gid)
-	}
-	if uid := c.Query("user_id"); uid != "" {
-		db = db.Where("user_id = ?", uid)
-	}
-	var rows []entity.Review
-	if err := db.Order("created_at desc").Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	db := configs.DB()
+	var list []entity.Review
+	if err := db.Preload("User").Preload("Game").
+		Order("updated_at DESC").
+		Find(&list).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed"})
 		return
 	}
-	c.JSON(http.StatusOK, rows)
+	c.JSON(http.StatusOK, list)
 }
 
 // GET /reviews/:id
 func GetReviewByID(c *gin.Context) {
+	id := c.Param("id")
+	db := configs.DB()
 	var row entity.Review
-	if err := configs.DB().Preload("User").Preload("Game").First(&row, c.Param("id")).Error; err != nil {
+	if err := db.Preload("User").Preload("Game").First(&row, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "review not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "get_failed"})
 		return
 	}
 	c.JSON(http.StatusOK, row)
@@ -84,116 +124,105 @@ func GetReviewByID(c *gin.Context) {
 
 // PUT /reviews/:id
 func UpdateReview(c *gin.Context) {
-	var payload entity.Review
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
+	id := c.Param("id")
+	var in reviewUpdateDTO
+	if err := c.ShouldBindJSON(&in); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_payload"})
 		return
 	}
-	var row entity.Review
+
 	db := configs.DB()
-	if err := db.First(&row, c.Param("id")).Error; err != nil {
+	var r entity.Review
+	if err := db.First(&r, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "review not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found"})
+			return
 		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "get_failed"})
 		return
 	}
-	// apply updatable fields
-	update := map[string]any{}
-	if payload.ReviewTitle != "" {
-		update["review_title"] = payload.ReviewTitle
+
+	if in.ReviewTitle != nil {
+		r.ReviewTitle = *in.ReviewTitle
 	}
-	if payload.ReviewText != "" {
-		update["review_text"] = payload.ReviewText
+	if in.ReviewText != nil {
+		r.ReviewText = *in.ReviewText
 	}
-	if payload.Rating != 0 {
-		update["rating"] = payload.Rating
+	if in.Rating != nil {
+		r.Rating = clampRating(*in.Rating)
 	}
-	if err := db.Model(&row).Updates(update).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed: " + err.Error()})
+
+	if err := db.Save(&r).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "update_failed"})
 		return
 	}
-	if err := db.Preload("User").Preload("Game").First(&row, row.ID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "reload failed: " + err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, row)
+
+	var out entity.Review
+	_ = db.Preload("User").Preload("Game").First(&out, r.ID).Error
+	c.JSON(http.StatusOK, out)
 }
 
 // DELETE /reviews/:id
 func DeleteReview(c *gin.Context) {
-	if tx := configs.DB().Delete(&entity.Review{}, c.Param("id")); tx.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": tx.Error.Error()})
-		return
-	} else if tx.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "review not found"})
+	id := c.Param("id")
+	db := configs.DB()
+	if err := db.Delete(&entity.Review{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete_failed"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	c.Status(http.StatusNoContent)
 }
 
-// POST /reviews/:id/toggle_like   { "user_id": 123 }
+// GET /games/:id/reviews
+func FindReviewsByGame(c *gin.Context) {
+	gameID := c.Param("id")
+	db := configs.DB()
+	var list []entity.Review
+	if err := db.Preload("User").
+		Where("game_id = ?", gameID).
+		Order("updated_at DESC").
+		Find(&list).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed"})
+		return
+	}
+	c.JSON(http.StatusOK, list)
+}
+
+// POST /reviews/:id/toggle_like
 func ToggleReviewLike(c *gin.Context) {
-	var req struct {
+	id := c.Param("id")
+	var body struct {
 		UserID uint `json:"user_id" binding:"required"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_payload"})
 		return
 	}
+
+	rid, _ := strconv.Atoi(id)
 	db := configs.DB()
 
-	// load review
-	var review entity.Review
-	if err := db.First(&review, c.Param("id")).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{"error": "review not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
-	}
-
-	// check existing like
+	// หา like เดิม
 	var like entity.Review_Like
-	if err := db.Where("review_id = ? AND user_id = ?", review.ID, req.UserID).First(&like).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			// create like
-			newLike := entity.Review_Like{ReviewID: review.ID, UserID: req.UserID, GameID: review.GameID}
-			if err := db.Create(&newLike).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "like failed: " + err.Error()})
-				return
-			}
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-	} else {
-		// found => toggle off (delete)
-		if err := db.Unscoped().Delete(&like).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "unlike failed: " + err.Error()})
-			return
-		}
-	}
-
-	// return new like count
-	var count int64
-	db.Model(&entity.Review_Like{}).Where("review_id = ?", review.ID).Count(&count)
-	c.JSON(http.StatusOK, gin.H{"review_id": review.ID, "likes": count})
-}
-
-// FindReviewsByGame handles GET /games/:id/reviews
-// and returns all reviews for a particular game.
-func FindReviewsByGame(c *gin.Context) {
-	var rows []entity.Review
-	if err := configs.DB().
-		Where("game_id = ?", c.Param("id")).
-		Preload("User").Preload("Game").
-		Order("created_at desc").
-		Find(&rows).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	err := db.Where("review_id = ? AND user_id = ?", rid, body.UserID).First(&like).Error
+	if err == nil {
+		// มีแล้ว => ลบ (unlike)
+		_ = db.Delete(&like).Error
+		c.Status(http.StatusNoContent)
 		return
 	}
-	c.JSON(http.StatusOK, rows)
+	if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
+		return
+	}
+	// ยังไม่มี => เพิ่ม like
+	newLike := entity.Review_Like{
+		ReviewID: uint(rid),
+		UserID:   body.UserID,
+	}
+	if err := db.Create(&newLike).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
+		return
+	}
+	c.Status(http.StatusCreated)
 }
