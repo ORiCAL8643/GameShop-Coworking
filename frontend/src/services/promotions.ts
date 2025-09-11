@@ -11,20 +11,25 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function listPromotions(withGames = false): Promise<Promotion[]> {
+export async function listPromotions(withGames = false, token?: string): Promise<Promotion[]> {
   const url = new URL(`${API_URL}/promotions`);
   if (withGames) url.searchParams.set("with", "games");
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Promotion[]>(res);
 }
 
 export async function getPromotion(
   id: number,
   withGames = false,
+  token?: string,
 ): Promise<Promotion> {
   const url = new URL(`${API_URL}/promotions/${id}`);
   if (withGames) url.searchParams.set("with", "games");
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Promotion>(res);
 }
 
@@ -61,8 +66,10 @@ export async function deletePromotion(id: number, token?: string): Promise<void>
   }
 }
 
-export async function listGames(): Promise<Game[]> {
-  const res = await fetch(`${API_URL}/game`);
+export async function listGames(token?: string): Promise<Game[]> {
+  const res = await fetch(`${API_URL}/game`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Game[]>(res);
 }
 

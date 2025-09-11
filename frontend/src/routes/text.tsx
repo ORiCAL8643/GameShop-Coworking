@@ -53,39 +53,35 @@ const router = createBrowserRouter([
     path: "/",
     element: <Sidebar />,
     children: [
-      { path: "/", element: <Home /> },
-      { path: "/home", element: <Home /> },
-      { path: "/request", element: <Request /> },
-      { path: "/requestinfo", element: <Requestinfo /> },
+      { path: "/", element: <RequirePermission permission="games.read" />, children: [{ path: "/", element: <Home /> }] },
+      { path: "/home", element: <RequirePermission permission="games.read" />, children: [{ path: "/home", element: <Home /> }] },
+
+      { path: "/request", element: <RequirePermission permission="requests.create" />, children: [{ path: "/request", element: <Request /> }] },
+      { path: "/requestinfo", element: <RequirePermission permission="requests.read" />, children: [{ path: "/requestinfo", element: <Requestinfo /> }] },
 
       {
         path: "/information",
+        element: <RequirePermission permission="games.manage" />,
         children: [
           { path: "/information/Add", element: <Add /> },
           { path: "/information/Edit", element: <Edit /> },
         ],
       },
 
-      {
-        path: "/category",
-        children: [
-          { path: "/category/Community", element: <CommunityPage /> },
-          { path: "/category/Payment", element: <PaymentPage /> },
-        ],
-      },
+      { path: "/category/Community", element: <RequirePermission permission="community.read" />, children: [{ path: "/category/Community", element: <CommunityPage /> }] },
+      { path: "/category/Payment", element: <RequirePermission permission="payments.create" />, children: [{ path: "/category/Payment", element: <PaymentPage /> }] },
 
-      { path: "/workshop", element: <WorkshopMain /> },
-      { path: "/workshop/:id", element: <WorkshopDetail /> },
-      { path: "/mod/:id", element: <ModDetail /> },
-      { path: "/upload", element: <Workshop /> },
+      { path: "/workshop", element: <RequirePermission permission="workshop.read" />, children: [{ path: "/workshop", element: <WorkshopMain /> }] },
+      { path: "/workshop/:id", element: <RequirePermission permission="workshop.read" />, children: [{ path: "/workshop/:id", element: <WorkshopDetail /> }] },
+      { path: "/mod/:id", element: <RequirePermission permission="workshop.read" />, children: [{ path: "/mod/:id", element: <ModDetail /> }] },
+      { path: "/upload", element: <RequirePermission permission="workshop.create" />, children: [{ path: "/upload", element: <Workshop /> }] },
 
-      { path: "/promotion", element: <PromotionManager /> },
-      { path: "/promotion/:id", element: <PromotionDetail /> },
-
+      { path: "/promotion", element: <RequirePermission permission="promotions.manage" />, children: [{ path: "/promotion", element: <PromotionManager /> }] },
+      { path: "/promotion/:id", element: <RequirePermission permission="promotions.read" />, children: [{ path: "/promotion/:id", element: <PromotionDetail /> }] },
 
       // 🟣 Refund
-      { path: "/refund", element: <RefundPage /> },
-      { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
+      { path: "/refund", element: <RequirePermission permission="refunds.manage" />, children: [{ path: "/refund", element: <RefundPage /> }] },
+      { path: "/refund-status", element: <RequirePermission permission="refunds.read" />, children: [{ path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> }] },
 
       // 🟣 Admin
       {
@@ -103,18 +99,16 @@ const router = createBrowserRouter([
               />
             ),
           },
-          { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+          {
+            path: "/Admin/PaymentReviewPage",
+            element: <RequirePermission permission="payments.manage" />,
+            children: [{ path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> }],
+          },
           { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
-      {
-        path: "/roles",
-        element: <RoleManagement />
-      },
-      {
-        path: "/roles/:id",
-        element: <RoleEdit />
-      }
+      { path: "/roles", element: <RequirePermission permission="roles.manage" />, children: [{ path: "/roles", element: <RoleManagement /> }] },
+      { path: "/roles/:id", element: <RequirePermission permission="roles.manage" />, children: [{ path: "/roles/:id", element: <RoleEdit /> }] }
     ],
   },
 ]);

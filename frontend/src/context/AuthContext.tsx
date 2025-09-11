@@ -7,6 +7,7 @@ interface AuthContextType {
   username: string | null;
   permissions: string[];
   login: (id: number, token: string, username: string, permissions: string[]) => void;
+  refresh: () => Promise<void>;
   logout: () => void;
 }
 
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType>({
   username: null,
   permissions: [],
   login: () => {},
+  refresh: async () => {},
   logout: () => {},
 });
 
@@ -41,6 +43,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('permissions', JSON.stringify(perms));
   };
 
+  const refresh = async () => {
+    const tk = localStorage.getItem('token');
+    if (!tk) return;
+    try {
+      const res = await fetch('http://localhost:8088/me', {
+        headers: {
+          Authorization: `Bearer ${tk}`,
+        },
+      });
+      if (!res.ok) throw new Error('unauthorized');
+      const data = await res.json();
+      setId(data.id);
+      setUsername(data.username);
+      setPermissions(data.permissions || []);
+      localStorage.setItem('userid', String(data.id));
+      localStorage.setItem('username', data.username);
+      localStorage.setItem('permissions', JSON.stringify(data.permissions || []));
+    } catch {
+      logout();
+      window.location.href = '/login';
+    }
+  };
+
   const logout = () => {
     setId(null);
     setToken(null);
@@ -52,8 +77,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('permissions');
   };
 
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 60000);
+    return () => clearInterval(t);
+  }, [token]);
+
   return (
-    <AuthContext.Provider value={{ id, token, username, permissions, login, logout }}>
+    <AuthContext.Provider value={{ id, token, username, permissions, login, refresh, logout }}>
       {children}
     </AuthContext.Provider>
   );

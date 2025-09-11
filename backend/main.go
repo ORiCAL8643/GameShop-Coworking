@@ -26,6 +26,7 @@ func main() {
 	router := r.Group("/")
 	{
 		router.POST("/login", controllers.Login)
+		router.GET("/me", middlewares.Authorize(""), controllers.Me)
 		// ===== Users =====
 		router.POST("/users", controllers.CreateUser)
 		router.GET("/users", middlewares.Authorize("users.manage"), controllers.FindUsers)
@@ -79,32 +80,32 @@ func main() {
 		router.DELETE("/comments/:id", middlewares.Authorize("community.moderate"), controllers.DeleteCommentByID)
 
 		// ===== UserGames (สิทธิ์การเป็นเจ้าของเกม) =====
-		router.POST("/user-games", controllers.CreateUserGame)
-		router.GET("/user-games", controllers.FindUserGames)
-		router.GET("/user-games/:id", controllers.FindUserGameByID)
-		router.PUT("/user-games/:id", controllers.UpdateUserGame)
-		router.DELETE("/user-games/:id", controllers.DeleteUserGameByID)
+		router.POST("/user-games", middlewares.Authorize("games.manage"), controllers.CreateUserGame)
+		router.GET("/user-games", middlewares.Authorize("games.read"), controllers.FindUserGames)
+		router.GET("/user-games/:id", middlewares.Authorize("games.read"), controllers.FindUserGameByID)
+		router.PUT("/user-games/:id", middlewares.Authorize("games.manage"), controllers.UpdateUserGame)
+		router.DELETE("/user-games/:id", middlewares.Authorize("games.manage"), controllers.DeleteUserGameByID)
 
 		// ===== Reactions =====
-		router.POST("/reactions", controllers.CreateReaction)
-		router.GET("/reactions", controllers.FindReactions) // ใช้ ?target_type=&target_id=&user_id=
-		router.GET("/reactions/:id", controllers.FindReactionByID)
-		router.PUT("/reactions/:id", controllers.UpdateReaction)
-		router.DELETE("/reactions/:id", controllers.DeleteReactionByID)
+		router.POST("/reactions", middlewares.Authorize("community.read"), controllers.CreateReaction)
+		router.GET("/reactions", middlewares.Authorize("community.read"), controllers.FindReactions) // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/reactions/:id", middlewares.Authorize("community.read"), controllers.FindReactionByID)
+		router.PUT("/reactions/:id", middlewares.Authorize("community.moderate"), controllers.UpdateReaction)
+		router.DELETE("/reactions/:id", middlewares.Authorize("community.moderate"), controllers.DeleteReactionByID)
 
 		// ===== Attachments =====
-		router.POST("/attachments", controllers.CreateAttachment)
-		router.GET("/attachments", controllers.FindAttachments) // ใช้ ?target_type=&target_id=&user_id=
-		router.GET("/attachments/:id", controllers.FindAttachmentByID)
-		router.PUT("/attachments/:id", controllers.UpdateAttachment)
-		router.DELETE("/attachments/:id", controllers.DeleteAttachmentByID)
+		router.POST("/attachments", middlewares.Authorize("community.read"), controllers.CreateAttachment)
+		router.GET("/attachments", middlewares.Authorize("community.read"), controllers.FindAttachments) // ใช้ ?target_type=&target_id=&user_id=
+		router.GET("/attachments/:id", middlewares.Authorize("community.read"), controllers.FindAttachmentByID)
+		router.PUT("/attachments/:id", middlewares.Authorize("community.moderate"), controllers.UpdateAttachment)
+		router.DELETE("/attachments/:id", middlewares.Authorize("community.moderate"), controllers.DeleteAttachmentByID)
 
 		// ===== Notifications =====
-		router.POST("/notifications", controllers.CreateNotification)
-		router.GET("/notifications", controllers.FindNotifications) // ใช้ ?user_id=
-		router.GET("/notifications/:id", controllers.FindNotificationByID)
-		router.PUT("/notifications/:id", controllers.UpdateNotification)
-		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
+		router.POST("/notifications", middlewares.Authorize("community.read"), controllers.CreateNotification)
+		router.GET("/notifications", middlewares.Authorize("community.read"), controllers.FindNotifications) // ใช้ ?user_id=
+		router.GET("/notifications/:id", middlewares.Authorize("community.read"), controllers.FindNotificationByID)
+		router.PUT("/notifications/:id", middlewares.Authorize("community.moderate"), controllers.UpdateNotification)
+		router.DELETE("/notifications/:id", middlewares.Authorize("community.moderate"), controllers.DeleteNotificationByID)
 
 		// ===== Promotions
 		router.POST("/promotions", middlewares.Authorize("promotions.manage"), controllers.CreatePromotion)
@@ -116,24 +117,24 @@ func main() {
 		router.GET("/promotions-active", middlewares.Authorize("promotions.read"), controllers.FindActivePromotions)
 
 		// ===== Reviews
-		router.POST("/reviews", controllers.CreateReview)
-		router.GET("/reviews", controllers.FindReviews) // ?game_id=&user_id=
-		router.GET("/reviews/:id", controllers.GetReviewByID)
-		router.PUT("/reviews/:id", controllers.UpdateReview)
-		router.DELETE("/reviews/:id", controllers.DeleteReview)
-		router.POST("/reviews/:id/toggle_like", controllers.ToggleReviewLike)
-		router.GET("/games/:id/reviews", controllers.FindReviewsByGame)
+		router.POST("/reviews", middlewares.Authorize("reviews.read"), controllers.CreateReview)
+		router.GET("/reviews", middlewares.Authorize("reviews.read"), controllers.FindReviews) // ?game_id=&user_id=
+		router.GET("/reviews/:id", middlewares.Authorize("reviews.read"), controllers.GetReviewByID)
+		router.PUT("/reviews/:id", middlewares.Authorize("reviews.moderate"), controllers.UpdateReview)
+		router.DELETE("/reviews/:id", middlewares.Authorize("reviews.moderate"), controllers.DeleteReview)
+		router.POST("/reviews/:id/toggle_like", middlewares.Authorize("reviews.read"), controllers.ToggleReviewLike)
+		router.GET("/games/:id/reviews", middlewares.Authorize("reviews.read"), controllers.FindReviewsByGame)
 
 		// categories routes
-		router.GET("/categories", controllers.FindCategories)
+		router.GET("/categories", middlewares.Authorize("games.read"), controllers.FindCategories)
 
 		// keygame routes
-		router.GET("/keygame", controllers.FindKeyGame)
-		router.POST("/new-keygame", controllers.CreateKeyGame)
+		router.GET("/keygame", middlewares.Authorize("games.read"), controllers.FindKeyGame)
+		router.POST("/new-keygame", middlewares.Authorize("games.manage"), controllers.CreateKeyGame)
 
 		//minimumspec routes
-		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
-		router.GET("/minimumspec", controllers.FindMinimumSpec)
+		router.POST("/new-minimumspec", middlewares.Authorize("games.manage"), controllers.CreateMinimumSpec)
+		router.GET("/minimumspec", middlewares.Authorize("games.read"), controllers.FindMinimumSpec)
 
 		//request routes
 		router.POST("/new-request", middlewares.Authorize("requests.create"), controllers.CreateRequest)
@@ -167,18 +168,18 @@ func main() {
 		router.DELETE("/mods/:id", middlewares.Authorize("workshop.moderate"), controllers.DeleteMod)
 
 		// ===== Mod Ratings =====
-		router.GET("/modratings", controllers.GetModRatings)
-		router.GET("/modratings/:id", controllers.GetModRatingById)
-		router.POST("/modratings", controllers.CreateModRating)
-		router.PATCH("/modratings/:id", controllers.UpdateModRating)
-		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+		router.GET("/modratings", middlewares.Authorize("workshop.read"), controllers.GetModRatings)
+		router.GET("/modratings/:id", middlewares.Authorize("workshop.read"), controllers.GetModRatingById)
+		router.POST("/modratings", middlewares.Authorize("workshop.read"), controllers.CreateModRating)
+		router.PATCH("/modratings/:id", middlewares.Authorize("workshop.moderate"), controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", middlewares.Authorize("workshop.moderate"), controllers.DeleteModRating)
 
 		// ===== Mod Tags =====
-		router.GET("/modtags", controllers.GetModTags)
-		router.GET("/modtags/:id", controllers.GetModTagById)
-		router.POST("/modtags", controllers.CreateModTag)
-		router.PATCH("/modtags/:id", controllers.UpdateModTag)
-		router.DELETE("/modtags/:id", controllers.DeleteModTag)
+		router.GET("/modtags", middlewares.Authorize("workshop.read"), controllers.GetModTags)
+		router.GET("/modtags/:id", middlewares.Authorize("workshop.read"), controllers.GetModTagById)
+		router.POST("/modtags", middlewares.Authorize("workshop.moderate"), controllers.CreateModTag)
+		router.PATCH("/modtags/:id", middlewares.Authorize("workshop.moderate"), controllers.UpdateModTag)
+		router.DELETE("/modtags/:id", middlewares.Authorize("workshop.moderate"), controllers.DeleteModTag)
 
 	}
 
@@ -190,7 +191,7 @@ func main() {
 // CORS แบบเดียวกับตัวอย่างที่แนบมา
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "http://localhost:5173")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")

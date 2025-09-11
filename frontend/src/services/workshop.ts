@@ -51,31 +51,36 @@ function addAliases<T extends Record<string, any>>(row: T) {
 }
 
 // ------------------------------- Games -------------------------------
-export async function listGames(): Promise<Game[]> {
-  // NOTE: โปรเจกต์นี้ใช้ /game สำหรับลิสต์ทั้งหมด
-  const res = await fetch(`${API_URL}/game`);
+export async function listGames(token?: string): Promise<Game[]> {
+  const res = await fetch(`${API_URL}/game`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Game[]>(res);
 }
 
-export async function getGame(id: number): Promise<Game> {
-  const games = await listGames();
+export async function getGame(id: number, token?: string): Promise<Game> {
+  const games = await listGames(token);
   const found = games.find((g: any) => (g?.ID ?? g?.id ?? g?.Id) === id);
   if (!found) throw new Error(`Game ${id} not found`);
   return found;
 }
 
 // ----------------------------- UserGames -----------------------------
-export async function listUserGames(userId: number): Promise<UserGame[]> {
+export async function listUserGames(userId: number, token?: string): Promise<UserGame[]> {
   const url = new URL(`${API_URL}/user-games`);
   url.searchParams.set("user_id", String(userId));
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   const rows = await handleResponse<any[]>(res);
   return (rows ?? []).map((r) => addAliases<UserGame>(r));
 }
 
 // ------------------------------- Mods --------------------------------
-export async function listMods(gameId?: number): Promise<Mod[]> {
-  const res = await fetch(`${API_URL}/mods`);
+export async function listMods(gameId?: number, token?: string): Promise<Mod[]> {
+  const res = await fetch(`${API_URL}/mods`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   let mods = await handleResponse<Mod[]>(res);
   if (gameId !== undefined) {
     mods = mods.filter(
@@ -85,8 +90,10 @@ export async function listMods(gameId?: number): Promise<Mod[]> {
   return mods;
 }
 
-export async function getMod(id: number): Promise<Mod> {
-  const res = await fetch(`${API_URL}/mods/${id}`);
+export async function getMod(id: number, token?: string): Promise<Mod> {
+  const res = await fetch(`${API_URL}/mods/${id}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Mod>(res);
 }
 
@@ -116,33 +123,37 @@ export async function updateMod(
 }
 
 // ----------------------------- Comments ------------------------------
-export async function listComments(threadId: number): Promise<Comment[]> {
+export async function listComments(threadId: number, token?: string): Promise<Comment[]> {
   const url = new URL(`${API_URL}/comments`);
   url.searchParams.set("thread_id", String(threadId));
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return handleResponse<Comment[]>(res);
 }
 
-export async function createComment(payload: CreateCommentRequest): Promise<Comment> {
+export async function createComment(payload: CreateCommentRequest, token?: string): Promise<Comment> {
   const res = await fetch(`${API_URL}/comments`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
   });
   return handleResponse<Comment>(res);
 }
 
 // --------------------------- Mod Ratings -----------------------------
-export async function listModRatings(modId: number): Promise<ModRating[]> {
-  const res = await fetch(`${API_URL}/modratings`);
+export async function listModRatings(modId: number, token?: string): Promise<ModRating[]> {
+  const res = await fetch(`${API_URL}/modratings`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   const ratings = await handleResponse<ModRating[]>(res);
   return ratings.filter((r: any) => (r?.mod_id ?? r?.modId ?? r?.ModID) === modId);
 }
 
-export async function createModRating(payload: CreateModRatingRequest): Promise<ModRating> {
+export async function createModRating(payload: CreateModRatingRequest, token?: string): Promise<ModRating> {
   const res = await fetch(`${API_URL}/modratings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: JSON.stringify(payload),
   });
   return handleResponse<ModRating>(res);

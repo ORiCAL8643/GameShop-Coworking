@@ -15,6 +15,7 @@ import {
 } from "antd";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 // ✅ โทนเดียวกับหน้าอื่น
 const THEME_PRIMARY = "#9b59b6";
@@ -45,6 +46,8 @@ const PaymentPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const { id } = useParams();
   const [searchParams] = useSearchParams();
+  const { token, permissions } = useAuth();
+  const can = (k: string) => permissions.includes(k);
   const orderIdParam =
     id ||
     searchParams.get("id") ||
@@ -55,7 +58,9 @@ const PaymentPage = () => {
     if (!orderIdParam) return;
     const load = async () => {
       try {
-        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`);
+        const res = await fetch(`http://localhost:8088/orders/${orderIdParam}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
         if (!res.ok) throw new Error("fetch order failed");
         const data = await res.json();
         setOrder(data);
@@ -96,7 +101,10 @@ const PaymentPage = () => {
       // 1) สร้างข้อมูลการชำระเงิน
       const res = await fetch("http://localhost:8088/payments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({
           order_id: orderId,
           amount: total,
@@ -114,6 +122,7 @@ const PaymentPage = () => {
       form.append("order_id", String(orderId));
       const slipRes = await fetch("http://localhost:8088/payment_slips", {
         method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         body: form,
       });
       if (!slipRes.ok) throw new Error("upload slip failed");
@@ -121,7 +130,10 @@ const PaymentPage = () => {
       // 3) อัปเดตสถานะคำสั่งซื้อหลังส่งสลิปสำเร็จ
       await fetch(`http://localhost:8088/orders/${orderId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ order_status: "PAID" }),
       });
 
@@ -237,6 +249,7 @@ const PaymentPage = () => {
                 size="large"
                 style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
                 onClick={() => setPayOpen(true)}
+                disabled={!can('payments.create')}
               >
                 ดำเนินการต่อไปยังการชำระเงิน
               </Button>
@@ -303,7 +316,7 @@ const PaymentPage = () => {
             <Button onClick={() => setPayOpen(false)}>ยกเลิก</Button>
             <Button
               type="primary"
-              disabled={!files.length}
+              disabled={!files.length || !can('payments.create')}
               loading={submitting}
               style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
               onClick={handleSubmitSlip}

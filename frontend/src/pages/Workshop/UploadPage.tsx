@@ -36,7 +36,8 @@ const UploadPage: React.FC = () => {
   const modId = modIdParam ? Number(modIdParam) : undefined;
 
   // สมมติ useAuth() คืน id กับ token (ถ้าไม่มี token ก็ไม่เป็นไร)
-  const { id: userId, token } = useAuth() as { id?: number; token?: string };
+  const { id: userId, token, permissions } = useAuth() as { id?: number; token?: string; permissions: string[] };
+  const can = (k: string) => permissions.includes(k);
 
   // Game + UserGame
   const [game, setGame] = useState<Game | null>(null);
@@ -47,7 +48,7 @@ const UploadPage: React.FC = () => {
 
   useEffect(() => {
     if (gameId) {
-      getGame(gameId)
+      getGame(gameId, token)
         .then(setGame)
         .catch((e) => {
           console.error("[getGame] failed:", e);
@@ -58,7 +59,7 @@ const UploadPage: React.FC = () => {
 
   useEffect(() => {
     if (modId) {
-      getMod(modId)
+      getMod(modId, token)
         .then((m: any) => {
           setModTitle(m?.title ?? "");
           setModDescription(m?.description ?? "");
@@ -74,7 +75,7 @@ const UploadPage: React.FC = () => {
 
   useEffect(() => {
     if (!userId) return;
-    listUserGames(userId)
+    listUserGames(userId, token)
       .then((rows: any[]) => {
         console.log("[listUserGames] raw:", rows);
         setUserGames(Array.isArray(rows) ? rows : []);
@@ -424,7 +425,7 @@ const UploadPage: React.FC = () => {
             type="primary"
             size="large"
             loading={uploading}
-            disabled={disableSubmit}
+            disabled={disableSubmit || (isEditing ? !can('workshop.moderate') : !can('workshop.create'))}
             style={{ background: "#9254de", borderColor: "#9254de" }}
             onClick={handleUpload}
           >
