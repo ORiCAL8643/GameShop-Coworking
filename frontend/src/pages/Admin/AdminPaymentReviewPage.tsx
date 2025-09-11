@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image,
-  App, Tooltip, Select
+  App, Tooltip, Select, message as antdMessage
 } from "antd";
 import {
   CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
@@ -37,7 +37,7 @@ const formatTHB = (n: number) =>
 
 const BASE_URL = "http://localhost:8088";
 
-// แปลง/ทำความสะอาดข้อมูลจาก backend ให้เป็นรูปแบบที่ปุ่มจะไม่โดน disable ผิด
+// แปลงข้อมูลจาก backend ให้เป็นรูปแบบเดียวกัน
 function normalizeRow(r: any): ReviewablePayment {
   const statusRaw = (r.status ?? r.Status ?? "PENDING").toString().toUpperCase();
   const orderStatusRaw = (r.order_status ?? r.OrderStatus ?? "").toString().toUpperCase();
@@ -56,7 +56,9 @@ function normalizeRow(r: any): ReviewablePayment {
 }
 
 export default function AdminPaymentReviewPage() {
-  const { modal, message } = App.useApp();
+  // ใช้ message จาก <App> ถ้ามี ไม่มีก็ fallback เป็น antdMessage
+  const appCtx = App.useApp?.();
+  const message = appCtx?.message ?? antdMessage;
 
   const { id: userId, token } = useAuth() as { id: number | null; token?: string };
 
@@ -105,8 +107,9 @@ export default function AdminPaymentReviewPage() {
     );
   }, [rows, keyword]);
 
+  // ✅ ใช้ Modal.confirm (static) โดยตรง — ไม่พึ่ง App.useApp()
   const approve = (id: number) => {
-    modal.confirm({
+    Modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
       icon: <ExclamationCircleOutlined />,
       okText: "อนุมัติ",
@@ -138,10 +141,9 @@ export default function AdminPaymentReviewPage() {
     if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
-      // ส่งได้ทั้ง reason และ reject_reason เพื่อเข้ากันได้หลาย backend
       await axios.post(
         `${BASE_URL}/payments/${id}/reject`,
-        { reason: rejectText.trim(), reject_reason: rejectText.trim() },
+        { reason: rejectText.trim(), reject_reason: rejectText.trim() }, // ส่งสอง key เพื่อรองรับหลาย backend
         { headers: authHeaders },
       );
       setRows(prev =>
@@ -186,12 +188,7 @@ export default function AdminPaymentReviewPage() {
             prefix={<SearchOutlined />}
             placeholder="ค้นหาเลขออเดอร์หรือชื่อผู้ใช้"
             onChange={(e) => setKeyword(e.target.value)}
-            style={{
-              width: 280,
-              background: BG_DARK,
-              color: TEXT_MAIN,
-              borderColor: BORDER,
-            }}
+            style={{ width: 280, background: BG_DARK, color: TEXT_MAIN, borderColor: BORDER }}
           />
           <Button onClick={() => fetchPayments(statusFilter)} loading={loading}>รีเฟรช</Button>
         </Space>
