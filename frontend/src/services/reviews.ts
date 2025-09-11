@@ -23,6 +23,7 @@ export type ReviewItem = {
 const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8088";
 
 /** ปรับชื่อฟิลด์ที่ backend ส่ง ให้เป็นรูปแบบที่ UI ใช้ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const normalizeReview = (r: any): ReviewItem => ({
   ID: Number(r?.ID ?? r?.id),
   CreatedAt: r?.CreatedAt ?? r?.createdAt ?? r?.created_at ?? "",
@@ -107,7 +108,7 @@ export const ReviewsAPI = {
     reviewId: number,
     userId: number,
     token?: string
-  ): Promise<{ review_id: number; likes: number; liked?: boolean }> {
+  ): Promise<{ review_id: number; likes: number; liked: boolean }> {
     const res = await axios.post(
       `${BASE}/reviews/${reviewId}/toggle_like`,
       { user_id: userId },
@@ -118,7 +119,12 @@ export const ReviewsAPI = {
         },
       }
     );
-    return res.data as { review_id: number; likes: number; liked?: boolean };
+    const data = res.data || {};
+    return {
+      review_id: Number(data.review_id ?? reviewId),
+      likes: typeof data.likes === "number" ? data.likes : 0,
+      liked: !!data.liked,
+    };
   },
 };
     
