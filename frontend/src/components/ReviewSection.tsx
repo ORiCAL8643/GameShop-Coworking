@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Avatar, Button, Form, Input, List, Modal, Popconfirm, Rate, Space, message } from "antd";
+import { Avatar, Button, ConfigProvider, Form, Input, List, Modal, Popconfirm, Rate, Space, message, theme } from "antd";
 import { Heart, Pencil, Trash2, Plus } from "lucide-react";
 import { UserOutlined } from "@ant-design/icons";
 
@@ -181,77 +181,85 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
 
   return (
     <div className={className}>
-      <List
-        header={header}
-        loading={loading}
-        dataSource={items}
-        itemLayout="vertical"
-        renderItem={(r) => (
-          <List.Item
-            key={r.ID}
-            actions={[
-              <Space key="like" onClick={() => handleToggleLike(r)} style={{ cursor: "pointer" }}>
-                <Heart size={18} style={{ verticalAlign: "middle" }} className={r.likedByMe ? "text-red-500" : "text-gray-400"} />
-                <span>{r.likes ?? 0}</span>
-              </Space>,
-              userId === r.user_id ? (
-                <Space key="edit-del">
-                  <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>
-                    แก้ไข
-                  </Button>
-                  <Popconfirm title="ลบรีวิวนี้?" okText="ลบ" cancelText="ยกเลิก" onConfirm={() => onDelete(r)}>
-                    <Button size="small" danger icon={<Trash2 size={14} />}>
-                      ลบ
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
+        <List
+          className="bg-[#1a1a1a]"
+          header={header}
+          loading={loading}
+          dataSource={items}
+          itemLayout="vertical"
+          renderItem={(r) => (
+            <List.Item
+              key={r.ID}
+              className="bg-[#1a1a1a]"
+              actions={[
+                <Space key="like" onClick={() => handleToggleLike(r)} style={{ cursor: "pointer" }}>
+                  <Heart size={18} style={{ verticalAlign: "middle" }} className={r.likedByMe ? "text-red-500" : "text-gray-400"} />
+                  <span>{r.likes ?? 0}</span>
+                </Space>,
+                userId === r.user_id ? (
+                  <Space key="edit-del">
+                    <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>
+                      แก้ไข
                     </Button>
-                  </Popconfirm>
-                </Space>
-              ) : null,
-            ].filter(Boolean)}
-          >
-            <List.Item.Meta
-              avatar={<Avatar icon={<UserOutlined />} />}
-              title={
-                <Space>
-                  <strong>{r.title || "ไม่มีหัวข้อ"}</strong>
-                  <Rate allowHalf disabled value={Number(r.rating) || 0} />
-                </Space>
-              }
-              description={
-                <span style={{ color: "#888" }}>
-                  โดย {r.username || `user#${r.user_id}`} · {new Date(r.UpdatedAt || r.CreatedAt || Date.now()).toLocaleString()}
-                </span>
-              }
-            />
-            <div style={{ whiteSpace: "pre-wrap" }}>{r.content}</div>
-          </List.Item>
-        )}
-      />
+                    <Popconfirm title="ลบรีวิวนี้?" okText="ลบ" cancelText="ยกเลิก" onConfirm={() => onDelete(r)}>
+                      <Button size="small" danger icon={<Trash2 size={14} />}>
+                        ลบ
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ) : null,
+              ].filter(Boolean)}
+            >
+              <List.Item.Meta
+                avatar={<Avatar icon={<UserOutlined />} />}
+                title={
+                  <Space>
+                    <strong>{r.title || "ไม่มีหัวข้อ"}</strong>
+                    <Rate allowHalf disabled value={Number(r.rating) || 0} />
+                  </Space>
+                }
+                description={
+                  <span style={{ color: "#888" }}>
+                    โดย {r.username || `user#${r.user_id}`} · {new Date(r.UpdatedAt || r.CreatedAt || Date.now()).toLocaleString()}
+                  </span>
+                }
+              />
+              <div style={{ whiteSpace: "pre-wrap" }}>{r.content}</div>
+            </List.Item>
+          )}
+        />
+      </ConfigProvider>
 
-      <Modal
-        open={showForm}
-        onCancel={() => {
-          setShowForm(false);
-          setEditing(null);
-          form.resetFields();
-        }}
-        onOk={onSubmit}
-        okText={editing ? "บันทึก" : "สร้าง"}
-        cancelText="ยกเลิก"
-        title={editing ? "แก้ไขรีวิว" : "สร้างรีวิว"}
-        destroyOnClose
-      >
-        <Form layout="vertical" form={form} initialValues={{ rating: 0 }}>
-          <Form.Item label="หัวข้อ" name="title">
-            <Input placeholder="เช่น เกมสนุกเกินคาด!" maxLength={120} />
-          </Form.Item>
-          <Form.Item label="รายละเอียด" name="content" rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}>
-            <Input.TextArea rows={5} placeholder="เล่าประสบการณ์ของคุณ" />
-          </Form.Item>
-          <Form.Item label="ให้คะแนน" name="rating" rules={[{ required: true }]}>
-            <Rate allowHalf />
-          </Form.Item>
-        </Form>
-      </Modal>
+      <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
+        <Modal
+          className="bg-[#1a1a1a]"
+          bodyStyle={{ background: "#1a1a1a" }}
+          open={showForm}
+          onCancel={() => {
+            setShowForm(false);
+            setEditing(null);
+            form.resetFields();
+          }}
+          onOk={onSubmit}
+          okText={editing ? "บันทึก" : "สร้าง"}
+          cancelText="ยกเลิก"
+          title={editing ? "แก้ไขรีวิว" : "สร้างรีวิว"}
+          destroyOnClose
+        >
+          <Form layout="vertical" form={form} initialValues={{ rating: 0 }}>
+            <Form.Item label="หัวข้อ" name="title">
+              <Input placeholder="เช่น เกมสนุกเกินคาด!" maxLength={120} />
+            </Form.Item>
+            <Form.Item label="รายละเอียด" name="content" rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}> 
+              <Input.TextArea rows={5} placeholder="เล่าประสบการณ์ของคุณ" />
+            </Form.Item>
+            <Form.Item label="ให้คะแนน" name="rating" rules={[{ required: true }]}> 
+              <Rate allowHalf />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </ConfigProvider>
     </div>
   );
 };
