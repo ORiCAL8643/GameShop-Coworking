@@ -104,6 +104,7 @@ const Add = () => {
 
     async function AddGame() {
         try {
+            AddMinimumSpec();
             const response = await axios.post(`${base_url}/new-game`, {
             game_name: gameName,
             base_price: price,
@@ -223,7 +224,6 @@ const Add = () => {
                     </Row>
                     <Row style={{marginTop: 12}}>
                         <Col offset={23}><Button type="primary" onClick={() => {
-                            AddMinimumSpec();
                             AddGame(); 
                         }}>ยืนยัน</Button></Col>
                     </Row>
