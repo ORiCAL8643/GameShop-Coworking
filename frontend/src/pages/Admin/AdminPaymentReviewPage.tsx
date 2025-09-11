@@ -197,15 +197,17 @@ export default function AdminPaymentReviewPage() {
             {
               title: "สถานะ",
               dataIndex: "status",
-              render: (s: PaymentStatus, r) =>
+              render: (s: PaymentStatus | string | undefined, r) =>
                 s === "PENDING" ? (
                   <Tag color="gold">รอตรวจสอบ</Tag>
                 ) : s === "APPROVED" ? (
                   <Tag color="success">อนุมัติแล้ว</Tag>
-                ) : (
+                ) : s === "REJECTED" ? (
                   <Tooltip title={r.reject_reason}>
                     <Tag color="error">ปฏิเสธแล้ว</Tag>
                   </Tooltip>
+                ) : (
+                  <Tag color="default">ไม่ทราบ</Tag>
                 ),
             },
             {
