@@ -97,20 +97,22 @@ const Reviewpage: React.FC = () => {
             style={{ width: "100%", height: 240, objectFit: "cover", display: "block" }}
           />
         )}
-        <div className="p-4">
-          {/* ✅ เพิ่มระยะห่างจากชื่อด้วย ml-4 md:ml-6 บนกล่องเรตติ้ง */}
-          <h1 className="text-xl md:text-2xl font-semibold flex items-center">
-            <span className="truncate">{game.name}</span>
 
-            <span className="inline-flex items-center ml-6 md:ml-12">
+        <div className="p-4">
+          {/* ชื่อเกมซ้าย – ดาวกับค่าเฉลี่ยขวา */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-xl md:text-2xl font-semibold truncate">{game.name}</h1>
+
+            <div className="flex items-center shrink-0">
               <Rate disabled allowHalf value={avgRating ?? 0} />
-              <span className="ml-4 text-lg md:text-xl text-gray-200">
+              <span className="ml-3 text-lg md:text-xl text-gray-200">
                 {avgRating?.toFixed(1) ?? "-"}
               </span>
-            </span>
-          </h1>
+            </div>
+          </div>
 
-          
+          {/* (ถ้าอยากโชว์จำนวนรีวิวใต้หัวข้อ—ปล่อยไว้หรือเอาออกได้) */}
+          {/* <div className="mt-2 text-sm text-gray-400">รีวิวทั้งหมด ({reviewCount})</div> */}
         </div>
       </div>
 
@@ -122,4 +124,3 @@ const Reviewpage: React.FC = () => {
 };
 
 export default Reviewpage;
-   
