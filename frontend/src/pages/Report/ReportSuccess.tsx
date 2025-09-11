@@ -1,4 +1,3 @@
-import React from "react";
 import { Card, Button, Typography } from "antd";
 import { CheckCircleTwoTone } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";

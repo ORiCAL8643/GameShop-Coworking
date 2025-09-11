@@ -1,5 +1,5 @@
 // src/services/Report.ts
-import api from "../lib/api";
+import { api } from "../api/client";
 import type { ProblemReport } from "../interfaces/problem_report";
 
 export type CreateReportInput = {
