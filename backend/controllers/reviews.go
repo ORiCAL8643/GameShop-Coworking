@@ -205,24 +205,32 @@ func ToggleReviewLike(c *gin.Context) {
 	// หา like เดิม
 	var like entity.Review_Like
 	err := db.Where("review_id = ? AND user_id = ?", rid, body.UserID).First(&like).Error
+	liked := true
 	if err == nil {
 		// มีแล้ว => ลบ (unlike)
 		_ = db.Delete(&like).Error
-		c.Status(http.StatusNoContent)
-		return
-	}
-	if err != gorm.ErrRecordNotFound {
+		liked = false
+	} else if err != gorm.ErrRecordNotFound {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
 		return
+	} else {
+		// ยังไม่มี => เพิ่ม like
+		newLike := entity.Review_Like{
+			ReviewID: uint(rid),
+			UserID:   body.UserID,
+		}
+		if err := db.Create(&newLike).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
+			return
+		}
 	}
-	// ยังไม่มี => เพิ่ม like
-	newLike := entity.Review_Like{
-		ReviewID: uint(rid),
-		UserID:   body.UserID,
-	}
-	if err := db.Create(&newLike).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "toggle_failed"})
-		return
-	}
-	c.Status(http.StatusCreated)
+
+	var cnt int64
+	db.Model(&entity.Review_Like{}).Where("review_id = ?", rid).Count(&cnt)
+
+	c.JSON(http.StatusOK, gin.H{
+		"review_id": rid,
+		"likes":     cnt,
+		"liked":     liked,
+	})
 }
