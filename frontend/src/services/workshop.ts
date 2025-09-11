@@ -1,4 +1,4 @@
-// src/services/workshop.ts
+// PATH: src/services/workshop.ts
 import type {
   Game,
   UserGame,
@@ -16,7 +16,9 @@ async function handleResponse<T>(res: Response): Promise<T> {
     const text = await res.text().catch(() => "");
     throw new Error(text || "API request failed");
   }
-  return res.json() as Promise<T>;
+  // บางครั้ง backend อาจคืน "" (ว่าง) แทน JSON → กันไว้
+  const txt = await res.text();
+  return (txt ? JSON.parse(txt) : (null as any)) as T;
 }
 
 // ---------- helpers: normalize keys (รองรับ snake/camel/Upper) ----------
@@ -36,25 +38,36 @@ function addAliases<T extends Record<string, any>>(row: T) {
 
   return {
     ...row,
-    id: id ?? row.id,
-    ID: id ?? row.ID,
-    Id: id ?? row.Id,
+    id: id ?? (row as any).id,
+    ID: id ?? (row as any).ID,
+    Id: id ?? (row as any).Id,
 
-    game_id: game_id ?? row.game_id,
-    gameId: game_id ?? row.gameId,
-    GameID: game_id ?? row.GameID,
+    game_id: game_id ?? (row as any).game_id,
+    gameId: game_id ?? (row as any).gameId,
+    GameID: game_id ?? (row as any).GameID,
 
-    user_id: user_id ?? row.user_id,
-    userId: user_id ?? row.userId,
-    UserID: user_id ?? row.UserID,
+    user_id: user_id ?? (row as any).user_id,
+    userId: user_id ?? (row as any).userId,
+    UserID: user_id ?? (row as any).UserID,
   };
 }
 
-// ------------------------------- Games -------------------------------
+// ช่วยให้ดึง array จากหลายรูปแบบ payload เช่น [], {items:[]}, {data:[]}, {rows:[]}
+const asArray = (v: any): any[] => {
+  if (Array.isArray(v)) return v;
+  if (Array.isArray(v?.items)) return v.items;
+  if (Array.isArray(v?.data)) return v.data;
+  if (Array.isArray(v?.rows)) return v.rows;
+  return [];
+};
+
+/* ------------------------------- Games ------------------------------- */
 export async function listGames(): Promise<Game[]> {
-  // NOTE: โปรเจกต์นี้ใช้ /game สำหรับลิสต์ทั้งหมด
-  const res = await fetch(`${API_URL}/game`);
-  return handleResponse<Game[]>(res);
+  // โปรเจกต์นี้ใช้ /game สำหรับลิสต์ทั้งหมด
+  const res = await fetch(`${API_URL}/game`, { credentials: "include" });
+  const raw = await handleResponse<any>(res);
+  // ✅ normalize ให้เป็นอาเรย์เสมอ + map alias ให้มีทั้ง id/ID
+  return asArray(raw).map((r: any) => addAliases<Game>(r));
 }
 
 export async function getGame(id: number): Promise<Game> {
@@ -64,19 +77,21 @@ export async function getGame(id: number): Promise<Game> {
   return found;
 }
 
-// ----------------------------- UserGames -----------------------------
+/* ----------------------------- UserGames ----------------------------- */
 export async function listUserGames(userId: number): Promise<UserGame[]> {
   const url = new URL(`${API_URL}/user-games`);
   url.searchParams.set("user_id", String(userId));
-  const res = await fetch(url.toString());
-  const rows = await handleResponse<any[]>(res);
-  return (rows ?? []).map((r) => addAliases<UserGame>(r));
+  const res = await fetch(url.toString(), { credentials: "include" });
+  const rows = await handleResponse<any>(res);
+  return asArray(rows).map((r) => addAliases<UserGame>(r));
 }
 
-// ------------------------------- Mods --------------------------------
+/* -------------------------------- Mods -------------------------------- */
 export async function listMods(gameId?: number): Promise<Mod[]> {
-  const res = await fetch(`${API_URL}/mods`);
-  let mods = await handleResponse<Mod[]>(res);
+  const res = await fetch(`${API_URL}/mods`, { credentials: "include" });
+  const raw = await handleResponse<any>(res);
+  let mods = asArray(raw).map((r) => addAliases<Mod>(r));
+
   if (gameId !== undefined) {
     mods = mods.filter(
       (m: any) => (m?.game_id ?? m?.gameId ?? m?.GameID) === gameId
@@ -86,8 +101,9 @@ export async function listMods(gameId?: number): Promise<Mod[]> {
 }
 
 export async function getMod(id: number): Promise<Mod> {
-  const res = await fetch(`${API_URL}/mods/${id}`);
-  return handleResponse<Mod>(res);
+  const res = await fetch(`${API_URL}/mods/${id}`, { credentials: "include" });
+  const raw = await handleResponse<any>(res);
+  return addAliases<Mod>(raw);
 }
 
 export async function createMod(formData: FormData, authToken?: string): Promise<Mod> {
@@ -95,8 +111,10 @@ export async function createMod(formData: FormData, authToken?: string): Promise
     method: "POST",
     body: formData, // อย่าตั้ง Content-Type เอง
     headers: authToken ? { Authorization: `Bearer ${authToken}` } : undefined,
+    credentials: "include",
   });
-  return handleResponse<Mod>(res);
+  const raw = await handleResponse<any>(res);
+  return addAliases<Mod>(raw);
 }
 
 export async function updateMod(
@@ -110,32 +128,38 @@ export async function updateMod(
       "Content-Type": "application/json",
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
-  return handleResponse<Mod>(res);
+  const raw = await handleResponse<any>(res);
+  return addAliases<Mod>(raw);
 }
 
-// ----------------------------- Comments ------------------------------
+/* ----------------------------- Comments ------------------------------ */
 export async function listComments(threadId: number): Promise<Comment[]> {
   const url = new URL(`${API_URL}/comments`);
   url.searchParams.set("thread_id", String(threadId));
-  const res = await fetch(url.toString());
-  return handleResponse<Comment[]>(res);
+  const res = await fetch(url.toString(), { credentials: "include" });
+  const raw = await handleResponse<any>(res);
+  return asArray(raw).map((r) => addAliases<Comment>(r));
 }
 
 export async function createComment(payload: CreateCommentRequest): Promise<Comment> {
   const res = await fetch(`${API_URL}/comments`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
-  return handleResponse<Comment>(res);
+  const raw = await handleResponse<any>(res);
+  return addAliases<Comment>(raw);
 }
 
-// --------------------------- Mod Ratings -----------------------------
+/* --------------------------- Mod Ratings ----------------------------- */
 export async function listModRatings(modId: number): Promise<ModRating[]> {
-  const res = await fetch(`${API_URL}/modratings`);
-  const ratings = await handleResponse<ModRating[]>(res);
+  const res = await fetch(`${API_URL}/modratings`, { credentials: "include" });
+  const raw = await handleResponse<any>(res);
+  const ratings = asArray(raw).map((r) => addAliases<ModRating>(r));
   return ratings.filter((r: any) => (r?.mod_id ?? r?.modId ?? r?.ModID) === modId);
 }
 
@@ -143,7 +167,9 @@ export async function createModRating(payload: CreateModRatingRequest): Promise<
   const res = await fetch(`${API_URL}/modratings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: JSON.stringify(payload),
   });
-  return handleResponse<ModRating>(res);
+  const raw = await handleResponse<any>(res);
+  return addAliases<ModRating>(raw);
 }
