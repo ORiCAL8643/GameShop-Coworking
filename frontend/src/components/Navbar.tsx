@@ -12,7 +12,7 @@ import type { Notification } from '../interfaces/Notification';
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { token, username, logout, userId } = useAuth();
+  const { token, username, logout, id: userId } = useAuth();
 
   const handleLoginSuccess = () => {
     setNotifications((prev) => [
