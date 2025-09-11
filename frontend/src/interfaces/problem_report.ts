@@ -1,33 +1,37 @@
 import type { ProblemAttachment } from "./problem_attachment";
 import type { User } from "./User";
-import type { Game } from "./Game";
 
-/**
- * รูปแบบ ProblemReport ตาม backend (gorm.Model)
- * - ID: number (พิมพ์ใหญ่เพราะ GORM คืนมาเป็น "ID")
- * - field อื่นเป็น lower_case ตาม json
- */
+// ====== Reply types ======
+export interface ProblemReplyAttachment {
+  ID: number;
+  file_path: string;
+  reply_id: number;
+}
+
+export interface ProblemReply {
+  ID: number;
+  report_id: number;
+  admin_id: number;
+  message: string;
+  created_at?: string;
+  attachments?: ProblemReplyAttachment[];
+}
+
+/** รูปแบบ ProblemReport ตาม backend (gorm.Model) */
 export interface ProblemReport {
-  ID: number;             // primary key
-
+  ID: number;
   title: string;
   description: string;
-  status: string;         // "pending" | "resolved"
+  category: string;
+  status: string; // "pending" | "resolved"
+
+  user_id: number;
+  user?: User;
 
   created_at?: string;
+  updated_at?: string;
   resolved_at?: string;
 
-  // foreign keys
-  user_id: number;        // ✅ ใช้ตัวนี้ตอน createNotification
-  game_id: number;
-
-  // preload relations
-  user?: User;
-  game?: Game;
-
-  // admin reply
-  reply?: string;
-
-  // attachments
   attachments?: ProblemAttachment[];
+  replies?: ProblemReply[];
 }

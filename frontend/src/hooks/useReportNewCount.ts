@@ -18,10 +18,7 @@ export function useReportNewCount(pollMs = 8000) {
 
       const all: ProblemReport[] = await fetchReports();
       const newOnes = (all || []).filter(
-        (r) =>
-          r.status !== "resolved" &&
-          !!r.created_at &&
-          new Date(r.created_at).getTime() > lastSeen
+        (r) => !!r.created_at && new Date(r.created_at).getTime() > lastSeen
       );
 
       setCount(newOnes.length);

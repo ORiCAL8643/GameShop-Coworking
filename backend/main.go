@@ -1,10 +1,13 @@
 package main
+
 import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"github.com/gin-gonic/gin"
 )
+
 const PORT = "8088"
+
 func main() {
 	configs.ConnectionDB()
 	configs.SetupDatabase()
@@ -171,11 +174,12 @@ func main() {
 
 		// ===== Problem Reports =====
 		router.POST("/reports", controllers.CreateReport)
-		router.GET("/reports", controllers.FindReports)
+		router.GET("/reports", controllers.GetPendingReports)
+		router.GET("/reports/resolved", controllers.GetResolvedReports)
 		router.GET("/reports/:id", controllers.GetReportByID)
-		router.PUT("/reports/:id", controllers.UpdateReport)
-		router.DELETE("/reports/:id", controllers.DeleteReport)
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
+		router.PUT("/reports/:id/resolve", controllers.ResolveReport)
+		router.DELETE("/reports/:id", controllers.DeleteReport)
 	}
 
 	// Run the server
