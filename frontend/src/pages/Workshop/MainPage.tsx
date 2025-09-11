@@ -22,22 +22,28 @@ const { Search } = Input;
 const WorkshopMain: React.FC = () => {
   const [search, setSearch] = useState("");
   const [activeMenu, setActiveMenu] = useState<"all" | "your-games">("all");
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<Game[]>([]);          // ✅ เริ่มเป็น []
   const [yourGames, setYourGames] = useState<number[]>([]);
-  const [modCounts, setModCounts] = useState<Record<number, number>>({}); // gameID -> count
+  const [modCounts, setModCounts] = useState<Record<number, number>>({});
 
   const navigate = useNavigate();
   const { id: userId } = useAuth();
 
   useEffect(() => {
-    // ดึงรายชื่อเกมทั้งหมด
-    listGames().then(setGames).catch(console.error);
+    // ดึงรายชื่อเกม
+    listGames()
+      .then((data: any) => setGames(Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [])) // ✅ normalize
+      .catch((e) => {
+        console.warn("listGames failed:", e);
+        setGames([]); // fallback
+      });
 
-    // ดึงม็อดทั้งหมดแล้วนับจำนวนต่อเกม (ทำครั้งเดียว)
+    // ดึงม็อดทั้งหมดแล้วนับต่อเกม
     listMods()
       .then((mods: Mod[]) => {
+        const arr = Array.isArray(mods) ? mods : Array.isArray((mods as any)?.items) ? (mods as any).items : [];
         const counts: Record<number, number> = {};
-        for (const m of mods ?? []) {
+        for (const m of arr) {
           const gid = Number((m as any)?.game_id ?? (m as any)?.gameId ?? (m as any)?.GameID);
           if (Number.isFinite(gid)) counts[gid] = (counts[gid] || 0) + 1;
         }
@@ -48,25 +54,34 @@ const WorkshopMain: React.FC = () => {
         setModCounts({});
       });
 
-    // ดึงเกมที่ผู้ใช้เป็นเจ้าของ (ถ้ามี userId)
+    // เกมของผู้ใช้
     if (userId) {
       listUserGames(Number(userId))
         .then((rows: any[]) => {
-          const ids = (rows ?? [])
+          const arr = Array.isArray(rows) ? rows : [];
+          const ids = arr
             .map((r) => Number(r.game_id ?? r.gameId ?? r.GameID))
             .filter((n) => Number.isFinite(n)) as number[];
           setYourGames(ids);
         })
-        .catch(console.error);
+        .catch((e) => {
+          console.warn("listUserGames failed:", e);
+          setYourGames([]);
+        });
+    } else {
+      setYourGames([]); // guest
     }
   }, [userId]);
 
-  const filtered = games.filter((g) => {
-    const matchesSearch = (g.game_name ?? "")
-      .toLowerCase()
-      .includes(search.toLowerCase());
+  // ✅ เผื่อกรณี games ไม่ใช่อาเรย์
+  const baseGames: Game[] = Array.isArray(games) ? games : [];
+
+  const filtered = baseGames.filter((g) => {
+    const name = (g as any)?.game_name ?? (g as any)?.name ?? "";
+    const matchesSearch = String(name).toLowerCase().includes(search.toLowerCase());
     if (activeMenu === "your-games") {
-      return yourGames.includes((g as any).ID) && matchesSearch;
+      const gid = Number((g as any).ID ?? (g as any).id);
+      return yourGames.includes(gid) && matchesSearch;
     }
     return matchesSearch;
   });

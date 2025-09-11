@@ -32,6 +32,28 @@ func main() {
 		router.GET("/users/:id", controllers.FindUserByID)
 		router.PUT("/users/:id", controllers.UpdateUser)
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
+		router.PATCH("/users/:id/role", controllers.UpdateUserRole)
+
+		// ===== Roles =====
+		router.GET("/roles", controllers.GetRoles)
+		router.GET("/roles/:id", controllers.GetRoleById)
+		router.POST("/roles", controllers.CreateRole)
+		router.PATCH("/roles/:id", controllers.UpdateRole)
+		router.DELETE("/roles/:id", controllers.DeleteRole)
+
+		// ===== Permissions =====
+		router.GET("/permissions", controllers.GetPermissions)
+		router.GET("/permissions/:id", controllers.GetPermissionById)
+		router.POST("/permissions", controllers.CreatePermission)
+		router.PATCH("/permissions/:id", controllers.UpdatePermission)
+		router.DELETE("/permissions/:id", controllers.DeletePermission)
+
+		// ===== RolePermissions =====
+		router.GET("/rolepermissions", controllers.GetRolePermissions)
+		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
+		router.POST("/rolepermissions", controllers.CreateRolePermission)
+		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
+		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
 
 		// ===== Games =====
 		router.POST("/new-game", controllers.CreateGame)
@@ -133,7 +155,7 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers",
 			"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
