@@ -43,6 +43,10 @@ func SetupDatabase() {
 	}
 
 	// สร้างตารางให้ครบ
+	// ลบ index เดิมของ Review หากมีอยู่ก่อนทำ AutoMigrate
+	if db.Migrator().HasIndex(&entity.Review{}, "idx_user_game") {
+		db.Migrator().DropIndex(&entity.Review{}, "idx_user_game")
+	}
 	if err := db.AutoMigrate(
 		&entity.User{},
 		&entity.Game{},
