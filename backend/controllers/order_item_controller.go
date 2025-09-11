@@ -2,7 +2,7 @@
 package controllers
 
 import (
-	"math"
+	//"math"
 	"net/http"
 	"time"
 
@@ -13,7 +13,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func round2(n float64) float64 { return math.Round(n*100) / 100 }
+//func round2(n float64) float64 { return math.Round(n*100) / 100 }
 
 func recalcOrderTotal(db *gorm.DB, orderID uint) error {
 	var items []entity.OrderItem

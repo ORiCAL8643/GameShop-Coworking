@@ -3,10 +3,15 @@ package main
 
 import (
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 const PORT = "8088"
@@ -25,7 +30,7 @@ func main() {
 	// 3) health check
 	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
 
-	// 4) กลุ่มเส้นทางหลัก
+	// 4) กลุ่มเส้นทางหลัก (public)
 	router := r.Group("/")
 	{
 		// -------- Auth --------
@@ -65,7 +70,6 @@ func main() {
 		router.GET("/game", controllers.FindGames)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
 		router.POST("/upload/game", controllers.UploadGame)
-		// (คุณมี FindGameByID/DeleteGameByID เดิมที่ถูกคอมเมนต์อยู่ เลยไม่ผูก route ตรงนี้)
 
 		// -------- Threads --------
 		router.POST("/threads", controllers.CreateThread)
@@ -76,7 +80,7 @@ func main() {
 
 		// -------- Comments --------
 		router.POST("/comments", controllers.CreateComment)
-		router.GET("/comments", controllers.FindComments)       // ?thread_id=&user_id=
+		router.GET("/comments", controllers.FindComments) // ?thread_id=&user_id=
 		router.GET("/comments/:id", controllers.FindCommentByID)
 		router.PUT("/comments/:id", controllers.UpdateComment)
 		router.DELETE("/comments/:id", controllers.DeleteCommentByID)
@@ -131,10 +135,8 @@ func main() {
 		router.GET("/categories", controllers.FindCategories)
 
 		// -------- KeyGames --------
-		// อ้างอิงชื่อฟังก์ชันชุดล่าสุดของคุณ: CreateKeyGame, FindKeyGame(list), DeleteKeyGameById
 		router.POST("/keygames", controllers.CreateKeyGame)
 		router.GET("/keygames", controllers.FindKeyGames)
-		// ถ้าคุณมี FindKeyGameByID ให้ปลดคอมเมนต์บรรทัดล่าง:
 		// router.GET("/keygames/:id", controllers.FindKeyGameByID)
 		router.DELETE("/keygames/:id", controllers.DeleteKeyGame)
 
@@ -145,53 +147,31 @@ func main() {
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
+	}
 
-		// -------- Orders --------
-		// ใช้ middleware InjectUserIDQuery เฉพาะ GET /orders และ GET /payments เพื่อช่วยยัด user_id ให้อัตโนมัติจาก header X-User-ID (ถ้ามี)
-		withUserQuery := router.Group("/", InjectUserIDQuery())
+	// -------- Routes ที่ต้อง Auth --------
+	authList := r.Group("/", AuthRequired())
+	{
+		withUserQuery := authList.Group("/", InjectUserIDQuery())
 		{
-			withUserQuery.GET("/orders", controllers.FindOrders) // ใช้ ?user_id= (แนะนำให้ FE ส่งจาก useAuth.id)
+			withUserQuery.GET("/orders", controllers.FindOrders)
 			withUserQuery.GET("/payments", controllers.FindPayments)
 		}
-		router.POST("/orders", controllers.CreateOrder)
-		// ไม่รองรับแก้ไข/ลบ order ตามโค้ดปัจจุบันที่คุณปรับไว้
-		// router.PUT("/orders/:id", controllers.UpdateOrder)
-		// router.DELETE("/orders/:id", controllers.DeleteOrder)
 
-		// -------- Order Items --------
-		router.POST("/order-items", controllers.CreateOrderItem)
-		router.GET("/order-items", controllers.FindOrderItems)
-		router.PUT("/order-items/:id/qty", controllers.UpdateOrderItemQty)
-		router.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+		// Orders (write)
+		authList.POST("/orders", controllers.CreateOrder)
 
-		// -------- Payments --------
-		// POST /payments (multipart: order_id, file)
-		router.POST("/payments", controllers.CreatePayment)
-		router.PATCH("/payments/:id", controllers.UpdatePayment) // 👈 เพิ่มบรรทัดนี้
-		router.GET("/payments", controllers.FindPayments)
-		// GET /payments จัดอยู่ในกลุ่ม withUserQuery ด้านบนแล้ว (เพื่อเติม user_id อัตโนมัติได้ ถ้าคุณเลือกส่ง header)
-		// ไม่รองรับ PATCH/DELETE payment โดยตรง
-		router.POST("/payments/:id/approve", controllers.ApprovePayment)
-		router.POST("/payments/:id/reject", controllers.RejectPayment)
+		// Order Items
+		authList.POST("/order-items", controllers.CreateOrderItem)
+		authList.GET("/order-items", controllers.FindOrderItems)
+		authList.PUT("/order-items/:id/qty", controllers.UpdateOrderItemQty)
+		authList.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
-		// -------- Mods / Workshop --------
-		router.GET("/mods", controllers.GetMods)
-		router.GET("/mods/:id", controllers.GetModById)
-		router.POST("/mods", controllers.CreateMod)
-		router.PATCH("/mods/:id", controllers.UpdateMod)
-		router.DELETE("/mods/:id", controllers.DeleteMod)
-
-		router.GET("/modratings", controllers.GetModRatings)
-		router.GET("/modratings/:id", controllers.GetModRatingById)
-		router.POST("/modratings", controllers.CreateModRating)
-		router.PATCH("/modratings/:id", controllers.UpdateModRating)
-		router.DELETE("/modratings/:id", controllers.DeleteModRating)
-
-		router.GET("/modtags", controllers.GetModTags)
-		router.GET("/modtags/:id", controllers.GetModTagById)
-		router.POST("/modtags", controllers.CreateModTag)
-		router.PATCH("/modtags/:id", controllers.UpdateModTag)
-		router.DELETE("/modtags/:id", controllers.DeleteModTag)
+		// Payments (write/action)
+		authList.POST("/payments", controllers.CreatePayment)
+		authList.PATCH("/payments/:id", controllers.UpdatePayment)
+		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler ตามเหมาะสม
+		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 	}
 
 	// 5) Run server
@@ -217,15 +197,98 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-// InjectUserIDQuery:
-//
-// สำหรับ GET /orders และ GET /payments เท่านั้น
-// - ถ้า query `user_id` มีอยู่แล้ว -> ไม่ทำอะไร
-// - ถ้ายังไม่มี และ header `X-User-ID` มา -> เติม `user_id` ให้
-// เหตุผล: ให้ทำงานร่วมกับ FE ที่ใช้ useAuth().id ผ่าน query ได้ทันที
+// AuthRequired:
+// - อ่าน user id จาก Bearer JWT (sub หรือ user_id) หรือ X-User-ID
+// - เซ็ต c.Set("userID", <uint>) และ (option) c.Set("roleID", <uint>)
+func AuthRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var userID uint
+
+		// 1) ลองจาก Bearer token
+		authz := c.GetHeader("Authorization")
+		if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
+			raw := strings.TrimSpace(authz[7:])
+			if raw != "" {
+				secret := []byte(os.Getenv("JWT_SECRET"))
+				if len(secret) == 0 {
+					secret = []byte("secret") // fallback ให้ตรงกับตอน Login ถ้าคุณใช้ค่าคงที่
+				}
+				if token, _ := jwt.Parse(raw, func(t *jwt.Token) (interface{}, error) {
+					return secret, nil
+				}); token != nil && token.Valid {
+					if claims, ok := token.Claims.(jwt.MapClaims); ok {
+						// sub เป็น string ตาม RegisteredClaims
+						if sub, ok2 := claims["sub"].(string); ok2 {
+							if n, err := strconv.Atoi(sub); err == nil && n > 0 {
+								userID = uint(n)
+							}
+						}
+						if userID == 0 {
+							switch v := claims["user_id"].(type) {
+							case float64:
+								if v > 0 {
+									userID = uint(v)
+								}
+							case string:
+								if n, err := strconv.Atoi(v); err == nil && n > 0 {
+									userID = uint(n)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// 2) สำรอง: X-User-ID
+	if userID == 0 {
+			if v := c.GetHeader("X-User-ID"); v != "" {
+				if n, err := strconv.Atoi(v); err == nil && n > 0 {
+					userID = uint(n)
+				}
+			}
+		}
+
+		if userID == 0 {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		// set ลง context
+		c.Set("userID", userID)
+
+		// (option) เติม roleID — รองรับทั้ง *uint และ uint
+		var u entity.User
+		if err := configs.DB().Select("id, role_id").First(&u, userID).Error; err == nil {
+			switch v := any(getRoleField(u)).(type) {
+			case *uint:
+				if v != nil {
+					c.Set("roleID", *v)
+				}
+			case uint:
+				if v > 0 {
+					c.Set("roleID", v)
+				}
+			}
+		}
+
+		c.Next()
+	}
+}
+
+// getRoleField ดึงค่า role_id ออกมา รองรับ model ที่ประกาศ role เป็น *uint หรือ uint
+func getRoleField(u entity.User) interface{} {
+	// ถ้ามีฟิลด์เป็น pointer:
+	//   type User struct { ... RoleID *uint `gorm:"column:role_id"` ... }
+	// หรือถ้าเป็นค่า:
+	//   type User struct { ... RoleID uint  `gorm:"column:role_id"` ... }
+	// ตรงนี้ใช้ type switch เอาตามที่คอมไพล์จริง
+	return any(u.RoleID)
+}
+
+// InjectUserIDQuery: ใช้เฉพาะ GET /orders และ GET /payments
 func InjectUserIDQuery() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// ใช้ c.FullPath() ได้เพราะ middleware นี้ถูกผูกที่ group หลังจากแม็พเส้นทางแล้ว
 		fp := c.FullPath()
 		if c.Request.Method == http.MethodGet && (fp == "/orders" || fp == "/payments") {
 			if c.Query("user_id") == "" {

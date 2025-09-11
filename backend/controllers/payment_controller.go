@@ -24,8 +24,7 @@ func baseURL(c *gin.Context) string {
 }
 
 // ============================
-// POST /payments
-// multipart/form-data: order_id, file
+// POST /payments  (multipart/form-data: order_id, file)
 // สร้างรายการชำระเงิน + อัปเดตคำสั่งซื้อเป็น UNDER_REVIEW
 // ============================
 func CreatePayment(c *gin.Context) {
@@ -60,13 +59,13 @@ func CreatePayment(c *gin.Context) {
 
 	// ตั้งชื่อไฟล์ปลายทาง
 	dstName := fmt.Sprintf("slips/order_%d_%d%s", ord.ID, time.Now().UnixNano(), filepath.Ext(file.Filename))
-	dstPath := filepath.Join("uploads", dstName) // เก็บเป็น path ภายใน
+	dstPath := filepath.Join("uploads", dstName) // เก็บเป็น path ภายใน เช่น uploads/slips/...
 	if err := c.SaveUploadedFile(file, dstPath); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "save slip failed"})
 		return
 	}
 
-	// ใช้ราคาออเดอร์ (ให้ฝั่ง server เป็น truth)
+	// ใช้ราคาออเดอร์จากฝั่ง server
 	amount := ord.TotalAmount
 
 	p := entity.Payment{
@@ -75,10 +74,10 @@ func CreatePayment(c *gin.Context) {
 		SlipPath:     dstName, // เก็บเฉพาะส่วนใต้ /uploads
 		Status:       entity.PaymentStatus("PENDING"),
 		RejectReason: nil,
-		UploadedAt:   time.Now(),
+		// ไม่ต้องมี UploadedAt เพราะ gorm.Model มี CreatedAt ให้อยู่แล้ว
 	}
 
-	// ใช้ transaction ป้องกันข้อมูลค้าง
+	// ใช้ transaction
 	if err := db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&p).Error; err != nil {
 			return err
@@ -95,13 +94,13 @@ func CreatePayment(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"id":           p.ID,
-		"order_id":     p.OrderID,
-		"amount":       p.Amount,
-		"status":       string(p.Status),
+		"id":            p.ID,
+		"order_id":      p.OrderID,
+		"amount":        p.Amount,
+		"status":        string(p.Status),
 		"reject_reason": p.RejectReason,
-		"slip_url":     baseURL(c) + "/uploads/" + p.SlipPath,
-		"uploaded_at":  p.UploadedAt,
+		"slip_url":      baseURL(c) + "/uploads/" + p.SlipPath,
+		"uploaded_at":   p.CreatedAt, // ใช้ CreatedAt แทน
 	})
 }
 
@@ -110,15 +109,15 @@ func CreatePayment(c *gin.Context) {
 // สำหรับหน้า AdminPaymentReview
 // ============================
 type adminPaymentDTO struct {
-	ID          string  `json:"id"`
-	OrderNo     string  `json:"order_no"`
-	UserName    string  `json:"user_name"`
-	Amount      float64 `json:"amount"`
-	SlipURL     string  `json:"slip_url"`
-	UploadedAt  string  `json:"uploaded_at"`
-	Status      string  `json:"status"`
+	ID           string  `json:"id"`
+	OrderNo      string  `json:"order_no"`
+	UserName     string  `json:"user_name"`
+	Amount       float64 `json:"amount"`
+	SlipURL      string  `json:"slip_url"`
+	UploadedAt   string  `json:"uploaded_at"`
+	Status       string  `json:"status"`
 	RejectReason *string `json:"reject_reason,omitempty"`
-	// จะส่งเพิ่มก็ได้ (ถ้าอยากใช้)
+	// จะส่งเพิ่มก็ได้
 	OrderStatus string `json:"order_status,omitempty"`
 }
 
@@ -127,7 +126,7 @@ func FindPayments(c *gin.Context) {
 	statusQ := c.Query("status") // optional
 
 	var rows []entity.Payment
-	q := db.Preload("Order").Preload("Order.User").Order("uploaded_at DESC")
+	q := db.Preload("Order").Preload("Order.User").Order("created_at DESC")
 	if statusQ != "" {
 		q = q.Where("status = ?", statusQ)
 	}
@@ -152,10 +151,10 @@ func FindPayments(c *gin.Context) {
 			UserName:     userName,
 			Amount:       p.Amount,
 			SlipURL:      baseURL(c) + "/uploads/" + p.SlipPath,
-			UploadedAt:   p.UploadedAt.Format(time.RFC3339),
-			Status:       string(p.Status),                 // 👈 แปลงชนิด custom → string
+			UploadedAt:   p.CreatedAt.Format(time.RFC3339), // ใช้ CreatedAt
+			Status:       string(p.Status),
 			RejectReason: p.RejectReason,
-			OrderStatus:  string(p.Order.OrderStatus),      // 👈 แปลงชนิด custom → string
+			OrderStatus:  string(p.Order.OrderStatus),
 		})
 	}
 
@@ -164,7 +163,7 @@ func FindPayments(c *gin.Context) {
 
 // ============================
 // PATCH /payments/:id
-// body: { "status": "APPROVED" | "REJECTED", "reject_reason": "..."? }
+// body: { "status": "APPROVED" | "REJECTED" | "PENDING", "reject_reason": "..."? }
 // - อัปเดตสถานะ payment
 // - ปรับสถานะ order ให้สอดคล้อง
 // ============================
@@ -191,66 +190,19 @@ func UpdatePayment(c *gin.Context) {
 		return
 	}
 
-	db := configs.DB()
-	var p entity.Payment
-	if err := db.Preload("Order").First(&p, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
-		return
-	}
-
-	newStatus := *body.Status
-	switch newStatus {
-	case "APPROVED":
-		// อนุมัติ
-		err = db.Transaction(func(tx *gorm.DB) error {
-			p.Status = entity.PaymentStatus("APPROVED")
-			p.RejectReason = nil
-			if err := tx.Save(&p).Error; err != nil {
-				return err
-			}
-			// อัปเดตคำสั่งซื้อให้ "PAID" (หรือ FULFILLED ถ้าคุณส่งมอบคีย์ทันที)
-			p.Order.OrderStatus = entity.OrderStatus("PAID")
-			if err := tx.Save(&p.Order).Error; err != nil {
-				return err
-			}
-			// TODO: ถ้าต้องจ่ายคีย์เกม/เขียน UserGame ให้ทำใน transaction นี้
-			return nil
-		})
-	case "REJECTED":
-		err = db.Transaction(func(tx *gorm.DB) error {
-			p.Status = entity.PaymentStatus("REJECTED")
-			p.RejectReason = body.RejectReason // pointer → pointer (ไม่มีปัญหา)
-			if err := tx.Save(&p).Error; err != nil {
-				return err
-			}
-			// กลับไปสถานะเดิมให้ชัดเจน (แล้วแต่ธุรกิจคุณ จะ WAITING_PAYMENT หรือ CANCELLED)
-			p.Order.OrderStatus = entity.OrderStatus("WAITING_PAYMENT")
-			if err := tx.Save(&p.Order).Error; err != nil {
-				return err
-			}
-			return nil
-		})
-	case "PENDING":
-		err = db.Transaction(func(tx *gorm.DB) error {
-			p.Status = entity.PaymentStatus("PENDING")
-			// อนุญาตให้ล้างเหตุผลปฏิเสธ
-			p.RejectReason = nil
-			if err := tx.Save(&p).Error; err != nil {
-				return err
-			}
-			p.Order.OrderStatus = entity.OrderStatus("UNDER_REVIEW")
-			if err := tx.Save(&p.Order).Error; err != nil {
-				return err
-			}
-			return nil
-		})
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid status"})
-		return
-	}
-
-	if err != nil {
+	if err := changePaymentStatus(uint(id), *body.Status, body.RejectReason); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
+		return
+	}
+
+	// โหลดล่าสุดเพื่อส่งกลับ
+	var p entity.Payment
+	if err := configs.DB().Preload("Order").First(&p, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "updated"}) // fallback
 		return
 	}
 
@@ -264,34 +216,104 @@ func UpdatePayment(c *gin.Context) {
 }
 
 // ============================
-// (ทางเลือก) ให้ /payments/:id/approve และ /payments/:id/reject
-// ยังใช้งานได้ โดยเรียกใช้ UpdatePayment ภายใน
+// ACTION endpoints (เรียกใช้ helper โดยตรง)
+// POST /payments/:id/approve
+// POST /payments/:id/reject   (body: {"reject_reason":"..."} optional)
 // ============================
 func ApprovePayment(c *gin.Context) {
-	c.Params = append(c.Params, gin.Param{Key: "status", Value: "APPROVED"})
-	var body patchPaymentBody
-	body.Status = strPtr("APPROVED")
-	c.Set("forceBody", body)
-	// เรียก UpdatePayment แบบจำลอง
-	updateWithInjectedBody(c, body)
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	if err := changePaymentStatus(uint(id), "APPROVED", nil); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "approve failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "approved"})
 }
 
 func RejectPayment(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
 	var b struct {
 		RejectReason *string `json:"reject_reason"`
 	}
-	if err := c.ShouldBindJSON(&b); err != nil {
-		// ถ้าไม่ส่ง JSON มาก็ให้ reject แบบไม่มีเหตุผลได้ (เป็น nil)
+	_ = c.ShouldBindJSON(&b) // อนุญาตให้ว่างได้
+
+	if err := changePaymentStatus(uint(id), "REJECTED", b.RejectReason); err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "reject failed"})
+		return
 	}
-	body := patchPaymentBody{Status: strPtr("REJECTED"), RejectReason: b.RejectReason}
-	updateWithInjectedBody(c, body)
+	c.JSON(http.StatusOK, gin.H{"message": "rejected"})
 }
 
-// helper สำหรับเรียก UpdatePayment ด้วย body ที่เตรียมไว้
-func updateWithInjectedBody(c *gin.Context, body patchPaymentBody) {
-	// สร้าง context ใหม่ชั่วคราวเพื่อยัด body เข้าไป
-	c.Request.Method = http.MethodPatch
-	UpdatePayment(c.CopyWithContext(c.Request.Context()))
-}
+// ============================
+// helper: เปลี่ยนสถานะ payment + sync order
+// ============================
+func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string) error {
+	db := configs.DB()
 
-func strPtr(s string) *string { return &s }
+	var p entity.Payment
+	if err := db.Preload("Order").First(&p, paymentID).Error; err != nil {
+		return err
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		switch newStatus {
+		case "APPROVED":
+			p.Status = entity.PaymentStatus("APPROVED")
+			p.RejectReason = nil
+			if err := tx.Save(&p).Error; err != nil {
+				return err
+			}
+			p.Order.OrderStatus = entity.OrderStatus("PAID")
+			if err := tx.Save(&p.Order).Error; err != nil {
+				return err
+			}
+			// TODO: จ่ายคีย์เกม/เขียน UserGame ที่นี่ (ภายใน TX นี้)
+			return nil
+
+		case "REJECTED":
+			p.Status = entity.PaymentStatus("REJECTED")
+			p.RejectReason = rejectReason
+			if err := tx.Save(&p).Error; err != nil {
+				return err
+			}
+			p.Order.OrderStatus = entity.OrderStatus("WAITING_PAYMENT")
+			if err := tx.Save(&p.Order).Error; err != nil {
+				return err
+			}
+			return nil
+
+		case "PENDING":
+			p.Status = entity.PaymentStatus("PENDING")
+			p.RejectReason = nil
+			if err := tx.Save(&p).Error; err != nil {
+				return err
+			}
+			p.Order.OrderStatus = entity.OrderStatus("UNDER_REVIEW")
+			if err := tx.Save(&p.Order).Error; err != nil {
+				return err
+			}
+			return nil
+
+		default:
+			return fmt.Errorf("invalid status: %s", newStatus)
+		}
+	})
+}

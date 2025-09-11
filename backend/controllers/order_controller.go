@@ -2,7 +2,7 @@
 package controllers
 
 import (
-
+	"math"
 	"net/http"
 	"time"
 
@@ -12,7 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
-
+// ปัดทศนิยม 2 ตำแหน่ง
+func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 // ดึงราคาหลังโปรจริง ๆ ให้ไปเติม logic preload promotion ที่นี่ถ้ามี
 func getDiscountedPriceForGame(db *gorm.DB, gameID uint, now time.Time) (float64, error) {
@@ -20,6 +21,7 @@ func getDiscountedPriceForGame(db *gorm.DB, gameID uint, now time.Time) (float64
 	if err := db.First(&g, gameID).Error; err != nil {
 		return 0, err
 	}
+	// TODO: preload promotion คำนวณราคาจริง ณ เวลา now
 	return float64(g.BasePrice), nil
 }
 
@@ -32,7 +34,7 @@ type CreateOrderInput struct {
 	Items []CreateOrderItemInput `json:"items" binding:"required"`
 }
 
-// POST /orders  (ต้อง Auth) — ผูกกับ user จาก token เสมอ
+// POST /orders  (ต้อง Auth) — ผูกกับ user จาก token/headers เสมอ
 func CreateOrder(c *gin.Context) {
 	uidAny, _ := c.Get("userID")
 	userID, _ := uidAny.(uint)
@@ -53,7 +55,8 @@ func CreateOrder(c *gin.Context) {
 	order := entity.Order{
 		UserID:      userID,
 		OrderCreate: now,
-		OrderStatus: entity.OrderWaitingPayment,
+		// ถ้าคุณมี const ชื่ออื่น ให้ปรับตรงนี้
+		OrderStatus: entity.OrderWaitingPayment, // หรือ entity.OrderStatus("WAITING_PAYMENT")
 	}
 
 	total := 0.0
@@ -93,7 +96,13 @@ func CreateOrder(c *gin.Context) {
 // - ถ้า query: ?mine=1 หรือไม่ส่งอะไรเลย -> คืนของ user ที่ล็อกอิน
 // - ถ้า admin ส่ง ?user_id=... ได้
 func FindOrders(c *gin.Context) {
-	uid := c.MustGet("userID").(uint)
+	uidAny, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid := uidAny.(uint)
+
 	db := configs.DB().Preload("User").Preload("OrderItems").Preload("Payments")
 
 	var rows []entity.Order
@@ -128,7 +137,13 @@ func FindOrders(c *gin.Context) {
 
 // GET /orders/:id  (ต้อง Auth) — เจ้าของหรือแอดมินเท่านั้น
 func FindOrderByID(c *gin.Context) {
-	uid := c.MustGet("userID").(uint)
+	uidAny, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	uid := uidAny.(uint)
+
 	roleAny, _ := c.Get("roleID")
 	isAdmin := roleAny != nil && roleAny.(uint) == configs.AdminRoleID()
 
@@ -143,5 +158,3 @@ func FindOrderByID(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, order)
 }
-
-// (ถ้ามี Update/Delete เดิมอยู่ ให้คงไว้ตามต้องการ แต่ควรก็ตรวจ owner เช่นกัน)

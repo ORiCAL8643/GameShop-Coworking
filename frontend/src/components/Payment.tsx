@@ -27,7 +27,17 @@ export default function PaymentPage() {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
-  const { id: userId } = useAuth(); // ✅ ใช้ id จาก AuthContext แบบที่คุณต้องการ
+
+  // ✅ เอาค่าจาก AuthContext
+  const { id: userId, token } = useAuth() as { id: number | null; token?: string };
+
+  // ✅ รวม header ที่ต้องใช้ยืนยันตัวตน (รองรับทั้ง JWT และ X-User-ID)
+  const authHeaders = () => {
+    const h: Record<string, string> = {};
+    if (token) h["Authorization"] = `Bearer ${token}`;
+    if (userId) h["X-User-ID"] = String(userId);
+    return h;
+  };
 
   const subtotal = useMemo(() => items.reduce((s, it) => s + it.price * it.quantity, 0), [items]);
   const total = useMemo(() => subtotal, [subtotal]);
@@ -57,12 +67,15 @@ export default function PaymentPage() {
     try {
       setSubmitting(true);
 
-      // 1) สร้าง Order จากตะกร้า (server จะ snapshot ราคาจริง/โปรฯ เอง)
+      // 1) สร้าง Order (ฝั่ง server จะคำนวณราคาจริง/โปรฯ เอง)
       const orderRes = await fetch(`${API}/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" }, // ❌ ไม่ใช้ authHeader()
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeaders(), // ✅ ส่งตัวตนไปหา backend
+        },
         body: JSON.stringify({
-          user_id: userId, // ✅ ส่ง user_id ตามที่ backend ปัจจุบันรองรับ
+          // ❌ ไม่ส่ง user_id ใน body เพื่อกันสวมรอยตามที่ backend ออกแบบ
           items: items.map((it) => ({ game_id: it.id, qty: it.quantity })),
         }),
       });
@@ -76,7 +89,13 @@ export default function PaymentPage() {
       form.append("order_id", String(orderId));
       form.append("file", files[0].originFileObj as File);
 
-      const payRes = await fetch(`${API}/payments`, { method: "POST", body: form }); // ❌ ไม่ใช้ authHeader()
+      const payRes = await fetch(`${API}/payments`, {
+        method: "POST",
+        headers: {
+          ...authHeaders(), // ✅ แนบ header เช่นกัน (บางระบบใช้เช็คสิทธิ์)
+        },
+        body: form,
+      });
       if (!payRes.ok) throw new Error("upload slip failed");
 
       // 3) แจ้งผู้ใช้ / เคลียร์ตะกร้า / ไปหน้าสถานะ
@@ -108,7 +127,8 @@ export default function PaymentPage() {
                 hoverable
                 className="payment-item"
                 style={{ borderRadius: 14, background: CARD_DARK, borderColor: BORDER }}
-                bodyStyle={{ padding: 16 }}
+                // ⬇️ เปลี่ยน bodyStyle → styles
+                styles={{ body: { padding: 16 } }}
               >
                 <Row align="middle" gutter={[12, 12]}>
                   <Col flex="auto">
@@ -165,7 +185,10 @@ export default function PaymentPage() {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }} bodyStyle={{ padding: 16 }}>
+          <Card
+            style={{ borderRadius: 16, background: CARD_DARK, borderColor: BORDER }}
+            styles={{ body: { padding: 16 } }}
+          >
             <Typography.Title level={4} style={{ marginTop: 4, color: TEXT_MAIN }}>
               สรุปการสั่งซื้อ
             </Typography.Title>
@@ -219,10 +242,11 @@ export default function PaymentPage() {
         onCancel={() => setPayOpen(false)}
         footer={null}
         centered
-        bodyStyle={{ background: CARD_DARK }}
+        // ⬇️ เปลี่ยน bodyStyle → styles
+        styles={{ body: { background: CARD_DARK } }}
       >
         <Space direction="vertical" style={{ width: "100%" }} size={16}>
-          <Card bordered={false} style={{ background: CARD_DARK }}>
+          <Card bordered={false} style={{ background: CARD_DARK }} styles={{ body: { padding: 0 } }}>
             <div style={{ textAlign: "center" }}>
               <img
                 src={qrPromptPay}
