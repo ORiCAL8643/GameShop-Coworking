@@ -92,15 +92,9 @@ func UpdateReview(c *gin.Context) {
 	}
 	// apply updatable fields
 	update := map[string]any{}
-	if payload.ReviewTitle != "" {
-		update["review_title"] = payload.ReviewTitle
-	}
-	if payload.ReviewText != "" {
-		update["review_text"] = payload.ReviewText
-	}
-	if payload.Rating != 0 {
-		update["rating"] = payload.Rating
-	}
+	if payload.ReviewTitle != "" { update["review_title"] = payload.ReviewTitle }
+	if payload.ReviewText != "" { update["review_text"] = payload.ReviewText }
+	if payload.Rating != 0     { update["rating"] = payload.Rating }
 	if err := db.Model(&row).Updates(update).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed: " + err.Error()})
 		return
@@ -162,7 +156,7 @@ func ToggleReviewLike(c *gin.Context) {
 		}
 	} else {
 		// found => toggle off (delete)
-		if err := db.Unscoped().Delete(&like).Error; err != nil {
+		if err := db.Delete(&like).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "unlike failed: " + err.Error()})
 			return
 		}
