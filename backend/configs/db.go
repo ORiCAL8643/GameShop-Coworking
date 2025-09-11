@@ -1,4 +1,3 @@
-// configs/database.go
 package configs
 
 import (
@@ -26,20 +25,30 @@ var (
 // ใช้เพื่อดึง *gorm.DB ไปใช้ที่อื่น
 func DB() *gorm.DB { return db }
 
-// เปิดการเชื่อมต่อฐานข้อมูล (SQLite)
-// สามารถตั้งค่าไฟล์ DB ผ่าน env DB_PATH ได้ (ค่าดีฟอลต์: gameshop-community.db)
 func ConnectionDB() {
 	dbPath := os.Getenv("DB_PATH")
 	if dbPath == "" {
 		dbPath = "gameshop-community.db"
 	}
-	database, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{})
+	log.Printf("[DB] using sqlite at: %s", dbPath)
+
+	// ปิดการสร้าง Foreign Key ตอน migrate เพื่อกัน GORM ไปแตะตารางเดิมของเพื่อน
+	gormCfg := &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	}
+
+	// ✅ ใส่ busy_timeout 5 วิ กัน database locked
+	database, err := gorm.Open(sqlite.Open(dbPath+"?_busy_timeout=5000"), gormCfg)
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
 	}
 	db = database
 
-	// เปิด foreign key constraints ของ SQLite
+	// ✅ เปิด WAL mode เพื่อให้เขียนพร้อมกันได้มากขึ้น
+	db.Exec("PRAGMA journal_mode=WAL;")
+	db.Exec("PRAGMA synchronous=NORMAL;")
+
+	// ✅ เปิดใช้ FK runtime (แค่ตอนใช้งาน ไม่เกี่ยวกับตอน migrate)
 	db.Exec("PRAGMA foreign_keys = ON")
 }
 

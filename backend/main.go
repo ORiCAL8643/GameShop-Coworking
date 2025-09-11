@@ -1,4 +1,3 @@
-// main.go
 package main
 
 import (
@@ -21,11 +20,13 @@ func main() {
 	configs.ConnectionDB()
 	configs.SetupDatabase()
 
-	r := gin.Default()
+	r := gin.New()
 
 	// 2) Static & CORS
+	r.Use(gin.Logger(), gin.Recovery(), CORSMiddleware())
+
+	// static สำหรับไฟล์อัปโหลด
 	r.Static("/uploads", "./uploads")
-	r.Use(CORSMiddleware())
 
 	// 3) health check
 	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
@@ -110,7 +111,8 @@ func main() {
 		router.POST("/notifications", controllers.CreateNotification)
 		router.GET("/notifications", controllers.FindNotifications) // ?user_id=
 		router.GET("/notifications/:id", controllers.FindNotificationByID)
-		router.PUT("/notifications/:id", controllers.UpdateNotification)
+		router.PUT("/notifications/:id/read", controllers.MarkNotificationRead)
+		router.PUT("/notifications/read-all", controllers.MarkAllNotificationsRead)
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
 
 		// -------- Promotions --------
@@ -124,7 +126,7 @@ func main() {
 
 		// -------- Reviews --------
 		router.POST("/reviews", controllers.CreateReview)
-		router.GET("/reviews", controllers.FindReviews) // ?game_id=&user_id=
+		router.GET("/reviews", controllers.FindReviews)
 		router.GET("/reviews/:id", controllers.GetReviewByID)
 		router.PUT("/reviews/:id", controllers.UpdateReview)
 		router.DELETE("/reviews/:id", controllers.DeleteReview)
@@ -144,6 +146,18 @@ func main() {
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
+		// ===== Problem Reports =====
+		router.POST("/reports", controllers.CreateReport)
+		router.GET("/reports", controllers.FindReports)
+		router.GET("/reports/:id", controllers.GetReportByID)
+		router.PUT("/reports/:id", controllers.UpdateReport)
+		router.DELETE("/reports/:id", controllers.DeleteReport)
+		router.POST("/reports/:id/reply", controllers.ReplyReport)
+
+		// ==อย่าทำอันนี้หายไม่งั้นรูปเกมไม่ขึ้น
+		router.POST("/upload/game", controllers.UploadGame)
+
+		//request
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)

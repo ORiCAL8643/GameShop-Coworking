@@ -36,8 +36,9 @@ const refunds: Refund[] = [
   { id: 2, orderId: "A002", user: "Bob", game: "Elden Ring", reason: "Accidental purchase", status: "Approved" },
 ];
 
-const addNotification = (msg: string) => console.log(msg);
-const addRefundUpdate = (msg: string) => console.log(msg);
+// 🟣 Mock ฟังก์ชัน
+const addNotification = (msg: string) => console.log("Notification:", msg);
+const addRefundUpdate = (msg: string) => console.log("Refund update:", msg);
 
 const router = createBrowserRouter([
   {
@@ -47,6 +48,11 @@ const router = createBrowserRouter([
       // === หน้าแรก
       { index: true, element: <Home /> },
       { path: "home", element: <Home /> },
+
+
+      // ✅ Report
+      { path: "/report", element: <ReportPage /> },
+      { path: "/report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
       { path: "information/Add", element: <Add /> },
@@ -74,7 +80,6 @@ const router = createBrowserRouter([
       // === promotion
       { path: "promotion", element: <PromotionManager /> },
       { path: "promotion/:id", element: <PromotionDetail /> },
-
       // === roles
       { path: "roles", element: <RoleManagement /> },
       { path: "roles/:id", element: <RoleEdit /> },
