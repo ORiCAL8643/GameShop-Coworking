@@ -166,7 +166,7 @@ func UpdateReview(c *gin.Context) {
 func DeleteReview(c *gin.Context) {
 	id := c.Param("id")
 	db := configs.DB()
-	if err := db.Delete(&entity.Review{}, id).Error; err != nil {
+	if err := db.Unscoped().Delete(&entity.Review{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete_failed"})
 		return
 	}
