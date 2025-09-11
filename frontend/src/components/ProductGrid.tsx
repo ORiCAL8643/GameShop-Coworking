@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { useCart } from "../context/CartContext";
-import { useCart } from "../context/CartContext";
 
 const base_url = "http://localhost:8088";
 
@@ -35,7 +34,6 @@ const ProductGrid: React.FC = () => {
   const [selected, setSelected] = useState<Game | null>(null);
   const open = !!selected;
 
-  const { addItem } = useCart();
   const navigate = useNavigate();
 
   const fetchGames = async () => {
