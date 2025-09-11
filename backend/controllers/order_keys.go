@@ -13,7 +13,7 @@ import (
 type orderKeyResp struct {
 	ID         uint    `json:"id"`
 	GameName   string  `json:"game_name"`
-	KeyCode    *string `json:"key_code"`
+	KeyCode    *string `json:"key_code,omitempty"`
 	IsRevealed bool    `json:"is_revealed"`
 }
 
