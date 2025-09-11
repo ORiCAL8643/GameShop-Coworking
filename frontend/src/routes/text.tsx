@@ -53,8 +53,8 @@ const router = createBrowserRouter([
     path: "/",
     element: <Sidebar />,
     children: [
-      { path: "/", element: <RequirePermission permission="games.read" />, children: [{ path: "/", element: <Home /> }] },
-      { path: "/home", element: <RequirePermission permission="games.read" />, children: [{ path: "/home", element: <Home /> }] },
+      { path: "/", element: <Home /> },
+      { path: "/home", element: <Home /> },
 
       { path: "/request", element: <RequirePermission permission="requests.create" />, children: [{ path: "/request", element: <Request /> }] },
       { path: "/requestinfo", element: <RequirePermission permission="requests.read" />, children: [{ path: "/requestinfo", element: <Requestinfo /> }] },

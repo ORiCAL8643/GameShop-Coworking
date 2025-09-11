@@ -18,7 +18,7 @@ type MenuItem = {
 };
 
 const menuItems: MenuItem[] = [
-  { key: "/home", label: "หน้าแรก", need: "games.read" },
+   { key: "/home", label: "หน้าแรก" },
   { key: "/request", label: "รีเควสเกม", need: "requests.create" },
   { key: "/requestinfo", label: "ข้อมูลรีเควส", need: "requests.read" },
   {
