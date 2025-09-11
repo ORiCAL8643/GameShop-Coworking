@@ -80,13 +80,14 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       const values = await form.validateFields();
 
       if (editing) {
-        // PUT: ต้องใช้ฟิลด์ ReviewTitle/ReviewText/Rating ให้ตรง backend
         const saved = await ReviewsAPI.updateJson(
           editing.ID,
           {
-            ReviewTitle: values.title,
-            ReviewText: values.content,
-            Rating: values.rating,
+            game_id: editing.game_id,
+            user_id: editing.user_id,
+            review_title: values.title,
+            review_text: values.content,
+            rating: values.rating,
           },
           token || undefined
         );
@@ -97,14 +98,13 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
           message.info("กรุณาเข้าสู่ระบบ");
           return;
         }
-        // POST: ส่ง GameID/UserID/ReviewTitle/ReviewText/Rating
         const created = await ReviewsAPI.createJson(
           {
-            GameID: gameId,
-            UserID: userId,
-            ReviewTitle: values.title,
-            ReviewText: values.content,
-            Rating: values.rating,
+            game_id: gameId,
+            user_id: userId,
+            review_title: values.title,
+            review_text: values.content,
+            rating: values.rating,
           },
           token || undefined
         );
