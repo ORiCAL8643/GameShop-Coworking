@@ -34,9 +34,9 @@ func main() {
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 
 		// ===== Games =====
-		router.POST("/games", controllers.CreateGame)
-		router.GET("/games", controllers.FindGames)
+		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
+		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
 
 		// ===== Threads =====
 		router.POST("/threads", controllers.CreateThread)
@@ -113,6 +113,14 @@ func main() {
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
+
+		// ==อย่าทำอันนี้หายไม่งั้นรูปเกมไม่ขึ้น
+		router.POST("/upload/game", controllers.UploadGame)
+
+		//request
+		router.POST("/new-request", controllers.CreateRequest)
+		router.GET("/request", controllers.FindRequest)
+
 	}
 
 	r.Run("localhost:" + PORT)

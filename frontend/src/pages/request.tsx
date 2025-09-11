@@ -46,11 +46,11 @@ const Request = () => {
     }, [])
 
     const pendingGames = game ? game.filter(g => g.status === "pending") : [];
-    return(<div>{(game || pendingGames.length !== 0) ? (
-        <Layout>
+    return(<div style={{background: '#141414', flex: 1 , minHeight: '100vh'}}>{(game || pendingGames.length !== 0) ? (
+        <Layout style={{flex: 1}}>
             <Layout style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
                 <Navbar />
-                <div style={{ padding: '10px' }}>
+                <div style={{ padding: '10px', flex: 1}}>
                     <div style={{ background: 'linear-gradient(90deg, #9254de 0%, #f759ab 100%)', height: 180, borderRadius: 10, marginBottom: 24 }}></div>
                     <Title level={3} style={{ color: 'white' }}>Request</Title> {/* title ต้อง import Typography*/}
                     <Space><PlusOutlined  style={{background: '#141414', color: '#d6d6d6ff'}}/><text style={{ color: '#d6d6d6ff' }}>ชื่อ</text></Space>
