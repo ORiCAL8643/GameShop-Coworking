@@ -24,7 +24,7 @@ func Login(c *gin.Context) {
 	}
 
 	var user entity.User
-	if tx := configs.DB().Where("username = ?", body.Username).First(&user); tx.RowsAffected == 0 {
+	if err := configs.DB().Preload("Role.RolePermissions.Permission").Where("username = ?", body.Username).First(&user).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
 		return
 	}
@@ -51,11 +51,20 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	perms := make([]string, 0, len(user.Role.RolePermissions))
+	for _, rp := range user.Role.RolePermissions {
+		if rp.Permission != nil {
+			perms = append(perms, rp.Permission.Key)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "login successful",
-		"id":       user.ID,
-		"username": user.Username,
-		"token":    tokenString,
-		"exp":      exp,
+		"message":     "login successful",
+		"id":          user.ID,
+		"username":    user.Username,
+		"role":        user.Role.Title,
+		"permissions": perms,
+		"token":       tokenString,
+		"exp":         exp,
 	})
 }
