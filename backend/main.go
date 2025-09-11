@@ -161,6 +161,9 @@ func main() {
 		// Orders (write)
 		authList.POST("/orders", controllers.CreateOrder)
 
+		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
+		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
+
 		// Order Items
 		authList.POST("/order-items", controllers.CreateOrderItem)
 		authList.GET("/order-items", controllers.FindOrderItems)
@@ -241,7 +244,7 @@ func AuthRequired() gin.HandlerFunc {
 		}
 
 		// 2) สำรอง: X-User-ID
-	if userID == 0 {
+		if userID == 0 {
 			if v := c.GetHeader("X-User-ID"); v != "" {
 				if n, err := strconv.Atoi(v); err == nil && n > 0 {
 					userID = uint(n)
