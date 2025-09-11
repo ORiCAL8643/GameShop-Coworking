@@ -3,6 +3,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 const PORT = "8088"
 func main() {
@@ -186,15 +187,23 @@ func main() {
 // CORS
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+		origin := c.GetHeader("Origin")
 
-		c.Writer.Header().Set("Access-Control-Allow-Headers",
-			"Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-		if c.Request.Method == "OPTIONS" {
+		// อนุญาตเฉพาะ origin ที่ใช้จริงตอน dev
+		allowed := map[string]bool{
+			"http://localhost:5173": true,
+			"http://127.0.0.1:5173": true,
+		}
+		if allowed[origin] {
+			c.Header("Access-Control-Allow-Origin", origin) // ห้ามใช้ "*"
+			c.Header("Vary", "Origin")
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers",
+				"Authorization, Content-Type, Accept, X-CSRF-Token, Origin, Cache-Control, X-Requested-With")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		}
+
+		if c.Request.Method == http.MethodOptions {
 			c.AbortWithStatus(204)
 			return
 		}
