@@ -178,14 +178,34 @@ func FindReviewsByGame(c *gin.Context) {
 	gameID := c.Param("id")
 	db := configs.DB()
 	var list []entity.Review
-	if err := db.Preload("User").
+	if err := db.Preload("User").Preload("Likes").
 		Where("game_id = ?", gameID).
 		Order("updated_at DESC").
 		Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "list_failed"})
 		return
 	}
-	c.JSON(http.StatusOK, list)
+
+	// แปลงให้มีฟิลด์ likes เป็นจำนวนไลก์แทนการส่งรายละเอียดไลก์ทั้งหมด
+	out := make([]gin.H, 0, len(list))
+	for _, r := range list {
+		out = append(out, gin.H{
+			"ID":           r.ID,
+			"CreatedAt":    r.CreatedAt,
+			"UpdatedAt":    r.UpdatedAt,
+			"DeletedAt":    r.DeletedAt,
+			"review_title": r.ReviewTitle,
+			"review_text":  r.ReviewText,
+			"rating":       r.Rating,
+			"user_id":      r.UserID,
+			"user":         r.User,
+			"game_id":      r.GameID,
+			"game":         r.Game,
+			"likes":        len(r.Likes),
+		})
+	}
+
+	c.JSON(http.StatusOK, out)
 }
 
 // POST /reviews/:id/toggle_like
