@@ -1,33 +1,36 @@
-import Home from "../pages/Home.tsx";
-import Request from "../pages/request.tsx";
-import Edit from "../pages/information/Edit.tsx";
-import Add from "../pages/information/Add.tsx";
-import Requestinfo from "../pages/requestinfo.tsx";
-import PaymentPage from "../components/Payment.tsx";
-import CommunityPage from "../pages/Community/CommunityPage.tsx";
-import { createBrowserRouter } from "react-router-dom";
-import Sidebar from "../components/Sidebar.tsx";
-import "../styles/community-dark.css";
-import WorkshopMain from "../pages/Workshop/MainPage.tsx";
-import WorkshopDetail from "../pages/Workshop/WorkshopDetail.tsx";
-import ModDetail from "../pages/Workshop/ModDetail.tsx";
-import Workshop from "../pages/Workshop/UploadPage.tsx";
-import RoleManagement from "../pages/role/RoleManagement.tsx";
+// src/routes/text.tsx
+import { createBrowserRouter, Navigate } from "react-router-dom";
 
-// 🟣 Report / Refund / Admin
-import ReportPage from "../pages/Report/ReportPage.tsx";
-import ReportSuccessPage from "../pages/Report/ReportSuccess.tsx";
-import RefundPage from "../pages/Refund/RefundPage.tsx";
-import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
-import AdminPage from "../pages/Admin/AdminPage.tsx";
-import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage.tsx"; // ✅ เพิ่ม
-import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
+import Sidebar from "../components/Sidebar";
 
-import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
-import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
-import RoleEdit from "../pages/role/RoleEdit.tsx";
+// pages
+import Home from "../pages/Home";
+import Request from "../pages/request";
+import Edit from "../pages/information/Edit";
+import Add from "../pages/information/Add";
+import Requestinfo from "../pages/requestinfo";
+import CommunityPage from "../pages/Community/CommunityPage";
+import PaymentPage from "../components/Payment";
+import WorkshopMain from "../pages/Workshop/MainPage";
+import WorkshopDetail from "../pages/Workshop/WorkshopDetail";
+import ModDetail from "../pages/Workshop/ModDetail";
+import Workshop from "../pages/Workshop/UploadPage";
 
-// 🟣 Mock Refund Data
+import PromotionManager from "../pages/Promotion/PromotionManager";
+import PromotionDetail from "../pages/Promotion/PromotionDetail";
+
+import RoleManagement from "../pages/role/RoleManagement";
+import RoleEdit from "../pages/role/RoleEdit";
+
+import RefundPage from "../pages/Refund/RefundPage";
+import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus";
+
+import AdminPage from "../pages/Admin/AdminPage";
+import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
+
+import OrdersStatusPage from "../pages/OrdersStatusPage";
+
+// mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
 const refunds: Refund[] = [
   { id: 1, orderId: "A001", user: "Alice", game: "Cyberpunk 2077", reason: "Buggy gameplay", status: "Pending" },
   { id: 2, orderId: "A002", user: "Bob", game: "Elden Ring", reason: "Accidental purchase", status: "Approved" },
@@ -42,71 +45,68 @@ const router = createBrowserRouter([
     path: "/",
     element: <Sidebar />,
     children: [
-      { path: "/", element: <Home /> },
-      { path: "/home", element: <Home /> },
+      // === หน้าแรก
+      { index: true, element: <Home /> },
+      { path: "home", element: <Home /> },
+
 
       // ✅ Report
       { path: "/report", element: <ReportPage /> },
       { path: "/report/success", element: <ReportSuccessPage /> },
 
-      { path: "/request", element: <Request /> },
-      { path: "/requestinfo", element: <Requestinfo /> },
+      // === กลุ่ม information
+      { path: "information/Add", element: <Add /> },
+      { path: "information/Edit", element: <Edit /> },
 
+      // === request
+      { path: "request", element: <Request /> },
+      { path: "requestinfo", element: <Requestinfo /> },
+
+      // === category (ใช้ path แบบ relative)
       {
-        path: "/information",
+        path: "category",
         children: [
-          { path: "/information/Add", element: <Add /> },
-          { path: "/information/Edit", element: <Edit /> },
+          { path: "Community", element: <CommunityPage /> },
+          { path: "Payment", element: <PaymentPage /> },
         ],
       },
 
+      // === workshop
+      { path: "workshop", element: <WorkshopMain /> },
+      { path: "workshop/:id", element: <WorkshopDetail /> },
+      { path: "mod/:id", element: <ModDetail /> },
+      { path: "upload", element: <Workshop /> },
+
+      // === promotion
+      { path: "promotion", element: <PromotionManager /> },
+      { path: "promotion/:id", element: <PromotionDetail /> },
+      // === roles
+      { path: "roles", element: <RoleManagement /> },
+      { path: "roles/:id", element: <RoleEdit /> },
+
+      // === refund
+      { path: "refund", element: <RefundPage /> },
+      { path: "refund-status", element: <RefundStatusPage refunds={refunds} /> },
+
+      // === admin
       {
-        path: "/category",
-        children: [
-          { path: "/category/Community", element: <CommunityPage /> },
-          { path: "/category/Payment", element: <PaymentPage /> },
-        ],
+        path: "Admin/Page",
+        element: (
+          <AdminPage
+            refunds={refunds}
+            setRefunds={() => {}}
+            addNotification={addNotification}
+            addRefundUpdate={addRefundUpdate}
+          />
+        ),
       },
+      { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
 
-      { path: "/workshop", element: <WorkshopMain /> },
-      { path: "/workshop/:id", element: <WorkshopDetail /> },
-      { path: "/mod/:id", element: <ModDetail /> },
-      { path: "/upload", element: <Workshop /> },
+      // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
+      { path: "orders-status", element: <OrdersStatusPage /> },
 
-      { path: "/promotion", element: <PromotionManager /> },
-      { path: "/promotion/:id", element: <PromotionDetail /> },
-
-      // 🟣 Refund
-      { path: "/refund", element: <RefundPage /> },
-      { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
-
-      // 🟣 Admin
-      {
-        path: "/Admin",
-        children: [
-          {
-            path: "/Admin/Page",
-            element: (
-              <AdminPage
-                refunds={refunds}
-                setRefunds={() => { }}
-                addNotification={addNotification}
-                addRefundUpdate={addRefundUpdate}
-              />
-            ),
-          },
-          { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
-          { path: "/Admin/RolePage", element: <RoleManagement /> },
-        ],
-      },
-      {
-        path: "/roles",
-        element: <RoleManagement />
-      },
-      {
-        path: "/roles/:id",
-        element: <RoleEdit />
-      }
+      // === fallback
+      { path: "*", element: <Navigate to="/home" replace /> },
     ],
   },
 ]);
