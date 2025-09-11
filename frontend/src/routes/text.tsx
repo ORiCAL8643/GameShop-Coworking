@@ -100,6 +100,7 @@ const router = createBrowserRouter([
           />
         ),
       },
+      { path: "Admin/RolePage", element: <RoleManagement /> },
       { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
 
       // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
