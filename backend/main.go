@@ -63,8 +63,8 @@ func main() {
 		auth.DELETE("/rolepermissions/:id", middleware.RequirePermission("roles.manage"), controllers.DeleteRolePermission)
 
 		// ===== Games =====
-		auth.POST("/new-game", middleware.RequirePermission("games.manage"), controllers.CreateGame)
 		auth.GET("/game", middleware.RequirePermission("games.read"), controllers.FindGames)
+		auth.POST("/new-game", middleware.RequirePermission("games.manage"), controllers.CreateGame)
 		auth.PUT("/update-game/:id", middleware.RequirePermission("games.manage"), controllers.UpdateGamebyID)
 		auth.POST("/upload/game", middleware.RequirePermission("games.manage"), controllers.UploadGame)
 

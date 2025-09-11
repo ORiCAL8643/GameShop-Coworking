@@ -320,6 +320,28 @@ func seedPermissionsAndGrantAdmin(adminID uint) {
 	}
 }
 
+// มอบสิทธิพื้นฐานให้กับ role User
+func grantBasicUserPermissions(userRoleID uint) {
+	keys := []string{
+		"games.read",
+		"workshop.read",
+		"community.read",
+		"promotions.read",
+		"reviews.read",
+	}
+
+	for _, k := range keys {
+		p, err := ensurePermission(k, "", "")
+		if err != nil {
+			log.Println("ensure permission for user error:", k, err)
+			continue
+		}
+		if err := ensureRoleHasPermission(userRoleID, p.ID); err != nil {
+			log.Println("grant user perm error:", k, err)
+		}
+	}
+}
+
 // ---------- Setup / Seed ----------
 
 // AutoMigrate และ seed ข้อมูลตัวอย่าง (ถ้ายังว่าง) — ไม่ต้องดรอปตาราง
@@ -351,8 +373,9 @@ func SetupDatabase() {
 	adminRoleID = roleAdmin.ID
 	userRoleID = roleUser.ID
 
-	// Seed permissions & มอบให้ admin
+	// Seed permissions & มอบให้ admin และ user
 	seedPermissionsAndGrantAdmin(roleAdmin.ID)
+	grantBasicUserPermissions(roleUser.ID)
 
 	// เฟส 3: ซ่อม users.role_id ให้ชี้ role ที่มีจริง (กันพังตอนคัดลอกเข้า users__temp ระหว่าง migrate)
 	if tableExists("users") {
