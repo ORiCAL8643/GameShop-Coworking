@@ -14,7 +14,7 @@ export type ReviewSectionProps = {
 };
 
 const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = true, className }) => {
-  const { id: authId, username, token } = useAuth();
+  const { id: authId, token } = useAuth();
   const userId = authId ? Number(authId) : undefined;
 
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       }));
       normalized.sort((a, b) => (b.UpdatedAt || "").localeCompare(a.UpdatedAt || ""));
       setItems(normalized);
-    } catch (e) {
+    } catch {
       message.error("โหลดรีวิวไม่สำเร็จ");
     } finally {
       setLoading(false);
@@ -49,11 +49,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
 
   const canCreate = allowCreate && !!userId;
 
-  const onCreate = () => {
+  const onCreate = React.useCallback(() => {
     setEditing(null);
     form.resetFields();
     setShowForm(true);
-  };
+  }, [form]);
 
   const onEdit = (r: ReviewItem) => {
     setEditing(r);
@@ -115,7 +115,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       setShowForm(false);
       setEditing(null);
       form.resetFields();
-    } catch (err) {
+    } catch {
       // antd จะจัดการ message validation ให้เอง
     }
   };
@@ -170,13 +170,18 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
       <Space style={{ width: "100%", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0 }}>รีวิวทั้งหมด</h3>
         {canCreate && (
-          <Button type="primary" icon={<Plus size={16} />} onClick={onCreate}>
+          <Button
+            type="primary"
+            icon={<Plus size={16} />}
+            onClick={onCreate}
+            className="bg-gray-700 text-white border border-gray-600 hover:bg-gray-600"
+          >
             สร้างรีวิว
           </Button>
         )}
       </Space>
     ),
-    [canCreate]
+    [canCreate, onCreate]
   );
 
   return (
@@ -199,11 +204,26 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
                 </Space>,
                 userId === r.user_id ? (
                   <Space key="edit-del">
-                    <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>
+                    <Button
+                      size="small"
+                      icon={<Pencil size={14} />}
+                      onClick={() => onEdit(r)}
+                      className="bg-gray-700 text-white border border-gray-600 hover:bg-gray-600"
+                    >
                       แก้ไข
                     </Button>
-                    <Popconfirm title="ลบรีวิวนี้?" okText="ลบ" cancelText="ยกเลิก" onConfirm={() => onDelete(r)}>
-                      <Button size="small" danger icon={<Trash2 size={14} />}>
+                    <Popconfirm
+                      title="ลบรีวิวนี้?"
+                      okText="ลบ"
+                      cancelText="ยกเลิก"
+                      onConfirm={() => onDelete(r)}
+                    >
+                      <Button
+                        size="small"
+                        danger
+                        icon={<Trash2 size={14} />}
+                        className="bg-red-800 text-white border border-gray-600 hover:bg-red-700"
+                      >
                         ลบ
                       </Button>
                     </Popconfirm>
@@ -233,8 +253,9 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
 
       <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
         <Modal
-          className="bg-[#1a1a1a]"
-          bodyStyle={{ background: "#1a1a1a" }}
+          className="bg-[#1a1a1a] text-white"
+          style={{ background: "#1a1a1a", color: "#fff" }}
+          bodyStyle={{ background: "#1a1a1a", color: "#fff" }}
           open={showForm}
           onCancel={() => {
             setShowForm(false);
@@ -246,16 +267,26 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
           cancelText="ยกเลิก"
           title={editing ? "แก้ไขรีวิว" : "สร้างรีวิว"}
           destroyOnClose
+          okButtonProps={{ className: "bg-blue-600 text-white border border-gray-600 hover:bg-blue-500" }}
+          cancelButtonProps={{ className: "bg-gray-700 text-white border border-gray-600 hover:bg-gray-600" }}
         >
           <Form layout="vertical" form={form} initialValues={{ rating: 0 }}>
             <Form.Item label="หัวข้อ" name="title">
-              <Input placeholder="เช่น เกมสนุกเกินคาด!" maxLength={120} />
+              <Input
+                placeholder="เช่น เกมสนุกเกินคาด!"
+                maxLength={120}
+                className="bg-[#333] text-white placeholder-gray-400 border border-gray-600 focus:border-blue-500"
+              />
             </Form.Item>
-            <Form.Item label="รายละเอียด" name="content" rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}> 
-              <Input.TextArea rows={5} placeholder="เล่าประสบการณ์ของคุณ" />
+            <Form.Item label="รายละเอียด" name="content" rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}>
+              <Input.TextArea
+                rows={5}
+                placeholder="เล่าประสบการณ์ของคุณ"
+                className="bg-[#333] text-white placeholder-gray-400 border border-gray-600 focus:border-blue-500"
+              />
             </Form.Item>
-            <Form.Item label="ให้คะแนน" name="rating" rules={[{ required: true }]}> 
-              <Rate allowHalf />
+            <Form.Item label="ให้คะแนน" name="rating" rules={[{ required: true }]}>
+              <Rate allowHalf className="text-yellow-400" />
             </Form.Item>
           </Form>
         </Modal>
