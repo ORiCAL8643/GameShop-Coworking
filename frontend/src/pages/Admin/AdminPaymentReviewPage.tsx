@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image,
-  App, Tooltip, Select, message as antdMessage
+  App, Tooltip, Select
 } from "antd";
 import {
   CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
@@ -56,10 +56,7 @@ function normalizeRow(r: any): ReviewablePayment {
 }
 
 export default function AdminPaymentReviewPage() {
-  // ใช้ App.useApp() ถ้ามี <App> ครอบ root; ถ้าไม่มี fallback เป็น antdMessage/Modal
-  const appCtx = App.useApp?.();
-  const msg = appCtx?.message ?? antdMessage;
-  const modal = appCtx?.modal ?? Modal;
+  const { modal, message } = App.useApp();
 
   const { id: userId, token } = useAuth() as { id: number | null; token?: string };
 
@@ -88,7 +85,7 @@ export default function AdminPaymentReviewPage() {
       setRows(data.map(normalizeRow));
     } catch (e) {
       console.error(e);
-      msg.error("โหลดข้อมูลการชำระเงินล้มเหลว");
+      message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
       setRows([]);
     } finally {
       setLoading(false);
@@ -123,10 +120,10 @@ export default function AdminPaymentReviewPage() {
               p.id === id ? { ...p, status: "APPROVED", reject_reason: null, order_status: "PAID" } : p,
             ),
           );
-          msg.success("อนุมัติการชำระเงินแล้ว");
+          message.success("อนุมัติการชำระเงินแล้ว");
         } catch (e) {
           console.error(e);
-          msg.error("ไม่สามารถอนุมัติได้");
+          message.error("ไม่สามารถอนุมัติได้");
         }
       },
     });
@@ -138,7 +135,7 @@ export default function AdminPaymentReviewPage() {
   };
 
   const submitReject = async () => {
-    if (!rejectText.trim()) return msg.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
+    if (!rejectText.trim()) return message.warning("กรอกเหตุผลที่ปฏิเสธก่อน");
     const id = rejectOpen.id!;
     try {
       // ส่งได้ทั้ง reason และ reject_reason เพื่อเข้ากันได้หลาย backend
@@ -154,11 +151,11 @@ export default function AdminPaymentReviewPage() {
             : p,
         ),
       );
-      msg.success("ปฏิเสธการชำระเงินแล้ว");
+      message.success("ปฏิเสธการชำระเงินแล้ว");
       setRejectOpen({ open: false });
     } catch (e) {
       console.error(e);
-      msg.error("ไม่สามารถปฏิเสธได้");
+      message.error("ไม่สามารถปฏิเสธได้");
     }
   };
 
