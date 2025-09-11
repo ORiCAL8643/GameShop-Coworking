@@ -1,10 +1,11 @@
 package controllers
 
 import (
+	"log"
 	"net/http"
 
 	"example.com/sa-gameshop/configs"
-    "example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,72 +17,111 @@ func CreateNotification(c *gin.Context) {
 		return
 	}
 
-	// เช็ค User
+	// ตรวจว่ามี user นี้จริง
 	var user entity.User
 	if tx := configs.DB().Where("id = ?", body.UserID).First(&user); tx.RowsAffected == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
 		return
 	}
 
+	// default type
+	if body.Type == "" {
+		body.Type = "system"
+	}
+	body.IsRead = false
+
 	if err := configs.DB().Create(&body).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Printf("📥 CreateNotification: user_id=%d title=%q message=%q type=%q report_id=%v",
+		body.UserID, body.Title, body.Message, body.Type, body.ReportID)
+
 	c.JSON(http.StatusCreated, body)
 }
 
-// GET /notifications  (required: ?user_id=...)
+// GET /notifications?user_id=...
 func FindNotifications(c *gin.Context) {
-	var rows []entity.Notification
 	uid := c.Query("user_id")
 	if uid == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "must be parameter 'user_id'"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "must provide user_id"})
 		return
 	}
 
-	if err := configs.DB().Preload("User").
-		Where("user_id = ?", uid).Find(&rows).Error; err != nil {
+	var rows []entity.Notification
+	if err := configs.DB().
+		Preload("User").
+		Preload("Report").
+		Preload("Report.Attachments").
+		Where("user_id = ?", uid).
+		Order("created_at DESC").
+		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
+
+	log.Printf("📤 FindNotifications: user_id=%s count=%d", uid, len(rows))
 	c.JSON(http.StatusOK, rows)
 }
 
 // GET /notifications/:id
 func FindNotificationByID(c *gin.Context) {
 	var row entity.Notification
-	if tx := configs.DB().Preload("User").First(&row, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
+	if tx := configs.DB().
+		Preload("User").
+		Preload("Report").
+		Preload("Report.Attachments").
+		First(&row, c.Param("id")); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "notification not found"})
 		return
 	}
 	c.JSON(http.StatusOK, row)
 }
 
-// PUT /notifications/:id
-func UpdateNotification(c *gin.Context) {
-	var payload entity.Notification
-	if err := c.ShouldBindJSON(&payload); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+// PUT /notifications/:id/read
+func MarkNotificationRead(c *gin.Context) {
+	id := c.Param("id")
 	db := configs.DB()
-	var row entity.Notification
-	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id not found"})
-		return
-	}
-	if err := db.Model(&row).Updates(payload).Error; err != nil {
+
+	if err := db.Model(&entity.Notification{}).
+		Where("id = ?", id).
+		Update("is_read", true).Error; err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "updated successful"})
+
+	var row entity.Notification
+	_ = db.First(&row, id)
+	c.JSON(http.StatusOK, row)
+}
+
+// PUT /notifications/read-all
+func MarkAllNotificationsRead(c *gin.Context) {
+	var body struct {
+		UserID uint `json:"user_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.UserID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "must provide user_id"})
+		return
+	}
+
+	db := configs.DB()
+	if err := db.Model(&entity.Notification{}).
+		Where("user_id = ? AND is_read = ?", body.UserID, false).
+		Update("is_read", true).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "marked all as read"})
 }
 
 // DELETE /notifications/:id
 func DeleteNotificationByID(c *gin.Context) {
 	if tx := configs.DB().Exec("DELETE FROM notifications WHERE id = ?", c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "notification not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
+	c.JSON(http.StatusOK, gin.H{"message": "deleted successfully"})
 }

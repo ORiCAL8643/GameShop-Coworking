@@ -1,3 +1,4 @@
+// src/pages/Refund/RefundPage.tsx
 import React, { useState } from "react";
 import {
   Card,
@@ -5,15 +6,11 @@ import {
   Input,
   Button,
   Select,
-  DatePicker,
-  Typography,
   Upload,
   Modal,
   message,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
-
-const { Title } = Typography;
 
 export default function RefundPage() {
   const [form] = Form.useForm();
@@ -22,195 +19,269 @@ export default function RefundPage() {
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
 
-  // 🟣 จำลองข้อมูลที่ได้จากปุ่ม "ขอรีฟันด์" จากหน้าเกม
+  // 🎮 ตัวอย่างข้อมูลจากหน้าเกม (mock)
   const mockGameData = {
     gameTitle: "Elden Ring",
-    purchaseDate: "2025-08-12", // ตัวอย่าง
+    purchaseDate: "2025-08-12",
     orderId: "#ER-928373",
   };
+
+  // 🎨 โทนดาร์ก + ม่วง (ให้เข้ากับหน้าก่อนหน้า)
+  const PAGE_BG = "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
+  const PURPLE = "#9254de";
+  const PURPLE_LIGHT = "#b388ff";
 
   const handleSubmit = async (values: any) => {
     try {
       console.log("Refund data (mock):", {
         ...values,
-        purchaseDate: mockGameData.purchaseDate, // ใช้จาก mock
-        orderId: mockGameData.orderId, // ใช้จาก mock
+        purchaseDate: mockGameData.purchaseDate,
+        orderId: mockGameData.orderId,
         files: fileList.map((f) => f.name),
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      message.success("ส่งคำร้องคืนเงินเรียบร้อย! (mock)");
+      await new Promise((r) => setTimeout(r, 600));
+      message.success("ส่งคำขอคืนเงินเรียบร้อย! (จำลอง)");
       form.resetFields();
       setFileList([]);
-    } catch (error: any) {
-      console.error("Error submitting refund (mock):", error);
-      message.error("เกิดข้อผิดพลาดในการส่งคำร้อง (mock)");
+    } catch (error) {
+      console.error(error);
+      message.error("เกิดข้อผิดพลาดในการส่งคำขอ (จำลอง)");
     }
   };
 
   return (
     <div
+      className="refund-page"
       style={{
-        background: "#1e1e2f",
-        minHeight: "100%",
-        color: "#fbfbfbff",
+        width: "100%",
+        minHeight: "100vh",
+        background: PAGE_BG,
         padding: "40px 20px",
-        flex: 1
+        color: "#fff",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "flex-start",
       }}
     >
+      {/* ✅ สไตล์ดาร์ก + ไฮไลท์ม่วง เฉพาะหน้านี้ */}
       <style>
         {`
-          .ant-form-item-label > label {
-            color: white !important;
+          .refund-page .card-title {
+            display:flex; align-items:center; gap:8px;
+            font-weight:800; letter-spacing:.2px;
+            background: linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%);
+            -webkit-background-clip:text; -webkit-text-fill-color:transparent;
           }
-          .ant-form-item {
-            margin-bottom: 20px;
+          .refund-page .ant-card {
+            background: rgba(15,14,24,.96);
+            border-radius: 16px;
+            box-shadow: 0 10px 34px rgba(146,84,222,.2), 0 2px 10px rgba(0,0,0,.35);
           }
+          .refund-page .ant-card-head { border-bottom: 1px solid rgba(146,84,222,.25); }
+          .refund-page .divider-line {
+            height:2px; width:100%; margin-top:8px;
+            background: linear-gradient(90deg, ${PURPLE}, transparent);
+            opacity:.85; border-radius:999px;
+          }
+
+          /* ===== ทำฟิลด์ให้ดาร์กทั้งหมด ===== */
+          .refund-page .ant-input,
+          .refund-page textarea.ant-input,
+          .refund-page .ant-select-selector {
+            background: #0f0f17 !important;
+            color: #eae6ff !important;
+            border: 1px solid rgba(146,84,222,.35) !important;
+            border-radius: 10px !important;
+          }
+          .refund-page .ant-select-selection-item,
+          .refund-page .ant-select-selection-placeholder { color: #cfc5ff !important; }
+          .refund-page .ant-select-arrow { color: #e6dbff !important; }
+          .refund-page .ant-input::placeholder,
+          .refund-page textarea.ant-input::placeholder { color: #cfc5ff !important; }
+
+          /* โฟกัส/โฮเวอร์ = วงม่วง */
+          .refund-page .ant-input:hover,
+          .refund-page .ant-input:focus,
+          .refund-page textarea.ant-input:hover,
+          .refund-page textarea.ant-input:focus,
+          .refund-page .ant-select-selector:hover,
+          .refund-page .ant-select-focused .ant-select-selector {
+            border-color: ${PURPLE} !important;
+            box-shadow: 0 0 0 2px rgba(146,84,222,.28) !important;
+          }
+
+          /* Select dropdown ดาร์ก */
+          .refund-page .refund-select .ant-select-item {
+            background: #0f0f17; color: #eae6ff;
+          }
+          .refund-page .refund-select .ant-select-item-option-active {
+            background: rgba(146,84,222,.25);
+          }
+
+          /* Upload ดาร์ก */
+          .refund-page .ant-upload.ant-upload-select-picture-card {
+            background: #0f0f17 !important;
+            border: 1px dashed ${PURPLE} !important;
+          }
+          .refund-page .ant-upload.ant-upload-select-picture-card:hover {
+            border-color: ${PURPLE_LIGHT} !important;
+          }
+          .refund-page .ant-upload-list-item {
+            background: #141322 !important;
+            border-color: rgba(146,84,222,.35) !important;
+          }
+
+          /* Labels */
+          .refund-page .ant-form-item-label > label {
+            color: #e9e1ff !important; font-weight: 600;
+          }
+
+          /* ปุ่มม่วงไล่เฉด */
+          .refund-page .purple-btn {
+            background: linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%);
+            border: none; color: #fff;
+          }
+          .refund-page .purple-btn:hover { filter: brightness(1.05); }
         `}
       </style>
 
       <Card
-        style={{
-          background: "rgba(40, 40, 40, 0.95)",
-          borderRadius: 16,
-          maxWidth: 650,
-          margin: "0 auto",
-          padding: "30px 25px",
-          boxShadow: "0 8px 30px rgba(146, 84, 222, 0.4)",
-        }}
         bordered={false}
+        style={{ width: "100%", maxWidth: 700 }}
+        title={
+          <div>
+            <span className="card-title">💸 คำขอคืนเงิน</span>
+            <div className="divider-line" />
+          </div>
+        }
       >
-        <Title
-          level={2}
-          style={{
-            textAlign: "center",
-            background: "linear-gradient(90deg, #9254de, #f759ab)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            marginBottom: 32,
-          }}
-        >
-          Refund Request
-        </Title>
-
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
           {/* Order ID (readonly) */}
-          <Form.Item label="Order ID">
+          <Form.Item label="หมายเลขคำสั่งซื้อ">
             <Input value={mockGameData.orderId} readOnly />
           </Form.Item>
 
           {/* Game Title (readonly) */}
-          <Form.Item label="Game Title">
+          <Form.Item label="ชื่อเกม">
             <Input value={mockGameData.gameTitle} readOnly />
           </Form.Item>
 
           {/* Purchase Date (readonly) */}
-          <Form.Item label="Purchase Date">
+          <Form.Item label="วันที่สั่งซื้อ">
             <Input value={mockGameData.purchaseDate} readOnly />
           </Form.Item>
 
-          {/* Reason (user input) */}
+          {/* Reason */}
           <Form.Item
-            label="Reason for Refund"
+            label="เหตุผลการขอคืนเงิน"
             name="reason"
             rules={[{ required: true, message: "กรุณาเลือกเหตุผล" }]}
           >
-            <Select placeholder="Select reason">
-              <Select.Option value="defective">Defective Product</Select.Option>
-              <Select.Option value="incorrect">Incorrect Item Received</Select.Option>
-              <Select.Option value="late">Item Arrived Late</Select.Option>
-              <Select.Option value="not_described">Item Not as Described</Select.Option>
-              <Select.Option value="duplicate">Duplicate Order</Select.Option>
-              <Select.Option value="accidental">Accidental Purchase</Select.Option>
-              <Select.Option value="billing">Billing Issue</Select.Option>
-              <Select.Option value="not_received">Did Not Receive Item</Select.Option>
-              <Select.Option value="wrong_version">Wrong Platform/Version</Select.Option>
-              <Select.Option value="other">Other</Select.Option>
+            <Select
+              placeholder="เลือกเหตุผล"
+              popupClassName="refund-select"
+              dropdownStyle={{ background: "#bea4e2ff" }}
+            >
+              <Select.Option value="defective">สินค้า/เกมมีปัญหา</Select.Option>
+              <Select.Option value="incorrect">ได้รับไม่ตรงกับที่สั่ง</Select.Option>
+              <Select.Option value="late">ได้รับล่าช้า</Select.Option>
+              <Select.Option value="not_described">ไม่ตรงตามคำอธิบาย</Select.Option>
+              <Select.Option value="duplicate">สั่งซื้อซ้ำ</Select.Option>
+              <Select.Option value="accidental">เผลอสั่งซื้อโดยไม่ตั้งใจ</Select.Option>
+              <Select.Option value="billing">ปัญหาการเรียกเก็บเงิน</Select.Option>
+              <Select.Option value="not_received">ยังไม่ได้รับสินค้า/คีย์</Select.Option>
+              <Select.Option value="wrong_version">แพลตฟอร์ม/เวอร์ชันไม่ถูกต้อง</Select.Option>
+              <Select.Option value="other">อื่น ๆ</Select.Option>
             </Select>
           </Form.Item>
 
-          {/* Bank (user input) */}
+          {/* Bank */}
           <Form.Item
-            label="Bank"
+            label="ธนาคาร"
             name="bank"
             rules={[{ required: true, message: "กรุณาเลือกธนาคาร" }]}
           >
-            <Select placeholder="Select bank">
-              <Select.Option value="kbank">Kasikorn Bank (KBANK)</Select.Option>
-              <Select.Option value="scb">Siam Commercial Bank (SCB)</Select.Option>
-              <Select.Option value="bbl">Bangkok Bank (BBL)</Select.Option>
-              <Select.Option value="ktb">Krungthai Bank (KTB)</Select.Option>
-              <Select.Option value="tmb">TMBThanachart Bank (TTB)</Select.Option>
-              <Select.Option value="gsb">Government Savings Bank (GSB)</Select.Option>
-              <Select.Option value="bay">Krungsri Bank (BAY)</Select.Option>
-              <Select.Option value="uob">UOB</Select.Option>
-              <Select.Option value="cimb">CIMB Thai</Select.Option>
-              <Select.Option value="other">Other</Select.Option>
+            <Select
+              placeholder="เลือกธนาคาร"
+              popupClassName="refund-select"
+              dropdownStyle={{ background: "#bea4e2ff" }}
+            >
+              <Select.Option value="kbank">กสิกรไทย (KBANK)</Select.Option>
+              <Select.Option value="scb">ไทยพาณิชย์ (SCB)</Select.Option>
+              <Select.Option value="bbl">กรุงเทพ (BBL)</Select.Option>
+              <Select.Option value="ktb">กรุงไทย (KTB)</Select.Option>
+              <Select.Option value="ttb">ทีเอ็มบีธนชาต (TTB)</Select.Option>
+              <Select.Option value="gsb">ออมสิน (GSB)</Select.Option>
+              <Select.Option value="bay">กรุงศรี (BAY)</Select.Option>
+              <Select.Option value="uob">ยูโอบี (UOB)</Select.Option>
+              <Select.Option value="cimb">ซีไอเอ็มบีไทย (CIMB)</Select.Option>
+              <Select.Option value="other">อื่น ๆ</Select.Option>
             </Select>
           </Form.Item>
 
-          {/* Account Number (user input) */}
+          {/* Account Number */}
           <Form.Item
-            label="Account Number"
+            label="เลขที่บัญชี"
             name="accountNumber"
             rules={[
-              { required: true, message: "กรุณากรอกเลขบัญชี" },
-              { pattern: /^[0-9]{10,16}$/, message: "เลขบัญชีต้อง 10-16 ตัวเลข" },
+              { required: true, message: "กรุณากรอกเลขที่บัญชี" },
+              { pattern: /^[0-9]{10,16}$/, message: "เลขบัญชีต้องเป็นตัวเลข 10–16 หลัก" },
             ]}
           >
-            <Input placeholder="Enter your account number" />
+            <Input placeholder="กรอกเลขที่บัญชีของคุณ" />
           </Form.Item>
 
           {/* Comments */}
-          <Form.Item label="Additional Comments" name="comments">
-            <Input.TextArea rows={3} placeholder="Provide any additional details" />
+          <Form.Item label="รายละเอียดเพิ่มเติม" name="comments">
+            <Input.TextArea rows={3} placeholder="ระบุข้อมูลเพิ่มเติม (ถ้ามี)" />
           </Form.Item>
 
           {/* Upload */}
-          <Form.Item label="Upload Proof" required>
+          <Form.Item label="อัปโหลดหลักฐาน" required>
             <Upload
               name="file"
               listType="picture-card"
               fileList={fileList}
-              onPreview={(file) => window.open(file.url || file.thumbUrl, "_blank")}
+              onPreview={(file) =>
+                window.open((file as any).url || (file as any).thumbUrl, "_blank")
+              }
               onChange={({ fileList: newFileList }) => setFileList(newFileList)}
               onRemove={(file) =>
                 setFileList((prev) => prev.filter((f) => f.uid !== file.uid))
               }
               beforeUpload={(file) => {
-                const isImage = file.type.startsWith("image/");
-                if (!isImage) {
-                  message.error("You can only upload image files!");
-                }
-                return false;
+                const isImage = file.type?.startsWith("image/");
+                if (!isImage) message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
+                return false; // ❌ ไม่อัปโหลดทันที
               }}
               maxCount={3}
             >
               {fileList.length < 3 && (
                 <div
                   style={{
-                    background: "#ffffffff",
-                    borderRadius: 8,
+                    background: "#0f0f17",
+                    borderRadius: 10,
                     padding: 8,
-                    border: "1px dashed #a310d0ff",
+                    border: `1px dashed ${PURPLE}`,
+                    color: "#cfc5ff",
                   }}
                 >
-                  <UploadOutlined style={{ color: "#000" }} />
-                  <div style={{ marginTop: 8, color: "#000" }}>Upload</div>
+                  <UploadOutlined />
+                  <div style={{ marginTop: 8 }}>Upload</div>
                 </div>
               )}
             </Upload>
           </Form.Item>
 
-          {/* Modal Preview */}
+          {/* Preview Modal (ถ้าอยากใช้) */}
           <Modal
             open={previewVisible}
             title={previewTitle}
             footer={null}
             onCancel={() => setPreviewVisible(false)}
           >
-            <img alt="example" style={{ width: "100%" }} src={previewImage} />
+            <img alt="preview" style={{ width: "100%" }} src={previewImage} />
           </Modal>
 
           {/* Submit */}
@@ -218,17 +289,15 @@ export default function RefundPage() {
             <Button
               type="primary"
               htmlType="submit"
+              className="purple-btn"
               style={{
-                background: "linear-gradient(90deg, #9254de 0%, #f759ab 100%)",
-                border: "none",
-                color: "white",
                 width: "100%",
-                height: 45,
-                fontSize: 16,
-                fontWeight: 600,
+                height: 46,
+                fontWeight: 700,
+                borderRadius: 10,
               }}
             >
-              Submit Request
+              ส่งคำขอคืนเงิน
             </Button>
           </Form.Item>
         </Form>

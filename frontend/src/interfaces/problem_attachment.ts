@@ -1,4 +1,5 @@
 export interface ProblemAttachment {
+  file_path: string;
   ID: number;
   FilePath: string;
   UploadedAt?: string; // optional เพราะบางกรณีอาจยังไม่เซ็ต
