@@ -9,11 +9,11 @@ type Review struct {
 	Rating      int    `json:"rating" gorm:"not null"`                         // คะแนนรีวิว
 
 	// FK → Users
-	UserID uint  `json:"user_id"`
+	UserID uint  `json:"user_id" gorm:"uniqueIndex:idx_user_game"`
 	User   *User `gorm:"foreignKey:UserID" json:"user"`
 
 	// FK → Games
-	GameID uint  `json:"game_id"`
+	GameID uint  `json:"game_id" gorm:"uniqueIndex:idx_user_game"`
 	Game   *Game `gorm:"foreignKey:GameID" json:"game"`
 
 	// 1:N ReviewLike

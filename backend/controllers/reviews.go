@@ -28,13 +28,22 @@ func CreateReview(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "rating must be 0-10"})
 		return
 	}
-	if err := configs.DB().Create(&body).Error; err != nil {
+	db := configs.DB()
+	var existing entity.Review
+	if err := db.Where("user_id = ? AND game_id = ?", body.UserID, body.GameID).First(&existing).Error; err == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ผู้ใช้เคยรีวิวเกมนี้แล้ว"})
+		return
+	} else if err != gorm.ErrRecordNotFound {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := db.Create(&body).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "create failed: " + err.Error()})
 		return
 	}
 	// reload
 	var row entity.Review
-	if err := configs.DB().Preload("User").Preload("Game").First(&row, body.ID).Error; err != nil {
+	if err := db.Preload("User").Preload("Game").First(&row, body.ID).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "reload failed: " + err.Error()})
 		return
 	}
