@@ -198,7 +198,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
     return viewReport.replies.map((reply: ProblemReply) => (
       <div
-        key={reply.ID}
+        key={reply.id}
         style={{
           marginBottom: 12,
           padding: "10px 12px",
