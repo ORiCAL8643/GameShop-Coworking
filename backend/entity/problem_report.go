@@ -8,21 +8,15 @@ import (
 
 type ProblemReport struct {
 	gorm.Model
-	Title       string
-	Description string
-	Status      string
-	UserID      uint
-	ResolvedAt  *time.Time
+	Title       string     `json:"title"`
+	Description string     `json:"description"`
+	Category    string     `json:"category"`
+	Status      string     `json:"status"`
+	UserID      uint       `json:"user_id"`
+	ResolvedAt  *time.Time `json:"resolved_at"`
 
 	// Relations
-	User        User
-	Attachments []ProblemAttachment `gorm:"foreignKey:ReportID"`
-	Replies     []ProblemReply      `gorm:"foreignKey:ReportID"`
-}
-
-// ไฟล์แนบของ Report (ของผู้ใช้)
-type ProblemAttachment struct {
-	gorm.Model
-	FilePath string
-	ReportID uint
+	User        User                `json:"user"`
+	Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
+	Replies     []ProblemReply      `json:"replies" gorm:"foreignKey:ReportID"`
 }

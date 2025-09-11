@@ -29,6 +29,7 @@ export interface ProblemReport {
   reply: any;
   ID: number;
   title: string;
+  category: string;
   description: string;
   status: string;
   created_at: string;

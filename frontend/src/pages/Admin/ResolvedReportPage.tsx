@@ -1,7 +1,7 @@
 // src/pages/Admin/ResolvedReportsPage.tsx
 import { useEffect, useState } from "react";
 import { Card, Button, Typography, Tag, Modal } from "antd";
-import { fetchReports } from "../../services/Report";
+import { fetchResolvedReports } from "../../services/Report";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import { useNavigate } from "react-router-dom";
 
@@ -18,8 +18,8 @@ export default function ResolvedReportsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const all = await fetchReports();
-        setItems((all || []).filter((i) => i.status === "resolved"));
+        const all = await fetchResolvedReports();
+        setItems(all || []);
       } catch (e) {
         console.error(e);
       }
@@ -112,7 +112,9 @@ export default function ResolvedReportsPage() {
 
               {reply && (
                 <div style={{ marginTop: 12 }}>
-                  <p style={{ ...textStyle, marginBottom: 8 }}>📨 Admin Reply:</p>
+                  <p style={{ ...textStyle, marginBottom: 8 }}>
+                    📨 Admin Reply:
+                  </p>
                   <div
                     style={{
                       background: "#141322",
@@ -126,8 +128,12 @@ export default function ResolvedReportsPage() {
 
                   {reply.attachments && reply.attachments.length > 0 && (
                     <div style={{ marginTop: 15 }}>
-                      <p style={{ ...textStyle, marginBottom: 8 }}>📎 Reply Attachments:</p>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      <p style={{ ...textStyle, marginBottom: 8 }}>
+                        📎 Reply Attachments:
+                      </p>
+                      <div
+                        style={{ display: "flex", flexWrap: "wrap", gap: 10 }}
+                      >
                         {reply.attachments.map((att) => {
                           const path = (att as any).file_path || "";
                           const isImage = path

@@ -23,13 +23,14 @@ func CreateReport(c *gin.Context) {
 
 	title := strings.TrimSpace(c.PostForm("title"))
 	desc := strings.TrimSpace(c.PostForm("description"))
+	category := strings.TrimSpace(c.PostForm("category"))
 	status := strings.TrimSpace(c.PostForm("status"))
 	if status == "" {
 		status = "open"
 	}
 	userID, _ := strconv.Atoi(c.PostForm("user_id"))
 
-	if title == "" || desc == "" || userID <= 0 {
+	if title == "" || desc == "" || category == "" || userID <= 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 		return
 	}
@@ -48,6 +49,7 @@ func CreateReport(c *gin.Context) {
 	report := entity.ProblemReport{
 		Title:       title,
 		Description: desc,
+		Category:    category,
 		Status:      status,
 		UserID:      uint(userID),
 	}
@@ -324,4 +326,53 @@ func ReplyReport(c *gin.Context) {
 		First(&rp, rp.ID).Error
 
 	c.JSON(http.StatusOK, rp)
+}
+
+// ================= MARK RESOLVED ==================
+// PUT /reports/:id/resolve
+func ResolveReport(c *gin.Context) {
+	db := configs.DB()
+	id, _ := strconv.Atoi(c.Param("id"))
+
+	var rp entity.ProblemReport
+	if err := db.First(&rp, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	now := time.Now()
+	rp.Status = "resolved"
+	rp.ResolvedAt = &now
+	if err := db.Save(&rp).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	_ = db.Preload("User").
+		Preload("Attachments").
+		Preload("Replies.Attachments").
+		First(&rp, rp.ID).Error
+
+	c.JSON(http.StatusOK, rp)
+}
+
+// ================= LIST RESOLVED ==================
+// GET /reports/resolved
+func FindResolvedReports(c *gin.Context) {
+	db := configs.DB()
+	var items []entity.ProblemReport
+	if err := db.Where("status = ?", "resolved").
+		Preload("User").
+		Preload("Attachments").
+		Preload("Replies.Attachments").
+		Order("updated_at DESC").
+		Find(&items).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, items)
 }
