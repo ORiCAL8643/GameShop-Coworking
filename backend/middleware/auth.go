@@ -1,3 +1,4 @@
+// middleware/auth.go
 package middleware
 
 import (
@@ -11,7 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// AuthMiddleware verifies JWT token and loads current user
+// ตรวจ JWT แล้วโหลด currentUser ใส่ context
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
@@ -59,7 +60,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	}
 }
 
-// RequirePermission checks that current user has one of the required permission keys
+// ตรวจว่าผู้ใช้มี permission ใดอย่างน้อยหนึ่งใน keys
 func RequirePermission(keys ...string) gin.HandlerFunc {
 	required := make(map[string]struct{}, len(keys))
 	for _, k := range keys {
@@ -79,9 +80,11 @@ func RequirePermission(keys ...string) gin.HandlerFunc {
 		}
 
 		for _, rp := range user.Role.RolePermissions {
-			if _, ok := required[rp.Permission.Key]; ok {
-				c.Next()
-				return
+			if rp.Permission != nil {
+				if _, ok := required[rp.Permission.Key]; ok {
+					c.Next()
+					return
+				}
 			}
 		}
 

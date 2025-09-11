@@ -2,6 +2,8 @@
 package main
 
 import (
+	"net/http"
+
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"example.com/sa-gameshop/middleware"
@@ -11,7 +13,7 @@ import (
 const PORT = "8088"
 
 func main() {
-	// เชื่อมต่อ DB และตั้งค่าฐานข้อมูล (migrate/seed ตามที่คุณทำไว้ใน configs.SetupDatabase)
+	// 1) เชื่อมต่อ DB + 2) AutoMigrate + Seed
 	configs.ConnectionDB()
 	configs.SetupDatabase()
 
@@ -19,12 +21,15 @@ func main() {
 	r.Static("/uploads", "./uploads")
 	r.Use(CORSMiddleware())
 
-	// health check ง่าย ๆ
-	r.GET("/ping", func(c *gin.Context) { c.String(200, "pong") })
+	// health check
+	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
 
+	// Public routes
 	public := r.Group("/")
 	public.POST("/login", controllers.Login)
+	public.POST("/register", controllers.Register) // สมัครสมาชิกได้ตลอด
 
+	// Protected routes
 	auth := r.Group("/")
 	auth.Use(middleware.AuthMiddleware())
 	{
@@ -181,21 +186,18 @@ func main() {
 		auth.DELETE("/modtags/:id", middleware.RequirePermission("workshop.moderate"), controllers.DeleteModTag)
 	}
 
-	// Run the server
-	// แก้สเปซตรง "localhost:" ให้ถูกต้อง
+	// Start server
 	r.Run("localhost:" + PORT)
 }
 
-// CORS แบบเดียวกับตัวอย่างที่แนบมา
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
-
 		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
+			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
 		c.Next()
