@@ -33,6 +33,7 @@ interface RefundRequest {
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
 }
+
 interface AdminPageProps {
   refunds: RefundRequest[];
   setRefunds: (refunds: RefundRequest[]) => void;
@@ -45,8 +46,9 @@ export default function AdminPage({
   setRefunds,
 }: AdminPageProps) {
   const navigate = useNavigate();
-  const auth = useAuth();
 
+  // ✅ หา adminId จาก auth หรือ .env (VITE_FORCE_ADMIN_ID) หรือ fallback = 1
+  const auth = useAuth();
   const ENV_FORCE_ADMIN_ID = Number(import.meta.env.VITE_FORCE_ADMIN_ID || "");
   const adminId =
     (auth as any)?.id ??
@@ -62,22 +64,27 @@ export default function AdminPage({
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const items = await fetchReports();
-        setProblems(items || []);
+  const load = async () => {
+    try {
+      const items = await fetchReports();
+      const pending = (items || []).filter(
+        (it: { status: string }) => it.status !== "resolved"
+      );
+      setProblems(pending);
 
-        // ✅ ตั้ง "เวลาที่เห็นล่าสุด" = created_at ที่ใหม่ที่สุดในชุดข้อมูล (หรือเวลาปัจจุบันถ้าไม่มี)
-        const latestTs = (items || []).reduce((max, r) => {
-          const t = r.created_at ? Date.parse(r.created_at) : 0;
-          return t > max ? t : max;
-        }, 0);
-        markReportsSeen(latestTs ? new Date(latestTs).toISOString() : undefined);
-      } catch (e) {
-        console.error(e);
-      }
-    };
+      // ✅ ตั้ง "เวลาที่เห็นล่าสุด" = created_at ที่ใหม่ที่สุด
+      const latestTs = (items || []).reduce((max: number, r: { created_at?: string }) => {
+        const t = r.created_at ? Date.parse(r.created_at) : 0;
+        return t > max ? t : max;
+      }, 0);
+
+      markReportsSeen(latestTs ? new Date(latestTs).toISOString() : undefined);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
     load();
   }, []);
 
@@ -105,18 +112,23 @@ export default function AdminPage({
         )
         .filter((f: File | null): f is File => f !== null);
 
-      await replyReport(rep.ID, adminId, reply.text, files);
+      await replyReport(rep.ID, {
+        admin_id: adminId,
+        message: reply.text,
+        files,
+      });
+
       message.success("ตอบกลับลูกค้าสำเร็จ");
+      setProblems((prev) => prev.filter((p) => p.ID !== rep.ID));
+
+      setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
     } catch (e: any) {
       console.error("❌ Error while sending reply:", e);
       const detail = e?.response?.data?.error || e?.message || String(e);
       message.error(`ไม่สามารถส่งคำตอบได้: ${detail}`);
     }
-
-    setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
   };
 
-  // ✅ ปิดงานเป็น resolved แล้วลบออกจากลิสต์
   const handleResolveProblem = async (id: number) => {
     try {
       await resolveReport(id);
@@ -230,7 +242,7 @@ export default function AdminPage({
         })}
       </div>
 
-      {/* Problem Reports: เฉพาะที่ยังไม่ resolved */}
+      {/* Problem Reports */}
       {activeTab === "problems" && (
         <div
           style={{

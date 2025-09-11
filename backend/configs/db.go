@@ -402,10 +402,6 @@ func SetupDatabase() {
 		&entity.Reaction{},
 		&entity.Attachment{},
 		&entity.Notification{},
-		&entity.ProblemReport{},
-		&entity.ProblemAttachment{},
-		&entity.ProblemReply{},
-		&entity.ProblemReplyAttachment{},
 		&entity.Order{},
 		&entity.OrderItem{},
 		&entity.Payment{},
@@ -418,6 +414,9 @@ func SetupDatabase() {
 		&entity.Promotion_Game{},
 		&entity.Mod{},
 		&entity.ModRating{},
+		&entity.ProblemReply{},            // ✅ เพิ่ม
+		&entity.ProblemReplyAttachment{},  // ✅ เพิ่ม
+		&entity.ProblemAttachment{},
 	); err != nil {
 		log.Fatal("auto migrate (others) failed: ", err)
 	}

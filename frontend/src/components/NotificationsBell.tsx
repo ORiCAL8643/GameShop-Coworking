@@ -9,7 +9,7 @@ import {
 } from "../services/Notification";
 import { getReportByID } from "../services/Report";
 import type { Notification } from "../interfaces/Notification";
-import type { ProblemReport } from "../interfaces/problem_report";
+import type { ProblemReport, ProblemReply } from "../interfaces/problem_report";
 
 const { Text, Paragraph } = Typography;
 
@@ -31,9 +31,13 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
   const [imgOpen, setImgOpen] = useState(false);
   const [imgSrc, setImgSrc] = useState<string>("");
 
-  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8088") as string;
+  const API_URL =
+    (import.meta.env.VITE_API_URL || "http://localhost:8088") as string;
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.is_read).length, [items]);
+  const unreadCount = useMemo(
+    () => items.filter((n) => !n.is_read).length,
+    [items]
+  );
 
   const normalizeUrl = (p: string) => {
     if (!p) return "";
@@ -48,7 +52,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     try {
       const raw = await fetchNotifications(userId);
 
-      // ✅ กรองซ้ำ: เก็บเฉพาะอันล่าสุดต่อ key (type + report_id)
+      // ✅ เก็บ noti ล่าสุดของแต่ละ type+report
       const map = new Map<string, Notification>();
       for (const n of raw) {
         const key = `${n.type}:${n.report_id ?? n.ID}`;
@@ -107,10 +111,23 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   const content = (
     <div style={{ width: 380, maxHeight: 420, overflow: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 8,
+          alignItems: "center",
+        }}
+      >
         <Text strong>การแจ้งเตือน</Text>
         {items.length > 0 && (
-          <Button size="small" onClick={async () => { await markAllNotificationsRead(userId); await load(); }}>
+          <Button
+            size="small"
+            onClick={async () => {
+              await markAllNotificationsRead(userId);
+              await load();
+            }}
+          >
             ทำเป็นอ่านแล้วทั้งหมด
           </Button>
         )}
@@ -128,13 +145,30 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
               padding: "10px 12px",
             }}
             actions={[
-              <Button size="small" type="link" onClick={() => openView(n)}>ดูข้อความ</Button>,
+              <Button size="small" type="link" onClick={() => openView(n)}>
+                ดูข้อความ
+              </Button>,
               !n.is_read ? (
-                <Button size="small" type="link" onClick={async () => { await markNotificationRead(n.ID); await load(); }}>
+                <Button
+                  size="small"
+                  type="link"
+                  onClick={async () => {
+                    await markNotificationRead(n.ID);
+                    await load();
+                  }}
+                >
                   อ่านแล้ว
                 </Button>
               ) : null,
-              <Button size="small" danger type="link" onClick={async () => { await deleteNotification(n.ID); await load(); }}>
+              <Button
+                size="small"
+                danger
+                type="link"
+                onClick={async () => {
+                  await deleteNotification(n.ID);
+                  await load();
+                }}
+              >
                 ลบ
               </Button>,
             ].filter(Boolean)}
@@ -158,60 +192,99 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // Attachments from first admin reply
-  const renderReplyAttachments = () => {
-    const reply = viewReport?.replies && viewReport.replies[0];
-    if (!reply || !reply.attachments || reply.attachments.length === 0) return null;
+  // Attachments from replies
+  const renderReplySection = () => {
+    if (!viewReport?.replies || viewReport.replies.length === 0) return null;
 
-    return (
-      <>
-        <Text strong>ไฟล์แนบจากแอดมิน:</Text>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
-          {reply.attachments.map((att) => {
-            const rawPath = (att as any).file_path || "";
-            const url = normalizeUrl(rawPath);
-            const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
+    return viewReport.replies.map((reply: ProblemReply) => (
+      <div
+        key={reply.ID}
+        style={{
+          marginBottom: 12,
+          padding: "10px 12px",
+          borderRadius: 8,
+          background: "#fafafa",
+        }}
+      >
+        <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
+        <Paragraph style={{ whiteSpace: "pre-line" }}>
+          {reply.message || "-"}
+        </Paragraph>
+        {reply.attachments && reply.attachments.length > 0 && (
+          <>
+            <Text strong>ไฟล์แนบจากแอดมิน:</Text>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 10,
+                marginTop: 8,
+              }}
+            >
+              {reply.attachments.map((att) => {
+                const rawPath = (att as any).file_path || "";
+                const url = normalizeUrl(rawPath);
+                const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
 
-            return (
-              <div key={att.ID} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                {isImg ? (
-                  <img
-                    src={url}
-                    alt="attachment"
+                return (
+                  <div
+                    key={att.ID}
                     style={{
-                      width: 100,
-                      height: 100,
-                      objectFit: "cover",
-                      borderRadius: 8,
-                      cursor: "pointer",
-                      boxShadow: "0 1px 4px rgba(0,0,0,.25)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
                     }}
-                    onClick={() => { setImgSrc(url); setImgOpen(true); }}
-                  />
-                ) : (
-                  <a href={url} target="_blank" rel="noopener noreferrer">
-                    📄 {rawPath.split("/").pop()}
-                  </a>
-                )}
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 12, marginTop: 6 }}
-                >
-                  เปิดในแท็บใหม่
-                </a>
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
+                  >
+                    {isImg ? (
+                      <img
+                        src={url}
+                        alt="attachment"
+                        style={{
+                          width: 100,
+                          height: 100,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          boxShadow: "0 1px 4px rgba(0,0,0,.25)",
+                        }}
+                        onClick={() => {
+                          setImgSrc(url);
+                          setImgOpen(true);
+                        }}
+                      />
+                    ) : (
+                      <a href={url} target="_blank" rel="noopener noreferrer">
+                        📄 {rawPath.split("/").pop()}
+                      </a>
+                    )}
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12, marginTop: 6 }}
+                    >
+                      เปิดในแท็บใหม่
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+        <Divider />
+      </div>
+    ));
   };
 
   return (
     <>
-      <Popover placement="bottomRight" trigger="click" content={content} open={open} onOpenChange={onOpenChange}>
+      <Popover
+        placement="bottomRight"
+        trigger="click"
+        content={content}
+        open={open}
+        onOpenChange={onOpenChange}
+      >
         <Badge count={unreadCount} size="small">
           <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
         </Badge>
@@ -219,31 +292,20 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
       {/* Modal: รายละเอียดแจ้งเตือน */}
       <Modal
-  open={viewOpen}
-  title={viewNoti?.title || "รายละเอียดแจ้งเตือน"}
-  onCancel={() => setViewOpen(false)}
-  footer={<Button onClick={() => setViewOpen(false)}>ปิด</Button>}
-  destroyOnClose
->
-  {/* ❌ ไม่แสดงข้อความสรุปใน noti ถ้าเป็นประเภท report_reply */}
-  {viewNoti?.type !== "report_reply" && (
-    <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8 }}>
-      {viewNoti?.message}
-    </Paragraph>
-  )}
+        open={viewOpen}
+        title={viewNoti?.title || "รายละเอียดแจ้งเตือน"}
+        onCancel={() => setViewOpen(false)}
+        footer={<Button onClick={() => setViewOpen(false)}>ปิด</Button>}
+        destroyOnClose
+      >
+        {viewNoti?.type !== "report_reply" && (
+          <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8 }}>
+            {viewNoti?.message}
+          </Paragraph>
+        )}
 
-  {viewNoti?.type === "report_reply" && viewReport && (
-    <>
-      <Divider style={{ margin: "10px 0" }} />
-      <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
-      <Paragraph style={{ whiteSpace: "pre-line" }}>
-        {viewReport.replies?.[0]?.message || "-"}
-      </Paragraph>
-      {renderReplyAttachments()}
-    </>
-  )}
-</Modal>
-
+        {viewNoti?.type === "report_reply" && viewReport && renderReplySection()}
+      </Modal>
 
       {/* Modal: Preview รูปภาพ */}
       <Modal

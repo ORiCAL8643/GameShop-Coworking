@@ -20,8 +20,8 @@ import ReportSuccessPage from "../pages/Report/ReportSuccess.tsx";
 import RefundPage from "../pages/Refund/RefundPage.tsx";
 import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus.tsx";
 import AdminPage from "../pages/Admin/AdminPage.tsx";
-import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage.tsx"; // ✅ เพิ่ม
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage.tsx";
+import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage.tsx"; // ✅ import หน้านี้
 
 import PromotionManager from "../pages/Promotion/PromotionManager.tsx";
 import PromotionDetail from "../pages/Promotion/PromotionDetail.tsx";
@@ -89,24 +89,25 @@ const router = createBrowserRouter([
             element: (
               <AdminPage
                 refunds={refunds}
-                setRefunds={() => { }}
+                setRefunds={() => {}}
                 addNotification={addNotification}
                 addRefundUpdate={addRefundUpdate}
               />
             ),
           },
+          { path: "/Admin/Resolved", element: <ResolvedReportsPage /> }, // ✅ เพิ่มตรงนี้
           { path: "/Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
           { path: "/Admin/RolePage", element: <RoleManagement /> },
         ],
       },
       {
         path: "/roles",
-        element: <RoleManagement />
+        element: <RoleManagement />,
       },
       {
         path: "/roles/:id",
-        element: <RoleEdit />
-      }
+        element: <RoleEdit />,
+      },
     ],
   },
 ]);

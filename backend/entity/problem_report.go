@@ -6,25 +6,23 @@ import (
 	"gorm.io/gorm"
 )
 
-// ProblemReport represents a problem/bug report created by a user.
-//
-// Fields follow the requirements in the task description:
-//   - category: text category chosen by user
-//   - status:  "pending" or "resolved"
-//   - attachments: files uploaded when creating the report
-//   - replies: admin replies (with their own attachments)
 type ProblemReport struct {
 	gorm.Model
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Category    string `json:"category"`
+	Title       string
+	Description string
+	Status      string
+	UserID      uint
+	ResolvedAt  *time.Time
 
-	Status     string     `json:"status" gorm:"default:pending"`
-	ResolvedAt *time.Time `json:"resolved_at"`
+	// Relations
+	User        User
+	Attachments []ProblemAttachment `gorm:"foreignKey:ReportID"`
+	Replies     []ProblemReply      `gorm:"foreignKey:ReportID"`
+}
 
-	UserID uint  `json:"user_id"`
-	User   *User `gorm:"foreignKey:UserID" json:"user"`
-
-	Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
-	Replies     []ProblemReply      `json:"replies" gorm:"foreignKey:ReportID"`
+// ไฟล์แนบของ Report (ของผู้ใช้)
+type ProblemAttachment struct {
+	gorm.Model
+	FilePath string
+	ReportID uint
 }

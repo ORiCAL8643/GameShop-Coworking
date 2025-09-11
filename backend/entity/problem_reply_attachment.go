@@ -1,10 +1,8 @@
+// entity/problem_reply_attachment.go
 package entity
 
-import "gorm.io/gorm"
-
-// ProblemReplyAttachment stores a file attached to an admin reply.
 type ProblemReplyAttachment struct {
-	gorm.Model
-	FilePath string `json:"file_path"`
-	ReplyID  uint   `json:"reply_id"`
+    ID     uint   `gorm:"primaryKey" json:"id"`
+    ReplyID uint   `json:"reply_id"`
+    FilePath string `json:"file_path"`
 }

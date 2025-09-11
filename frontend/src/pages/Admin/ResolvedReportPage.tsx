@@ -1,6 +1,7 @@
+// src/pages/Admin/ResolvedReportsPage.tsx
 import { useEffect, useState } from "react";
 import { Card, Button, Typography, Tag, Modal } from "antd";
-import { fetchResolvedReports } from "../../services/Report";
+import { fetchReports } from "../../services/Report";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import { useNavigate } from "react-router-dom";
 
@@ -17,8 +18,8 @@ export default function ResolvedReportsPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const all = await fetchResolvedReports();
-        setItems(all || []);
+        const all = await fetchReports();
+        setItems((all || []).filter((i) => i.status === "resolved"));
       } catch (e) {
         console.error(e);
       }
@@ -96,37 +97,38 @@ export default function ResolvedReportsPage() {
           gap: "25px",
         }}
       >
-        {items.map((rep) => (
-          <Card key={rep.ID} style={cardStyle}>
-            <p style={textStyle}>
-              User: {rep.user?.username ?? (rep as any).user_id}
-            </p>
-            <p style={textStyle}>Title: {rep.title}</p>
-            <p style={textStyle}>Description: {rep.description}</p>
-            <p style={textStyle}>
-              Status: <Tag color="#52c41a">✅ Resolved</Tag>
-            </p>
+        {items.map((rep) => {
+          const reply = rep.replies?.[0];
+          return (
+            <Card key={rep.ID} style={cardStyle}>
+              <p style={textStyle}>
+                User: {rep.user?.username ?? (rep as any).user_id}
+              </p>
+              <p style={textStyle}>Title: {rep.title}</p>
+              <p style={textStyle}>Description: {rep.description}</p>
+              <p style={textStyle}>
+                Status: <Tag color="#52c41a">✅ Resolved</Tag>
+              </p>
 
-            {rep.replies && rep.replies.length > 0 && (
-              <div style={{ marginTop: 12 }}>
-                <p style={{ ...textStyle, marginBottom: 8 }}>📨 Admin Reply:</p>
-                {rep.replies.map((r) => (
-                  <div key={r.ID} style={{ marginBottom: 12 }}>
-                    <div
-                      style={{
-                        background: "#141322",
-                        padding: "10px 12px",
-                        borderRadius: 8,
-                        whiteSpace: "pre-line",
-                      }}
-                    >
-                      {r.message}
-                    </div>
-                    {r.attachments && r.attachments.length > 0 && (
-                      <div
-                        style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}
-                      >
-                        {r.attachments.map((att) => {
+              {reply && (
+                <div style={{ marginTop: 12 }}>
+                  <p style={{ ...textStyle, marginBottom: 8 }}>📨 Admin Reply:</p>
+                  <div
+                    style={{
+                      background: "#141322",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {reply.message}
+                  </div>
+
+                  {reply.attachments && reply.attachments.length > 0 && (
+                    <div style={{ marginTop: 15 }}>
+                      <p style={{ ...textStyle, marginBottom: 8 }}>📎 Reply Attachments:</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        {reply.attachments.map((att) => {
                           const path = (att as any).file_path || "";
                           const isImage = path
                             .toLowerCase()
@@ -160,54 +162,13 @@ export default function ResolvedReportsPage() {
                           );
                         })}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {rep.attachments && rep.attachments.length > 0 && (
-              <div style={{ marginTop: 15 }}>
-                <p style={{ ...textStyle, marginBottom: 8 }}>📎 Attachments:</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                  {rep.attachments.map((att) => {
-                    const path = (att as any).file_path || "";
-                    const isImage = path
-                      .toLowerCase()
-                      .match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
-                    const url = `${API_URL}/${path}`;
-                    return isImage ? (
-                      <img
-                        key={(att as any).ID}
-                        src={url}
-                        alt="attachment"
-                        style={{
-                          width: 100,
-                          height: 100,
-                          objectFit: "cover",
-                          borderRadius: 8,
-                          cursor: "pointer",
-                          boxShadow: "0 0 6px rgba(0,0,0,0.4)",
-                        }}
-                        onClick={() => handlePreview(url)}
-                      />
-                    ) : (
-                      <a
-                        key={(att as any).ID}
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{ color: "#40a9ff" }}
-                      >
-                        📄 {path.split("/").pop()}
-                      </a>
-                    );
-                  })}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </Card>
-        ))}
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       <Modal
