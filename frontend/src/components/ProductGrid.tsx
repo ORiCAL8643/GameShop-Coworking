@@ -5,6 +5,7 @@ import { Card, Button, Modal} from "antd";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { MoreOutlined } from "@ant-design/icons";
+import { useCart } from "../context/CartContext";
 
 const base_url = "http://localhost:8088";
 
@@ -55,6 +56,7 @@ const ProductGrid: React.FC<ProductGridProps> = () => {
 
   const [game, Setgame] = useState<Game[]>([]);
   const navigate = useNavigate();
+  const { addItem } = useCart();
   const [selected, setSelected] = useState<Game | null>(null); //usestate
   const open = !!selected;
 
@@ -74,29 +76,10 @@ const ProductGrid: React.FC<ProductGridProps> = () => {
     GetGame();
   }, []);
 
-  const handleAddToCart = async (g: Game) => {
-    try {
-      const price = g.discounted_price ?? g.base_price;
-      const res = await axios.post(`${base_url}/orders`, {
-        user_id: 1,
-        total_amount: price,
-        order_status: "PENDING",
-        order_items: [
-          {
-            unit_price: price,
-            qty: 1,
-            game_key_id: g.key_id,
-          },
-        ],
-      });
-      const orderId = res.data.ID || res.data.id;
-      if (orderId) {
-        localStorage.setItem("orderId", String(orderId));
-      }
-      navigate("/category/Payment");
-    } catch (err) {
-      console.error("add to cart error", err);
-    }
+  const handleAddToCart = (g: Game) => {
+    const price = g.discounted_price ?? g.base_price;
+    addItem({ id: g.ID, title: g.game_name, price, quantity: 1 });
+    navigate("/category/Payment");
   };
 
   const approveGames = game.filter((g) => g.status === "approve");
