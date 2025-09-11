@@ -1,51 +1,120 @@
-// =============================
-// File: src/services/reviews.ts
-// =============================
 import axios from "axios";
 
+/** รูปแบบรีวิวที่ UI ใช้จริง */
+export type ReviewItem = {
+  ID: number;
+  CreatedAt?: string;
+  UpdatedAt?: string;
+  DeletedAt?: string | null;
+
+  // ⚠️ Backend เก็บชื่อ ReviewTitle/ReviewText เรา map เป็นชื่อที่ UI ใช้:
+  title?: string;      // ← ReviewTitle
+  content: string;     // ← ReviewText
+  rating: number;      // ← Rating
+
+  game_id: number;     // ← GameID
+  user_id: number;     // ← UserID
+
+  username?: string;
+  likes?: number;
+  likedByMe?: boolean;
+};
 
 const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8088";
 
+/** ปรับชื่อฟิลด์ที่ backend ส่ง ให้เป็นรูปแบบที่ UI ใช้ */
+export const normalizeReview = (r: any): ReviewItem => ({
+  ID: Number(r?.ID ?? r?.id),
+  CreatedAt: r?.CreatedAt ?? r?.createdAt ?? r?.created_at ?? "",
+  UpdatedAt: r?.UpdatedAt ?? r?.updatedAt ?? r?.updated_at ?? "",
+  DeletedAt: r?.DeletedAt ?? r?.deletedAt ?? r?.deleted_at ?? null,
 
-export type Review = {
-ID: number;
-created_at?: string;
-updated_at?: string;
-review_title: string;
-review_text?: string;
-rating: number; // 0-10
-user_id: number;
-game_id: number;
-likes?: number;
-user?: { ID: number; username?: string };
-};
+  title: r?.ReviewTitle ?? r?.title ?? "",
+  content: r?.ReviewText ?? r?.content ?? "",
+  rating: Number(r?.Rating ?? r?.rating ?? 0),
 
+  game_id: Number(r?.GameID ?? r?.game_id ?? r?.gameId),
+  user_id: Number(r?.UserID ?? r?.user_id ?? r?.userId),
 
-export type CreateReviewReq = Pick<
-Review,
-"review_title" | "review_text" | "rating" | "user_id" | "game_id"
->;
-export type UpdateReviewReq = Partial<CreateReviewReq>;
-
+  username: r?.username,
+  likes: typeof r?.likes === "number" ? r.likes : 0,
+  likedByMe: typeof r?.likedByMe === "boolean" ? r.likedByMe : false,
+});
 
 export const ReviewsAPI = {
-async listByGame(gameId: number) {
-const { data } = await axios.get(`${BASE}/games/${gameId}/reviews`);
-return data as Review[];
-},
-async create(body: CreateReviewReq) {
-const { data } = await axios.post(`${BASE}/reviews`, body);
-return data as Review;
-},
-async update(id: number, body: UpdateReviewReq) {
-const { data } = await axios.put(`${BASE}/reviews/${id}`, body);
-return data as Review;
-},
-async remove(id: number) {
-await axios.delete(`${BASE}/reviews/${id}`);
-},
-async toggleLike(id: number, user_id: number) {
-const { data } = await axios.post(`${BASE}/reviews/${id}/toggle_like`, { user_id });
-return data as { review_id: number; likes: number };
-},
+  /** GET /games/:id/reviews */
+  async listByGame(gameId: number, token?: string): Promise<ReviewItem[]> {
+    const res = await axios.get(`${BASE}/games/${gameId}/reviews`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    const arr = Array.isArray(res.data) ? res.data : [];
+    return arr.map(normalizeReview);
+  },
+
+  /** POST /reviews  — ต้องส่งชื่อฟิลด์ให้ตรง backend */
+  async createJson(
+    payload: {
+      GameID: number;
+      UserID: number;
+      ReviewTitle?: string;
+      ReviewText: string;
+      Rating: number;
+    },
+    token?: string
+  ): Promise<ReviewItem> {
+    const res = await axios.post(`${BASE}/reviews`, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    return normalizeReview(res.data);
+  },
+
+  /** PUT /reviews/:id */
+  async updateJson(
+    id: number,
+    payload: {
+      ReviewTitle?: string;
+      ReviewText: string;
+      Rating: number;
+    },
+    token?: string
+  ): Promise<ReviewItem> {
+    const res = await axios.put(`${BASE}/reviews/${id}`, payload, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+    return normalizeReview(res.data);
+  },
+
+  /** DELETE /reviews/:id */
+  async remove(id: number, token?: string) {
+    const res = await axios.delete(`${BASE}/reviews/${id}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    return res.data;
+  },
+
+  /** POST /reviews/:id/toggle_like  { user_id }  */
+  async toggleLike(
+    reviewId: number,
+    userId: number,
+    token?: string
+  ): Promise<{ review_id: number; likes: number; liked?: boolean }> {
+    const res = await axios.post(
+      `${BASE}/reviews/${reviewId}/toggle_like`,
+      { user_id: userId },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      }
+    );
+    return res.data as { review_id: number; likes: number; liked?: boolean };
+  },
 };
+    

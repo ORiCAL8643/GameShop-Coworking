@@ -1,255 +1,254 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ReviewsAPI, type Review } from "../services/reviews";
 import { Avatar, Button, Form, Input, List, Modal, Popconfirm, Rate, Space, message } from "antd";
-import {
-  HeartOutlined,
-  HeartFilled,
-  EditOutlined,
-  DeleteOutlined,
-  PlusOutlined,
-  UserOutlined,
-} from "@ant-design/icons";
+import { Heart, Pencil, Trash2, Plus } from "lucide-react";
+import { UserOutlined } from "@ant-design/icons";
+
+import { ReviewsAPI, type ReviewItem } from "../services/reviews";
+// ใช้ context จริงของโปรเจกต์คุณ (ต้องมี id, username, token)
 import { useAuth } from "../context/AuthContext";
 
 export type ReviewSectionProps = {
   gameId: number;
-  allowCreate?: boolean; // default true
+  allowCreate?: boolean;
   className?: string;
 };
 
 const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = true, className }) => {
-  const { id, username } = useAuth();
-  const userId = id;
+  const { id: authId, username, token } = useAuth();
+  const userId = authId ? Number(authId) : undefined;
 
   const [loading, setLoading] = useState(false);
-  const [items, setItems] = useState<(Review & { likedByMe?: boolean })[]>([]);
+  const [items, setItems] = useState<ReviewItem[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<Review | null>(null);
-  const [form] = Form.useForm<{ review_title: string; review_text?: string; rating: number }>();
+  const [editing, setEditing] = useState<ReviewItem | null>(null);
+  const [form] = Form.useForm<{ title?: string; content: string; rating: number }>();
 
-  const canEdit = useMemo(() => (r: Review) => userId && r.user_id === Number(userId), [userId]);
-
-  async function load() {
-    setLoading(true);
+  // โหลดรีวิวของเกม
+  const load = async () => {
     try {
-      // Load reviews for the given game via GET /games/:gameId/reviews
-      const list = await ReviewsAPI.listByGame(gameId);
-      setItems(
-        list
-          .map(r => ({ ...r, likedByMe: false })) // ถ้า backend ส่งสถานะ liked มาได้ ค่อยอัปเดตส่วนนี้
-          .sort((a, b) => (b.ID ?? 0) - (a.ID ?? 0))
-      );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      message.error(msg || "โหลดรีวิวไม่สำเร็จ");
+      setLoading(true);
+      const list = await ReviewsAPI.listByGame(gameId, token || undefined);
+      const normalized = (list || []).map(r => ({
+        ...r,
+        likes: typeof r.likes === "number" ? r.likes : 0,
+        likedByMe: typeof r.likedByMe === "boolean" ? r.likedByMe : false,
+      }));
+      normalized.sort((a, b) => (b.UpdatedAt || "").localeCompare(a.UpdatedAt || ""));
+      setItems(normalized);
+    } catch (e) {
+      message.error("โหลดรีวิวไม่สำเร็จ");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  useEffect(() => { load(); }, [gameId]);
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId]);
 
-  function openCreate() {
+  const canCreate = allowCreate && !!userId;
+
+  const onCreate = () => {
     setEditing(null);
     form.resetFields();
-    form.setFieldsValue({ rating: 8 });
     setShowForm(true);
-  }
+  };
 
-  function openEdit(r: Review) {
+  const onEdit = (r: ReviewItem) => {
     setEditing(r);
     form.setFieldsValue({
-      review_title: r.review_title,
-      review_text: r.review_text,
+      title: r.title,
+      content: r.content,
       rating: r.rating,
     });
     setShowForm(true);
-  }
+  };
 
-  async function handleSubmit() {
-    const v = await form.validateFields();
+  const onDelete = async (r: ReviewItem) => {
     try {
-      if (!userId) {
-        message.warning("กรุณาเข้าสู่ระบบก่อนรีวิว");
-        return;
-      }
+      await ReviewsAPI.remove(r.ID, token || undefined);
+      setItems(prev => prev.filter(it => it.ID !== r.ID));
+      message.success("ลบรีวิวแล้ว");
+    } catch {
+      message.error("ลบรีวิวไม่สำเร็จ");
+    }
+  };
+
+  const onSubmit = async () => {
+    try {
+      const values = await form.validateFields();
+
       if (editing) {
-        const saved = await ReviewsAPI.update(editing.ID, {
-          review_title: v.review_title,
-          review_text: v.review_text,
-          rating: v.rating,
-        });
-        setItems(prev => prev.map(it => (it.ID === editing.ID ? saved : it)));
-        message.success("แก้ไขรีวิวแล้ว");
+        // PUT: ต้องใช้ฟิลด์ ReviewTitle/ReviewText/Rating ให้ตรง backend
+        const saved = await ReviewsAPI.updateJson(
+          editing.ID,
+          {
+            ReviewTitle: values.title,
+            ReviewText: values.content,
+            Rating: values.rating,
+          },
+          token || undefined
+        );
+        setItems(prev => prev.map(it => (it.ID === editing.ID ? { ...it, ...saved } : it)));
+        message.success("อัปเดตรีวิวแล้ว");
       } else {
-        const saved = await ReviewsAPI.create({
-          review_title: v.review_title,
-          review_text: v.review_text,
-          rating: v.rating,
-          user_id: Number(userId),
-          game_id: Number(gameId),
-        });
-        setItems(prev => [saved, ...prev]);
+        if (!userId) {
+          message.info("กรุณาเข้าสู่ระบบ");
+          return;
+        }
+        // POST: ส่ง GameID/UserID/ReviewTitle/ReviewText/Rating
+        const created = await ReviewsAPI.createJson(
+          {
+            GameID: gameId,
+            UserID: userId,
+            ReviewTitle: values.title,
+            ReviewText: values.content,
+            Rating: values.rating,
+          },
+          token || undefined
+        );
+        setItems(prev => [created, ...prev]);
         message.success("สร้างรีวิวแล้ว");
       }
+
       setShowForm(false);
       setEditing(null);
       form.resetFields();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      message.error(msg || "บันทึกรีวิวไม่สำเร็จ");
+      // antd จะจัดการ message validation ให้เอง
     }
-  }
+  };
 
-  async function handleDelete(id: number) {
-    try {
-      await ReviewsAPI.remove(id);
-      setItems(prev => prev.filter(it => it.ID !== id));
-      message.success("ลบรีวิวแล้ว");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      message.error(msg || "ลบรีวิวไม่สำเร็จ");
-    }
-  }
-
-  async function handleToggleLike(r: Review & { likedByMe?: boolean }) {
+  // อ่านสถานะล่าสุดจาก state ก่อน toggle (กันค่า stale)
+  const handleToggleLike = (r: ReviewItem) => {
     if (!userId) {
       message.info("กรุณาเข้าสู่ระบบเพื่อกดถูกใจ");
       return;
     }
-    const alreadyLiked = !!r.likedByMe;
+    const latest = items.find(it => it.ID === r.ID);
+    const alreadyLiked = !!latest?.likedByMe;
+    const currentLikes = latest?.likes ?? 0;
 
     // optimistic update
     setItems(prev =>
       prev.map(it =>
         it.ID === r.ID
-          ? {
-              ...it,
-              likedByMe: !alreadyLiked,
-              likes: Math.max(0, (it.likes || 0) + (alreadyLiked ? -1 : 1)),
-            }
-          : it,
-      ),
+          ? { ...it, likedByMe: !alreadyLiked, likes: Math.max(0, currentLikes + (alreadyLiked ? -1 : 1)) }
+          : it
+      )
     );
-    try {
-      const res = await ReviewsAPI.toggleLike(r.ID, Number(userId));
-      setItems(prev =>
-        prev.map(it => (it.ID === r.ID ? { ...it, likes: res.likes } : it)),
-      );
-    } catch {
-      // rollback
-      setItems(prev =>
-        prev.map(it =>
-          it.ID === r.ID
-            ? {
-                ...it,
-                likedByMe: alreadyLiked,
-                likes: Math.max(0, (it.likes || 0) + (alreadyLiked ? 1 : -1)),
-              }
-            : it,
-        ),
-      );
-    }
-  }
 
-  return (
-    <div className={"w-full max-w-3xl mx-auto " + (className || "")}>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-semibold">รีวิวจากผู้เล่น</h2>
-        {allowCreate && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-            เขียนรีวิว
+    ReviewsAPI.toggleLike(r.ID, userId, token || undefined)
+      .then(res => {
+        setItems(prev =>
+          prev.map(it =>
+            it.ID === r.ID
+              ? {
+                  ...it,
+                  likes: typeof res.likes === "number" ? res.likes : it.likes,
+                  // บาง backend อาจคืน liked มาด้วย
+                  ...(typeof res.liked === "boolean" ? { likedByMe: res.liked } : {}),
+                }
+              : it
+          )
+        );
+      })
+      .catch(() => {
+        // rollback
+        setItems(prev =>
+          prev.map(it =>
+            it.ID === r.ID ? { ...it, likedByMe: alreadyLiked, likes: Math.max(0, currentLikes) } : it
+          )
+        );
+        message.error("ไม่สามารถกดถูกใจได้");
+      });
+  };
+
+  const header = useMemo(
+    () => (
+      <Space style={{ width: "100%", justifyContent: "space-between" }}>
+        <h3 style={{ margin: 0 }}>รีวิวทั้งหมด</h3>
+        {canCreate && (
+          <Button type="primary" icon={<Plus size={16} />} onClick={onCreate}>
+            สร้างรีวิว
           </Button>
         )}
-      </div>
+      </Space>
+    ),
+    [canCreate]
+  );
 
+  return (
+    <div className={className}>
       <List
+        header={header}
         loading={loading}
         dataSource={items}
-        locale={{ emptyText: "ยังไม่มีรีวิวสำหรับเกมนี้" }}
-        className="space-y-4"
-        split={false}
-        renderItem={(item) => {
-          const initials = (item.user?.username || (item.user_id === userId && username) || "")
-            .charAt(0)
-            .toUpperCase();
-
-          const actionButtons = [
-            (
-              <Button
-                key="like"
-                type="text"
-                shape="round"
-                onClick={() => handleToggleLike(item)}
-                icon={item.likedByMe ? <HeartFilled /> : <HeartOutlined />}
-              >
-                {(item.likes ?? 0) > 0 ? item.likes : "ถูกใจ"}
-              </Button>
-            ),
-            canEdit(item) && (
-              <Button key="edit" type="text" shape="round" onClick={() => openEdit(item)} icon={<EditOutlined />}>
-                แก้ไข
-              </Button>
-            ),
-            canEdit(item) && (
-              <Popconfirm key="del" title="ลบรีวิวนี้?" onConfirm={() => handleDelete(item.ID)}>
-                <Button danger type="text" shape="round" icon={<DeleteOutlined />}>
-                  ลบ
-                </Button>
-              </Popconfirm>
-            ),
-          ].filter(Boolean) as React.ReactNode[];
-
-          return (
-            <List.Item
-              className="bg-white p-4 rounded-md shadow"
-              actions={[<Space key="actions" size={8}>{actionButtons}</Space>]}
-            >
-              <List.Item.Meta
-                avatar={<Avatar icon={!initials && <UserOutlined />}>{initials || undefined}</Avatar>}
-                title={
-                  <Space align="center" size={8}>
-                    <span className="font-medium">{item.review_title}</span>
-                    <Rate disabled allowHalf value={item.rating / 2} />
-                    <span className="text-xs text-gray-500">ให้ {item.rating}/10</span>
-                  </Space>
-                }
-                description={
-                  <div>
-                    {item.review_text && <p className="text-sm text-gray-800 mb-1">{item.review_text}</p>}
-                    <p className="text-xs text-gray-500">
-                      โดย {item.user?.username || (item.user_id === userId && username) || `User#${item.user_id}`} · ID #{item.ID}
-                    </p>
-                  </div>
-                }
-              />
-            </List.Item>
-          );
-        }}
+        itemLayout="vertical"
+        renderItem={(r) => (
+          <List.Item
+            key={r.ID}
+            actions={[
+              <Space key="like" onClick={() => handleToggleLike(r)} style={{ cursor: "pointer" }}>
+                <Heart size={18} style={{ verticalAlign: "middle" }} className={r.likedByMe ? "text-red-500" : "text-gray-400"} />
+                <span>{r.likes ?? 0}</span>
+              </Space>,
+              userId === r.user_id ? (
+                <Space key="edit-del">
+                  <Button size="small" icon={<Pencil size={14} />} onClick={() => onEdit(r)}>
+                    แก้ไข
+                  </Button>
+                  <Popconfirm title="ลบรีวิวนี้?" okText="ลบ" cancelText="ยกเลิก" onConfirm={() => onDelete(r)}>
+                    <Button size="small" danger icon={<Trash2 size={14} />}>
+                      ลบ
+                    </Button>
+                  </Popconfirm>
+                </Space>
+              ) : null,
+            ].filter(Boolean)}
+          >
+            <List.Item.Meta
+              avatar={<Avatar icon={<UserOutlined />} />}
+              title={
+                <Space>
+                  <strong>{r.title || "ไม่มีหัวข้อ"}</strong>
+                  <Rate allowHalf disabled value={Number(r.rating) || 0} />
+                </Space>
+              }
+              description={
+                <span style={{ color: "#888" }}>
+                  โดย {r.username || `user#${r.user_id}`} · {new Date(r.UpdatedAt || r.CreatedAt || Date.now()).toLocaleString()}
+                </span>
+              }
+            />
+            <div style={{ whiteSpace: "pre-wrap" }}>{r.content}</div>
+          </List.Item>
+        )}
       />
 
       <Modal
-        title={editing ? "แก้ไขรีวิว" : "เขียนรีวิวใหม่"}
         open={showForm}
-        onOk={handleSubmit}
-        onCancel={() => { setShowForm(false); setEditing(null); }}
+        onCancel={() => {
+          setShowForm(false);
+          setEditing(null);
+          form.resetFields();
+        }}
+        onOk={onSubmit}
         okText={editing ? "บันทึก" : "สร้าง"}
         cancelText="ยกเลิก"
+        title={editing ? "แก้ไขรีวิว" : "สร้างรีวิว"}
+        destroyOnClose
       >
-        <Form layout="vertical" form={form}>
-          <Form.Item
-            label="หัวข้อ"
-            name="review_title"
-            rules={[{ required: true, message: "กรุณาใส่หัวข้อ" }]}
-          >
-            <Input maxLength={120} placeholder="สั้นๆ สรุปความรู้สึกต่อเกม" />
+        <Form layout="vertical" form={form} initialValues={{ rating: 0 }}>
+          <Form.Item label="หัวข้อ" name="title">
+            <Input placeholder="เช่น เกมสนุกเกินคาด!" maxLength={120} />
           </Form.Item>
-          <Form.Item label="รายละเอียด" name="review_text">
-            <Input.TextArea rows={4} maxLength={2000} placeholder="เล่าประสบการณ์ จุดเด่น จุดที่ควรปรับ" />
+          <Form.Item label="รายละเอียด" name="content" rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}>
+            <Input.TextArea rows={5} placeholder="เล่าประสบการณ์ของคุณ" />
           </Form.Item>
-          <Form.Item label="คะแนน (0-10)" name="rating" rules={[{ required: true }]}>
-            <Rate allowHalf defaultValue={4} tooltips={["0","1","2","3","4","5","6","7","8","9","10"].map(x=>`${x}/10`)} />
-            <div className="text-xs text-gray-500 mt-1">* แสดงเป็น 0–10 (ดาวจะคิดครึ่ง = /2)</div>
+          <Form.Item label="ให้คะแนน" name="rating" rules={[{ required: true }]}>
+            <Rate allowHalf />
           </Form.Item>
         </Form>
       </Modal>
