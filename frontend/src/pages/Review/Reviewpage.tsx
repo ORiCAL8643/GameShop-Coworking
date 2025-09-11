@@ -60,15 +60,13 @@ const Reviewpage: React.FC = () => {
     return () => { ignore = true; };
   }, [gameId]);
 
-  const cover = useMemo(() => resolveImgUrl(game?.img), [game]);
-
   useEffect(() => {
     async function fetchReviews() {
       if (!gameId) return;
       try {
         const list = await ReviewsAPI.listByGame(Number(gameId));
         if (list.length > 0) {
-          const avg = list.reduce((sum, r) => sum + r.rating, 0) / list.length;
+          const avg = list.reduce((sum, r) => sum + Number(r.rating || 0), 0) / list.length;
           setAvgRating(avg);
           setReviewCount(list.length);
         } else {
@@ -83,17 +81,14 @@ const Reviewpage: React.FC = () => {
     fetchReviews();
   }, [gameId]);
 
-  // ✅ ลดระยะให้พอดี: padding ซ้าย–ขวา 24px (ไม่มี margin-left 220 อีกแล้ว)
-  const shellStyle: React.CSSProperties = {
-    padding: "16px 24px 24px 24px",
-  };
+  const cover = useMemo(() => resolveImgUrl(game?.img), [game]);
+  const shellStyle: React.CSSProperties = { padding: "16px 24px 24px 24px" };
 
   if (loading) return <div style={shellStyle}>Loading…</div>;
   if (!game)  return <div style={shellStyle}>ไม่พบข้อมูลเกม</div>;
 
   return (
     <div style={shellStyle}>
-      {/* hero กว้างพอดี และไม่ชิดซ้ายเกินไป */}
       <div className="rounded-2xl overflow-hidden bg-[#1a1a1a] shadow mb-6 max-w-5xl mx-auto">
         {cover && (
           <img
@@ -103,22 +98,22 @@ const Reviewpage: React.FC = () => {
           />
         )}
         <div className="p-4">
+          {/* ✅ เพิ่มระยะห่างจากชื่อด้วย ml-4 md:ml-6 บนกล่องเรตติ้ง */}
           <h1 className="text-xl md:text-2xl font-semibold flex items-center">
-            {game.name}
-            {reviewCount > 0 ? (
-              <span className="ml-2 inline-flex items-center">
-                <Rate disabled allowHalf value={avgRating ?? 0} />
-                <span className="ml-1 text-sm text-gray-400">{avgRating?.toFixed(1)}</span>
+            <span className="truncate">{game.name}</span>
+
+            <span className="inline-flex items-center ml-4 md:ml-10">
+              <Rate disabled allowHalf value={avgRating ?? 0} />
+              <span className="ml-4 text-lg md:text-xl text-gray-200">
+                {avgRating?.toFixed(1) ?? "-"}
               </span>
-            ) : (
-              <span className="ml-2 text-sm text-gray-400">–</span>
-            )}
+            </span>
           </h1>
+
           <p className="text-gray-400">All reviews for this game</p>
         </div>
       </div>
 
-      {/* ส่วนรีวิว – จำกัดความกว้างให้อ่านสบาย */}
       <div className="max-w-5xl mx-auto">
         <ReviewSection gameId={game.id} allowCreate className="mt-4" />
       </div>
@@ -127,3 +122,4 @@ const Reviewpage: React.FC = () => {
 };
 
 export default Reviewpage;
+   
