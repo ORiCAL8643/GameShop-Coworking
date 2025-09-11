@@ -65,35 +65,38 @@ const Reviewpage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="p-6 flex justify-center">
+      <div className="min-h-screen bg-[#0d0d0d] text-white p-6 flex justify-center">
         <div className="animate-pulse">Loading…</div>
       </div>
     );
   }
 
   if (!game) {
-    return <div className="p-6">ไม่พบข้อมูลเกม</div>;
+    return <div className="min-h-screen bg-[#0d0d0d] text-white p-6">ไม่พบข้อมูลเกม</div>;
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      {/* ส่วนบน: รูปเกม + ชื่อเกม */}
-      <div className="rounded-2xl overflow-hidden shadow-lg mb-6">
-        {cover && (
-          <img
-            src={cover}
-            alt={game.name}
-            style={{ width: "100%", height: 320, objectFit: "cover", display: "block" }}
-          />
-        )}
-        <div className="p-4 text-center">
-          <h1 className="text-2xl font-semibold">{game.name}</h1>
-          <p className="text-gray-500">All reviews for this game</p>
+    <div className="min-h-screen bg-[#0d0d0d] text-white">
+      <div className="h-40 bg-gradient-to-r from-purple-500 to-pink-500" />
+      <div className="p-6 max-w-5xl mx-auto">
+        {/* ส่วนบน: รูปเกม + ชื่อเกม */}
+        <div className="rounded-2xl overflow-hidden bg-[#1a1a1a] shadow-lg shadow-purple-900/50 mb-6">
+          {cover && (
+            <img
+              src={cover}
+              alt={game.name}
+              style={{ width: "100%", height: 320, objectFit: "cover", display: "block" }}
+            />
+          )}
+          <div className="p-4 text-center">
+            <h1 className="text-2xl font-semibold text-white">{game.name}</h1>
+            <p className="text-gray-400">All reviews for this game</p>
+          </div>
         </div>
-      </div>
 
-      {/* ส่วนล่าง: ReviewSection ของเกมนี้ */}
-      <ReviewSection gameId={game.id} allowCreate />
+        {/* ส่วนล่าง: ReviewSection ของเกมนี้ */}
+        <ReviewSection gameId={game.id} allowCreate />
+      </div>
     </div>
   );
 };
