@@ -199,7 +199,11 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
               className="bg-[#1a1a1a]"
               actions={[
                 <Space key="like" onClick={() => handleToggleLike(r)} style={{ cursor: "pointer" }}>
-                  <Heart size={18} style={{ verticalAlign: "middle" }} className={r.likedByMe ? "text-red-500" : "text-gray-400"} />
+                  <Heart
+                    size={18}
+                    style={{ verticalAlign: "middle" }}
+                    className={r.likedByMe ? "text-red-400" : "text-gray-500"}
+                  />
                   <span>{r.likes ?? 0}</span>
                 </Space>,
                 userId === r.user_id ? (
@@ -232,7 +236,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
               ].filter(Boolean)}
             >
               <List.Item.Meta
-                avatar={<Avatar icon={<UserOutlined />} />}
+                avatar={<Avatar icon={<UserOutlined />} className="bg-gray-700 text-white border border-gray-300" />}
                 title={
                   <Space>
                     <strong>{r.title || "ไม่มีหัวข้อ"}</strong>
