@@ -2,6 +2,7 @@
 package controllers
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,6 +14,11 @@ import (
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+)
+
+var (
+	ErrNotEnoughKeys       = errors.New("not enough keys")
+	ErrUserAlreadyOwnsGame = errors.New("user already owns game")
 )
 
 func baseURL(c *gin.Context) string {
@@ -191,12 +197,17 @@ func UpdatePayment(c *gin.Context) {
 	}
 
 	if err := changePaymentStatus(uint(id), *body.Status, body.RejectReason); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
+		case errors.Is(err, ErrNotEnoughKeys), errors.Is(err, ErrUserAlreadyOwnsGame):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
-		return
 	}
 
 	// โหลดล่าสุดเพื่อส่งกลับ
@@ -229,12 +240,17 @@ func ApprovePayment(c *gin.Context) {
 	}
 
 	if err := changePaymentStatus(uint(id), "APPROVED", nil); err != nil {
-		if err == gorm.ErrRecordNotFound {
+		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
+		case errors.Is(err, ErrNotEnoughKeys), errors.Is(err, ErrUserAlreadyOwnsGame):
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+			return
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "approve failed"})
-		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "approved"})
 }
@@ -291,15 +307,15 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 				var keys []entity.KeyGame
 				if err := tx.Where("game_id = ? AND owned_by_order_item_id IS NULL", item.GameID).
 					Limit(item.QTY).Find(&keys).Error; err != nil {
-					return err
+					return fmt.Errorf("find keys failed: %w", err)
 				}
 				if len(keys) < item.QTY {
-					return fmt.Errorf("not enough keys for game %d", item.GameID)
+					return fmt.Errorf("%w: game %d", ErrNotEnoughKeys, item.GameID)
 				}
 				for _, k := range keys {
 					k.OwnedByOrderItemID = &item.ID
 					if err := tx.Save(&k).Error; err != nil {
-						return err
+						return fmt.Errorf("save key failed: %w", err)
 					}
 					ug := entity.UserGame{
 						UserID:             p.Order.UserID,
@@ -308,7 +324,10 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 						GrantedAt:          time.Now(),
 					}
 					if err := tx.Create(&ug).Error; err != nil {
-						return err
+						if errors.Is(err, gorm.ErrDuplicatedKey) {
+							return fmt.Errorf("%w: game %d", ErrUserAlreadyOwnsGame, item.GameID)
+						}
+						return fmt.Errorf("create user_game failed: %w", err)
 					}
 				}
 			}
