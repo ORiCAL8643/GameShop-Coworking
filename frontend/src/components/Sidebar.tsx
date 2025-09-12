@@ -1,8 +1,10 @@
 import { Layout, Menu } from "antd";
+import { Layout, Menu, Badge } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
+import { useReportNewCount } from "../hooks/useReportNewCount";
 
 const { Sider } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -63,9 +65,11 @@ const items: GroupItem[] = [
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const reportCount = useReportNewCount();
 
   // เส้นทางที่เป็น "กลุ่ม" (มี children)
   const rootSubmenuKeys = useMemo(() => ["/information", "/category"], []);
+  const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
 
   // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
   const selectedKey = location.pathname;
@@ -84,6 +88,56 @@ const Sidebar = () => {
     // อนุญาตเปิดได้หลายกลุ่มพร้อมกัน (ถ้าอยากเปิดทีละกลุ่ม ให้คอมเมนต์โค้ดนี้แล้วใช้ logic แบบ antd ตัวอย่าง)
     setOpenKeys(keys as string[]);
   };
+
+  const items: GroupItem[] = [
+    { key: "/home", label: "หน้าแรก" },
+    { key: "/request", label: "รีเควสเกม" },
+    { key: "/requestinfo", label: "ข้อมูลรีเควส" },
+    {
+      key: "/information",
+      label: "จัดการข้อมูลเกม",
+      children: [
+        { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
+        { key: "/information/Edit", label: "แก้ไขข้อมูลเกม", icon: <PlusOutlined /> },
+      ],
+    },
+    {
+      key: "/category",
+      label: "หมวดหมู่",
+      children: [
+        { key: "/category/Community", label: "ชุมชน", icon: <PlusOutlined /> },
+        { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined /> },
+      ],
+    },
+    { key: "/workshop", label: "Workshop" },
+    { key: "/promotion", label: "Promotion" },
+    { key: "/refund", label: "การคืนเงินผู้ใช้" },
+    { key: "/report", label: "รายงานปัญหา" },
+    {
+      key: "/Admin",
+      label: "Admin",
+      children: [
+        {
+          key: "/Admin/Page",
+          icon: <PlusOutlined />,
+          label: (
+            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              Page
+              {reportCount > 0 && (
+                <Badge count={reportCount} size="small" offset={[4, -2]} />
+              )}
+            </span>
+          ),
+        },
+        {
+          key: "/Admin/PaymentReviewPage",
+          label: "PaymentReview",
+          icon: <PlusOutlined />,
+        },
+        { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
+      ],
+    },
+  ];
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
