@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/pages/admin/AdminPaymentReviewPage.tsx
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -121,7 +122,20 @@ export default function AdminPaymentReviewPage() {
         } catch (e: any) {
           // ถ้า 404 (โปรเจ็กต์บางอันไม่ผูก /approve) ให้ fallback ไป PATCH
           if (e?.response?.status === 404) {
-            await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" }, { headers: authHeaders });
+            try {
+              await axios.patch(`${BASE_URL}/payments/${id}`, { status: "APPROVED" }, { headers: authHeaders });
+            } catch (e2: any) {
+              if (e2?.response?.status === 409) {
+                const msg = e2?.response?.data?.error || "not enough keys";
+                message.error(`${msg} กรุณาเติมคีย์ในตาราง key_games ก่อนอนุมัติอีกครั้ง`);
+                return;
+              }
+              throw e2;
+            }
+          } else if (e?.response?.status === 409) {
+            const msg = e?.response?.data?.error || "not enough keys";
+            message.error(`${msg} กรุณาเติมคีย์ในตาราง key_games ก่อนอนุมัติอีกครั้ง`);
+            return;
           } else {
             throw e;
           }
