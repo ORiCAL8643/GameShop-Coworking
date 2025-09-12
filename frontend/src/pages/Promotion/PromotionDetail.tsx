@@ -57,8 +57,16 @@ export default function PromotionDetail() {
         const data = await getPromotion(Number(id), true);
         setPromotion(data);
         if (data.games) {
+          const related = data.games.filter((g: any) => {
+            if (Array.isArray(g.promotion_games)) {
+              return g.promotion_games.some(
+                (pg: any) => pg.promotion_id === data.ID,
+              );
+            }
+            return g.promotion_id === data.ID;
+          });
           setGames(
-            data.games.map((g) => ({
+            related.map((g: any) => ({
               ...g,
               discounted_price: applyDiscount(
                 g.base_price,
