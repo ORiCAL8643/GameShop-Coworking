@@ -6,6 +6,7 @@ import axios from "axios";
 import { useState, useEffect } from "react";
 import type { Request } from "../interfaces/Request";
 import type { Game } from "../interfaces";
+import { useAuth } from '../context/AuthContext';
 
 const base_url = "http://localhost:8088";
 const { Title } = Typography;
@@ -17,6 +18,12 @@ type Row = {
   user: string;
   date: string; // แสดงเป็นข้อความพอ
 };
+
+type useronline = {
+  ID: number
+  role_id: number
+  role: {title: string};
+}
 
 const columns: ColumnsType<Row> = [
   {
@@ -36,6 +43,9 @@ export default function Requestinfo() {
   const [Requestinfo, SetRequestinfo] = useState<Request[]>([]);
   const [game, Setgame] = useState<Game[]>([]);
   const [gameid, SetgameID] = useState<number | null>(null);
+  const { id } = useAuth(); //คนใช้งานระบบ
+  const [useron, Setuseron] = useState<useronline | null>(null)
+
 
   async function UpdateGame(id: number, data: { status?: string }) {
     try {
@@ -59,6 +69,20 @@ export default function Requestinfo() {
     }
   }
 
+  async function GetUserbyid(id: number) { //เก็บเป็น object ไม่ใช้ array
+    try {
+      const response = await axios.get(`${base_url}/users/${id}`);
+      console.log("ดึงข้อมูลผู้ใช้สำเร็จ", response.data);
+      Setuseron(response.data)
+    } catch (err) {
+      console.error("get user error:", err);
+      message.error("เกิดข้อผิดพลาดในการดึงผู้ใช้");
+    }
+  }
+  useEffect(() => {
+    GetUserbyid(Number(id));
+  }, [id]);
+
   useEffect(() => {
     GetRequest();
   }, []);
@@ -77,9 +101,9 @@ export default function Requestinfo() {
     }, [])
 
     const pendingGames = game ? game.filter(g => g.status === "pending") : [];
+    const useronline = useron?.role?.title === "Admin"
 
-
-  return (<div><div>{(pendingGames.length !== 0) ? (
+  return (<div><div>{useronline ? (
     <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
         bodyStyle={{ padding: 20 }}
@@ -136,7 +160,7 @@ export default function Requestinfo() {
           </Button>
         </Col>
       </Row>
-    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist.maybe not have game is pending."</div>} extra={[<Link to="/home"><Button type="primary">Back Home</Button></Link>]}/>)
+    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"error"} title={<div style={{color:'#ffffffff'}}>"block user"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, you dont have admin role."</div>} extra={[<Link to="/home"><Button type="primary">Back Home</Button></Link>]}/>)
   }</div></div>
   );
 }
