@@ -18,7 +18,6 @@ import {
   ShoppingCartOutlined,
   PictureOutlined,
   StarFilled,
-  TagsOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
@@ -29,7 +28,7 @@ import { findMinimumSpecForGame, type MinimumSpec } from "../../services/minimum
 import ReviewSection from "../../components/ReviewSection";
 import type { Game, Mod } from "../../interfaces";
 
-const { Header, Content, Sider } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 const API_BASE = "http://localhost:8088";
@@ -458,34 +457,6 @@ const GameDetail: React.FC = () => {
       </Card>
     </Content>
 
-    {/* Side info */}
-    <Sider width={320} style={{ background: "#0f1419", padding: "24px 16px" }}>
-      <Card
-            size="small"
-            title={<Space><TagsOutlined /> <span>Tags</span></Space>}
-            style={{ background: "#12181f", borderColor: "#23313a", marginBottom: 16 }}
-            headStyle={{ color: "#fff" }}
-          >
-            <Space size={[6, 6]} wrap>
-              {tags.slice(0, 12).map((t) => (
-                <Tag key={t} color="geekblue">
-                  {t}
-                </Tag>
-              ))}
-              {tags.length === 0 && <Tag>Singleplayer</Tag>}
-            </Space>
-          </Card>
-
-          <Card size="small" title="User Reviews" style={{ background: "#12181f", borderColor: "#23313a" }} headStyle={{ color: "#fff" }}>
-            <div style={{ color: "#d1d5db" }}>
-              Overall: <b>{(game as any)?.review_summary ?? "—"}</b>
-              <br />
-              Recent: <b>{(game as any)?.recent_review_summary ?? "—"}</b>
-              <br />
-              Total reviews: <b>{safeNum((game as any)?.review_count, 0).toLocaleString()}</b>
-            </div>
-          </Card>
-        </Sider>
       </Layout>
     </Layout>
   );
