@@ -187,13 +187,13 @@ const GameDetail: React.FC = () => {
         msg.success("สร้างออเดอร์เรียบร้อย");
       } else {
         // โฟลว์ตะกร้า local
-        addItem({ id: Number(gameId), title, price, quantity: 1 });
         msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
       }
     } catch (err) {
       console.error("purchase error:", err);
       msg.error("ไม่สามารถทำรายการได้");
     } finally {
+      addItem({ id: Number(gameId), title, price, quantity: 1 });
       navigate("/category/Payment");
     }
   };
