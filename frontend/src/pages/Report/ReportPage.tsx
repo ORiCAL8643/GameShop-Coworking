@@ -1,47 +1,61 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, Form, Input, Button, Select, Upload, message } from "antd";
+import {
+  Card,
+  Form,
+  Input,
+  Button,
+  Select,
+  Upload,
+  message,
+  Typography,
+} from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import { createReport } from "../../services/Report";
 import { useAuth } from "../../context/AuthContext";
+import type { UploadFile } from "antd/es/upload/interface";
+
+const { Title } = Typography;
 
 export default function ReportPage() {
   const [form] = Form.useForm();
-  const [fileList, setFileList] = useState<any[]>([]);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const navigate = useNavigate();
   const { id: userId } = useAuth();
 
-  // TODO: เปลี่ยนเป็นเลือกเกมจาก UI ของคุณ
-  const DEFAULT_GAME_ID = 1;
-
-  const PAGE_BG =
-    "linear-gradient(135deg, #0b0a14 0%, #15122a 45%, #1b1740 100%)";
+  const PAGE_BG = "radial-gradient(circle at top left, #2a165d, #0b0a14 70%)";
   const PURPLE = "#9254de";
+  const TEXT_COLOR = "#fff";
+
+  const toFiles = (fl: UploadFile[]): File[] =>
+    (fl ?? [])
+      .map((f) => (f.originFileObj ? (f.originFileObj as File) : null))
+      .filter((f): f is File => !!f);
 
   const handleSubmit = async (values: any) => {
     try {
-      if (!userId) {
-        message.error("กรุณาเข้าสู่ระบบก่อนส่งรายงาน");
-        return;
-      }
+      const files = toFiles(fileList);
 
-      const files: File[] = (fileList || [])
-        .map((f: any) => f?.originFileObj)
-        .filter(Boolean);
-
-      await createReport({
+      const res = await createReport({
         title: values.title,
         description: values.description,
-        user_id: userId,          // ✅ ใช้ snake_case ให้ตรง backend
-        game_id: DEFAULT_GAME_ID,
+        category: values.category,
+        user_id: Number(userId || 0),
         status: "open",
         files,
       });
 
-      message.success("ส่งรายงานปัญหาเรียบร้อย!");
+      const report = (res && (res.data || res)) || {};
+      const reportId = report?.id;
+
+      message.success("✅ ส่งรายงานปัญหาเรียบร้อย!");
       form.resetFields();
       setFileList([]);
-      navigate("/report/success", { state: { title: values.title } });
+
+      navigate(`/report/success?id=${reportId ?? ""}`, {
+        replace: true,
+        state: { title: values.title, id: reportId },
+      });
     } catch (e: any) {
       const apiMsg =
         e?.response?.data?.error ||
@@ -53,53 +67,83 @@ export default function ReportPage() {
 
   return (
     <div
-      className="report-page"
       style={{
         width: "100%",
         minHeight: "100vh",
         background: PAGE_BG,
-        padding: "40px 16px",
+        padding: "60px 16px",
         display: "flex",
         justifyContent: "center",
         alignItems: "flex-start",
-        color: "#fff",
+        color: TEXT_COLOR,
+        fontSize: 15,
+        lineHeight: 1.6,
+        fontFamily: "'Kanit', sans-serif",
       }}
     >
       <Card
         bordered={false}
-        style={{ width: "100%", maxWidth: 720 }}
+        style={{
+          width: "100%",
+          maxWidth: 720,
+          borderRadius: 24,
+          background: "rgba(20, 18, 40, 0.65)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(146, 84, 222, 0.5)",
+          boxShadow: `0 0 25px rgba(146, 84, 222, 0.6), inset 0 0 20px rgba(146,84,222,0.2)`,
+          padding: "24px 32px",
+        }}
         title={
-          <div>
-            <span
+          <div style={{ textAlign: "center" }}>
+            <Title
+              level={3}
               style={{
+                margin: 0,
                 fontWeight: 800,
+                fontSize: 22,
                 background: `linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%)`,
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
+                textShadow: "0 0 12px rgba(146,84,222,0.8)",
               }}
             >
               📝 รายงานปัญหา
-            </span>
+            </Title>
             <div
               style={{
-                height: 2,
-                width: "100%",
-                marginTop: 8,
-                background: `linear-gradient(90deg, ${PURPLE}, transparent)`,
-                opacity: 0.85,
+                height: 3,
+                width: 100,
+                margin: "12px auto 0",
+                background: `linear-gradient(90deg, ${PURPLE}, #ff5ca8)`,
                 borderRadius: 999,
+                boxShadow: `0 0 16px ${PURPLE}`,
               }}
             />
           </div>
         }
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
+          {/* Select */}
           <Form.Item
-            label="หมวดปัญหา"
+            label={<span style={{ color: TEXT_COLOR, fontWeight: 600 }}>หมวดปัญหา</span>}
             name="category"
             rules={[{ required: true, message: "กรุณาเลือกหมวดปัญหา" }]}
           >
-            <Select placeholder="เลือกหมวดปัญหา">
+            <Select
+              placeholder="เลือกหมวดปัญหา"
+              style={{
+                borderRadius: 12,
+                color: TEXT_COLOR,
+                fontSize: 15,
+                background: "#141029",
+                border: `1px solid ${PURPLE}`,
+                boxShadow: `0 0 8px ${PURPLE}`,
+              }}
+              dropdownStyle={{
+                background: "#9086e9ff",
+                color: "#fff",
+              }}
+            >
               <Select.Option value="technical">⚙️ ปัญหาทางเทคนิค</Select.Option>
               <Select.Option value="billing">💳 ปัญหาการเรียกเก็บเงิน</Select.Option>
               <Select.Option value="login">🔐 เข้าสู่ระบบ/ยืนยันตัวตน</Select.Option>
@@ -113,27 +157,51 @@ export default function ReportPage() {
             </Select>
           </Form.Item>
 
+          {/* Title */}
           <Form.Item
-            label="หัวข้อ"
+            label={<span style={{ color: TEXT_COLOR, fontWeight: 600 }}>หัวข้อ</span>}
             name="title"
             rules={[{ required: true, message: "กรุณากรอกหัวข้อ" }]}
           >
-            <Input placeholder="ปัญหาที่พบ" />
+            <Input
+              placeholder="ปัญหาที่พบ"
+              style={{
+                background: "#5433a2ff",
+                borderRadius: 12,
+                border: `1px solid ${PURPLE}`,
+                color: TEXT_COLOR, // ✅ ตัวอักษรขาว
+                fontSize: 15,
+                fontWeight: 500,
+                boxShadow: `0 0 8px ${PURPLE}`,
+              }}
+            />
           </Form.Item>
 
+          {/* Description */}
           <Form.Item
-            label="รายละเอียด"
+            label={<span style={{ color: TEXT_COLOR, fontWeight: 600 }}>รายละเอียด</span>}
             name="description"
             rules={[{ required: true, message: "กรุณากรอกรายละเอียด" }]}
           >
-            <Input.TextArea rows={4} placeholder="อธิบายรายละเอียดของปัญหาให้ชัดเจน" />
+            <Input.TextArea
+              rows={5}
+              placeholder="อธิบายรายละเอียดของปัญหาให้ชัดเจน"
+              style={{
+                background: "#5433a2ff",
+                borderRadius: 12,
+                border: `1px solid ${PURPLE}`,
+                color: TEXT_COLOR, // ✅ ตัวอักษรขาว
+                fontSize: 15,
+                lineHeight: 1.6,
+                boxShadow: `0 0 8px ${PURPLE}`,
+              }}
+            />
           </Form.Item>
 
+          {/* Upload */}
           <Form.Item
-            label="อัปโหลดภาพหน้าจอ / หลักฐาน"
+            label={<span style={{ color: TEXT_COLOR, fontWeight: 600 }}>อัปโหลดภาพหน้าจอ / หลักฐาน</span>}
             name="attachments"
-            valuePropName="fileList"
-            getValueFromEvent={(e) => (Array.isArray(e) ? e : e?.fileList)}
           >
             <Upload
               name="attachments"
@@ -143,47 +211,44 @@ export default function ReportPage() {
                 window.open((file as any).url || (file as any).thumbUrl, "_blank");
               }}
               onChange={({ fileList: fl }) => setFileList(fl)}
-              onRemove={(file) => {
-                setFileList((prev) => prev.filter((f) => f.uid !== file.uid));
-              }}  // ✅ แก้จาก })} เป็น }}
-              beforeUpload={(file) => {
-                const isImage = file.type?.startsWith("image/");
-                if (!isImage) message.error("อัปโหลดได้เฉพาะไฟล์รูปภาพเท่านั้น");
-                return false; // ไม่อัปโหลดทันที ให้รวมส่งตอน submit
-              }}
+              beforeUpload={() => false}
               maxCount={3}
             >
               {fileList.length < 3 && (
                 <div
                   style={{
                     background: "#0f0f17",
-                    borderRadius: 10,
-                    padding: 8,
+                    borderRadius: 12,
+                    padding: 10,
                     border: `1px dashed ${PURPLE}`,
                     color: "#cfc5ff",
+                    boxShadow: `0 0 8px ${PURPLE}`,
                   }}
                 >
                   <UploadOutlined />
-                  <div style={{ marginTop: 8 }}>Upload</div>
+                  <div style={{ marginTop: 8 }}>อัปโหลด</div>
                 </div>
               )}
             </Upload>
           </Form.Item>
 
+          {/* Submit Button */}
           <Form.Item>
             <Button
               type="primary"
               htmlType="submit"
               style={{
                 width: "100%",
-                height: 46,
+                height: 50,
                 fontWeight: 700,
-                borderRadius: 10,
+                fontSize: 16,
+                borderRadius: 14,
                 background: `linear-gradient(90deg, ${PURPLE} 0%, #ff5ca8 100%)`,
                 border: "none",
+                boxShadow: `0 0 20px ${PURPLE}`,
               }}
             >
-              ส่งรายงานปัญหา
+              🚀 ส่งรายงานปัญหา
             </Button>
           </Form.Item>
         </Form>

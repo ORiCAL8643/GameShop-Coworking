@@ -1,48 +1,92 @@
 // src/hooks/useReportNewCount.ts
-import { useEffect, useRef, useState } from "react";
-import { fetchReports } from "../services/Report";
-import type { ProblemReport } from "../interfaces/problem_report";
+import { useEffect, useState } from "react";
+import { API_URL } from "../services/Report";
 
-const LS_KEY = "admin_reports_last_seen";
+const LS_KEY = "reports_seen_at";
 
-/** โป่งตัวเลข “คำร้องใหม่” (ที่เข้ามาหลังจากครั้งล่าสุดที่แอดมินเห็นหน้า Admin) */
-export function useReportNewCount(pollMs = 8000) {
+// เวลาเห็นล่าสุด (ISO string)
+export function getReportsSeenAt(): string {
+  return localStorage.getItem(LS_KEY) || "";
+}
+
+export function markReportsSeen(iso?: string) {
+  const v = iso ?? new Date().toISOString();
+  localStorage.setItem(LS_KEY, v);
+  window.dispatchEvent(new CustomEvent("report:lastSeenChanged", { detail: v }));
+}
+
+// ช่วย parse created_at/CreatedAt ให้เป็น ms
+function parseCreatedAtMs(r: any): number {
+  const v = r?.created_at ?? r?.CreatedAt ?? r?.createdAt;
+  if (!v) return 0;
+
+  // รองรับ string, number, หรือ object จาก GORM (มี .Time)
+  if (typeof v === "string") {
+    const ms = Date.parse(v);
+    return isNaN(ms) ? 0 : ms;
+  }
+  if (typeof v === "number") return v;
+  if (v?.Time) {
+    const ms = Date.parse(v.Time);
+    return isNaN(ms) ? 0 : ms;
+  }
+  const ms = Date.parse(String(v));
+  return isNaN(ms) ? 0 : ms;
+}
+
+// ดึง open reports ทั้งหมด
+async function fetchOpenReports(): Promise<any[]> {
+  try {
+    const res = await fetch(`${API_URL}/reports?status=open&limit=200`);
+    const data = await res.json().catch(() => null);
+    const list = Array.isArray(data) ? data : data?.data ?? [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    console.error("[useReportNewCount] fetchOpenReports error:", e);
+    return [];
+  }
+}
+
+/**
+ * นับจำนวนเคสใหม่ (created_at/CreatedAt > lastSeen)
+ * - poll ทุก pollMs ms
+ * - refresh เมื่อมี event "admin:report:new" หรือ "report:lastSeenChanged"
+ */
+export function useReportNewCount(pollMs = 8000): number {
   const [count, setCount] = useState(0);
-  const timer = useRef<number | null>(null);
 
-  const load = async () => {
+  const refresh = async () => {
     try {
-      const lastSeenStr =
-        localStorage.getItem(LS_KEY) || "1970-01-01T00:00:00.000Z";
-      const lastSeen = new Date(lastSeenStr).getTime();
+      const lastSeen = getReportsSeenAt();
+      const lastSeenMs = lastSeen ? Date.parse(lastSeen) : 0;
 
-      const all: ProblemReport[] = await fetchReports();
-      const newOnes = (all || []).filter(
-        (r) =>
-          r.status !== "resolved" &&
-          !!r.created_at &&
-          new Date(r.created_at).getTime() > lastSeen
-      );
+      const items = await fetchOpenReports();
 
-      setCount(newOnes.length);
-    } catch {
-      // เงียบไว้ไม่กวน UI
+      const newCount = items.filter((r) => {
+        const t = parseCreatedAtMs(r);
+        return lastSeenMs ? t > lastSeenMs : true;
+      }).length;
+
+      setCount(newCount);
+    } catch (e) {
+      console.error("[useReportNewCount] refresh error:", e);
     }
   };
 
   useEffect(() => {
-    load(); // ครั้งแรก
-    timer.current = window.setInterval(load, pollMs);
+    refresh();
+    const t = setInterval(refresh, pollMs);
+
+    const onBump = () => refresh();
+    window.addEventListener("admin:report:new", onBump as any);
+    window.addEventListener("report:lastSeenChanged", onBump as any);
+
     return () => {
-      if (timer.current) clearInterval(timer.current);
+      clearInterval(t);
+      window.removeEventListener("admin:report:new", onBump as any);
+      window.removeEventListener("report:lastSeenChanged", onBump as any);
     };
   }, [pollMs]);
 
   return count;
-}
-
-/** เรียกใช้ตอนแอดมิน “เห็นแล้ว” เพื่อตั้ง timestamp ใหม่ */
-export function markReportsSeen(latestIso?: string) {
-  const iso = latestIso || new Date().toISOString();
-  localStorage.setItem(LS_KEY, iso);
 }

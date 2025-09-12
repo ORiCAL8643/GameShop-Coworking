@@ -1,182 +1,309 @@
+// src/pages/Admin/ResolvedReportsPage.tsx
 import { useEffect, useState } from "react";
-import { Card, Button, Typography, Tag, Modal } from "antd";
-import { fetchReports } from "../../services/Report";
-import type { ProblemReport } from "../../interfaces/problem_report";
-import { useNavigate } from "react-router-dom";
+import { Button, Card, Tag, Typography, Modal, Empty, Space, Input } from "antd";
+import {
+  ArrowLeftOutlined,
+  CheckCircleTwoTone,
+  PaperClipOutlined,
+  ReloadOutlined,
+  SearchOutlined,
+} from "@ant-design/icons";
+import { fetchResolvedReports, API_URL } from "../../services/Report";
 
-const { Title } = Typography;
+const { Title, Paragraph, Text } = Typography;
+
+type Attachment = {
+  ID?: number;
+  file_path?: string;
+  original_name?: string;
+};
+
+type User = {
+  id?: number;
+  username?: string;
+  name?: string;
+};
+
+type ProblemReport = {
+  ID: number;
+  title: string;
+  description: string;
+  status: "open" | "in_progress" | "resolved" | string;
+  category?: string;
+  created_at?: string;
+  resolved_at?: string;
+  user?: User | null;
+  attachments?: Attachment[];
+};
 
 export default function ResolvedReportsPage() {
-  const navigate = useNavigate();
   const [items, setItems] = useState<ProblemReport[]>([]);
+  const [loading, setLoading] = useState(true);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string>("");
+  const [previewSrc, setPreviewSrc] = useState("");
+  const [search, setSearch] = useState("");
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8088";
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      const data = await fetchResolvedReports();
+      setItems(data || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const all = await fetchReports();
-        setItems((all || []).filter((i) => i.status === "resolved"));
-      } catch (e) {
-        console.error(e);
-      }
-    };
-    load();
+    loadReports();
   }, []);
 
-  const cardStyle = {
-    background: "rgba(27,16,52,0.8)",
-    borderRadius: 20,
-    padding: 25,
-    border: "1px solid rgba(255,255,255,0.1)",
-    boxShadow:
-      "0 8px 25px rgba(147, 84, 222, 0.3),0 0 15px rgba(255,255,255,0.05) inset",
-    backdropFilter: "blur(6px)",
-  };
-
-  const textStyle = {
-    fontSize: 16,
-    fontWeight: 600 as const,
-    color: "#ffffff",
-  };
-
-  const handlePreview = (url: string) => {
-    setPreviewImage(url);
+  const handlePreview = (src: string) => {
+    setPreviewSrc(src);
     setPreviewOpen(true);
+  };
+
+  // ✅ filter ตามคำค้นหา
+  const filteredItems = items.filter((r) => {
+    if (!search.trim()) return true;
+    const s = search.toLowerCase();
+    return (
+      r.title?.toLowerCase().includes(s) ||
+      r.description?.toLowerCase().includes(s) ||
+      r.category?.toLowerCase().includes(s) ||
+      r.user?.username?.toLowerCase().includes(s) ||
+      r.user?.name?.toLowerCase().includes(s)
+    );
+  });
+
+  const pageBg = "radial-gradient(circle at top left, #1b1034, #0a0915 70%)";
+  const cardStyle: React.CSSProperties = {
+    background: "rgba(20, 18, 40, 0.75)",
+    borderRadius: 20,
+    padding: 20,
+    border: "1px solid rgba(146,84,222,0.3)",
+    boxShadow: "0 6px 18px rgba(146,84,222,0.25)",
+    backdropFilter: "blur(12px)",
+  };
+
+  // ✅ style ปุ่มธีมม่วง–ดำ
+  const purpleBtn: React.CSSProperties = {
+    borderRadius: 10,
+    background: "linear-gradient(135deg, #6a0dad 0%, #2e0f4d 100%)",
+    border: "none",
+    fontWeight: 700,
+    color: "#fff",
+    boxShadow: "0 0 12px rgba(146,84,222,0.6)",
+    height: 44,
   };
 
   return (
     <div
       style={{
-        background: "#0f0c29",
+        background: pageBg,
         minHeight: "100vh",
-        padding: "50px",
-        color: "#fff",
-        fontFamily: "'Poppins', sans-serif",
+        padding: "40px 40px 80px",
+        color: "#f0f0f0",
         flex: 1,
+        fontFamily: "'Kanit', sans-serif",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <Title
           level={2}
           style={{
             flex: 1,
-            background: "linear-gradient(90deg, #52c41a, #2bbb72)",
-            WebkitBackgroundClip: "text",
-            color: "transparent",
-            textShadow: "0 0 20px rgba(82, 196, 26, .6)",
-            marginBottom: 30,
-            fontWeight: 900,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            color: "#52c41a",
+            textShadow: "0 0 12px rgba(82,196,26,.5)",
           }}
         >
-          ✅ Resolved Problem Reports
+          <CheckCircleTwoTone twoToneColor="#52c41a" /> รายการที่แก้ไขแล้ว
         </Title>
 
-        <Button
-          onClick={() => navigate("/Admin/Page")}
-          style={{
-            height: 40,
-            borderRadius: 10,
-            background: "linear-gradient(90deg, #9254de, #f759ab)",
-            color: "#fff",
-            border: "none",
-            fontWeight: 700,
-          }}
-        >
-          กลับไปหน้า Admin
-        </Button>
+        <Space>
+          {/* กล่องค้นหา */}
+          <Input
+            placeholder="🔍 ค้นหาปัญหาที่เคยแก้..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            prefix={<SearchOutlined style={{ color: "#cfc5ff" }} />}
+            style={{
+              width: 260,
+              borderRadius: 10,
+              background: "rgba(237, 234, 234, 0.95)",
+              border: "1px solid #9254de",
+              color: "#500363ff",
+              fontWeight: 500,
+              boxShadow: "0 0 8px rgba(146,84,222,0.5)",
+            }}
+          />
+
+          {/* ปุ่ม Refresh */}
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={loadReports}
+            style={purpleBtn}
+          >
+            Refresh
+          </Button>
+
+          {/* ปุ่มกลับหน้า Admin */}
+          <Button
+            icon={<ArrowLeftOutlined />}
+            onClick={() => history.back()}
+            style={{
+              ...purpleBtn,
+              background: "linear-gradient(135deg, #9254de 0%, #f759ab 100%)",
+            }}
+          >
+            กลับหน้า Admin
+          </Button>
+        </Space>
       </div>
 
+      {/* Grid */}
       <div
         style={{
+          marginTop: 28,
           display: "grid",
           gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-          gap: "25px",
+          gap: 28,
         }}
       >
-        {items.map((rep) => (
-          <Card key={rep.ID} style={cardStyle}>
-            <p style={textStyle}>
-              User: {rep.user?.username ?? (rep as any).user_id}
-            </p>
-            <p style={textStyle}>Title: {rep.title}</p>
-            <p style={textStyle}>Description: {rep.description}</p>
-            <p style={textStyle}>
-              Status: <Tag color="#52c41a">✅ Resolved</Tag>
-            </p>
+        {!loading && filteredItems.length === 0 && (
+          <div
+            style={{
+              gridColumn: "1/-1",
+              display: "flex",
+              justifyContent: "center",
+              paddingTop: 80,
+            }}
+          >
+            <Empty
+              description={
+                <span style={{ color: "#cfc5ff" }}>ยังไม่มีรายการที่แก้ไขแล้ว</span>
+              }
+            />
+          </div>
+        )}
 
-            {rep.reply && (
-              <div style={{ marginTop: 12 }}>
-                <p style={{ ...textStyle, marginBottom: 8 }}>📨 Admin Reply:</p>
-                <div
-                  style={{
-                    background: "#141322",
-                    padding: "10px 12px",
-                    borderRadius: 8,
-                    whiteSpace: "pre-line",
-                  }}
-                >
-                  {rep.reply}
-                </div>
-              </div>
+        {filteredItems.map((rep) => (
+          <Card key={rep.ID} style={cardStyle} bordered={false} hoverable>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ color: "#cfc5ff", fontWeight: 700 }}>#{rep.ID}</Text>
+              <Tag
+                color="success"
+                style={{
+                  fontWeight: 700,
+                  borderRadius: 8,
+                  boxShadow: "0 0 6px rgba(82,196,26,0.4)",
+                }}
+              >
+                Resolved
+              </Tag>
+            </div>
+
+            <Paragraph style={{ marginBottom: 6 }}>
+              <Text strong style={{ color: "#cfc5ff" }}>User:</Text>{" "}
+              <Text style={{ color: "#fff" }}>
+                {rep.user?.username || rep.user?.name || "-"}
+              </Text>
+            </Paragraph>
+
+            {rep.category && (
+              <Paragraph style={{ marginBottom: 6 }}>
+                <Text strong style={{ color: "#cfc5ff" }}>Category:</Text>{" "}
+                <Text style={{ color: "#fff" }}>{rep.category}</Text>
+              </Paragraph>
             )}
 
+            <Paragraph style={{ marginBottom: 6 }}>
+              <Text strong style={{ color: "#cfc5ff" }}>Title:</Text>{" "}
+              <Text style={{ color: "#fff" }}>{rep.title}</Text>
+            </Paragraph>
+
+            <Paragraph style={{ marginBottom: 12 }}>
+              <Text strong style={{ color: "#cfc5ff" }}>Description:</Text>
+              <br />
+              <Text style={{ color: "#fff" }}>{rep.description}</Text>
+            </Paragraph>
+
             {rep.attachments && rep.attachments.length > 0 && (
-              <div style={{ marginTop: 15 }}>
-                <p style={{ ...textStyle, marginBottom: 8 }}>📎 Attachments:</p>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <PaperClipOutlined />
+                  <Text style={{ color: "#cfc5ff", fontWeight: 600 }}>
+                    User Attachments:
+                  </Text>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
                   {rep.attachments.map((att) => {
-                    const path = (att as any).file_path || "";
+                    const path = att.file_path || "";
                     const isImage = path
                       .toLowerCase()
                       .match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
-                    const url = `${API_URL}/${path}`;
+                    const url = path.startsWith("http")
+                      ? path
+                      : `${API_URL}${path}`;
                     return isImage ? (
                       <img
-                        key={(att as any).ID}
+                        key={att.ID || path}
                         src={url}
                         alt="attachment"
                         style={{
                           width: 100,
                           height: 100,
                           objectFit: "cover",
-                          borderRadius: 8,
+                          borderRadius: 10,
                           cursor: "pointer",
-                          boxShadow: "0 0 6px rgba(0,0,0,0.4)",
+                          boxShadow: "0 0 10px rgba(146,84,222,0.5)",
                         }}
-                        onClick={() => handlePreview(url)}
+                        
                       />
                     ) : (
                       <a
-                        key={(att as any).ID}
+                        key={att.ID || path}
                         href={url}
                         target="_blank"
                         rel="noopener noreferrer"
                         style={{ color: "#40a9ff" }}
                       >
-                        📄 {path.split("/").pop()}
+                        📄 {att.original_name || path.split("/").pop() || "file"}
                       </a>
                     );
                   })}
                 </div>
-              </div>
+              </>
             )}
           </Card>
         ))}
       </div>
 
+      {/* Modal Preview */}
       <Modal
         open={previewOpen}
         footer={null}
         onCancel={() => setPreviewOpen(false)}
         destroyOnClose
+        centered
+        bodyStyle={{ background: "#1b1034", padding: 0 }}
       >
         <img
           alt="preview"
           style={{ width: "100%", borderRadius: 12 }}
-          src={previewImage}
+          src={previewSrc}
         />
       </Modal>
     </div>

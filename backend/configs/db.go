@@ -415,6 +415,8 @@ func SetupDatabase() {
 
 
 
+		&entity.Review{},      // ★ ใช้ชื่อดัชนีใหม่แล้ว
+		&entity.Review_Like{}, // ถ้ามี
 	); err != nil {
 		log.Fatal("auto migrate (others) failed: ", err)
 	}
@@ -431,7 +433,7 @@ func seedIfNeededWithRoles(roleAdmin entity.Role, roleUser entity.Role) {
 		return
 	}
 
-	// users ตัวอย่าง
+	// สร้าง users
 	pw, _ := bcrypt.GenerateFromPassword([]byte("123456"), 12)
 	u1 := entity.User{
 		Username:  "alice",
