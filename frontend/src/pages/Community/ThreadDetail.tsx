@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Avatar, Badge, Button, Card, Input, Modal, Space, Typography, message } from "antd";
-import { ArrowLeftOutlined, LikeOutlined, MessageOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
+import { ArrowLeftOutlined, LikeFilled, LikeOutlined, MessageOutlined, SendOutlined, UserOutlined } from "@ant-design/icons";
 import axios from "axios";
 
 // ปรับ path ให้ตรงกับโปรเจกต์
@@ -49,10 +49,13 @@ export default function ThreadDetail({ threadId, onBack }: Props) {
   const [comments, setComments] = useState<ThreadComment[]>([]);
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<string | null>(null);
+  const [liked, setLiked] = useState(false);
 
   const load = async () => {
     try {
-      const th = await axios.get(`${BASE_URL}/threads/${threadId}`);
+      const th = await axios.get(`${BASE_URL}/threads/${threadId}`, {
+        headers: authHeaders(token, authId),
+      });
       const t = th.data;
       const mapped: Thread = {
         id: t.id ?? t.ID,
@@ -70,6 +73,7 @@ export default function ThreadDetail({ threadId, onBack }: Props) {
         })),
       };
       setThread(mapped);
+      setLiked(!!(t.liked ?? t.Liked));
 
       const cm = await axios.get(`${BASE_URL}/threads/${threadId}/comments?limit=200&offset=0`);
       const rows: ThreadComment[] = (cm.data || []).map((c: any) => ({
@@ -113,10 +117,14 @@ export default function ThreadDetail({ threadId, onBack }: Props) {
       return message.error("ต้องเข้าสู่ระบบก่อนจึงจะกดถูกใจได้");
     }
     try {
-      await axios.post(`${BASE_URL}/threads/${threadId}/toggle_like`, null, {
+      const res = await axios.post(`${BASE_URL}/threads/${threadId}/toggle_like`, null, {
         headers: authHeaders(token, authId),
       });
-      await load();
+      const liked = !!res.data?.liked;
+      setLiked(liked);
+      setThread((prev) =>
+        prev ? { ...prev, likeCount: Math.max(0, prev.likeCount + (liked ? 1 : -1)) } : prev
+      );
     } catch (e: any) {
       const msg = e?.response?.data?.error || e.message;
       message.error("กดถูกใจไม่สำเร็จ: " + (msg || ""));
@@ -164,7 +172,17 @@ export default function ThreadDetail({ threadId, onBack }: Props) {
               </Text>
             </div>
             <Space>
-              <Button icon={<LikeOutlined />} onClick={toggleLike} shape="round">ถูกใจ</Button>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <Button
+                  icon={liked ? <LikeFilled /> : <LikeOutlined />}
+                  onClick={toggleLike}
+                  shape="round"
+                  type={liked ? "primary" : undefined}
+                >
+                  ถูกใจ
+                </Button>
+                <span style={{ color: "#a8b3cf" }}>{thread.likeCount}</span>
+              </div>
               <Badge count={comments.length} size="small">
                 <Button icon={<MessageOutlined />} shape="circle" />
               </Badge>
