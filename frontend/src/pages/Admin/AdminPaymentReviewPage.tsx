@@ -83,7 +83,19 @@ export default function AdminPaymentReviewPage() {
       const qs = st === "ALL" ? "" : `?status=${st}`;
       const res = await axios.get(`${BASE_URL}/payments${qs}`, { headers: authHeaders });
       const data = Array.isArray(res.data) ? res.data : [];
-      setRows(data.map(normalizeRow));
+      const mapped = data.map(normalizeRow);
+      const withTotals = await Promise.all(
+        mapped.map(async (r) => {
+          try {
+            const ord = await axios.get(`${BASE_URL}/orders/${r.order_id}`, { headers: authHeaders });
+            const total = Number(ord.data?.total_amount ?? ord.data?.TotalAmount ?? r.amount);
+            return { ...r, amount: total };
+          } catch {
+            return r;
+          }
+        }),
+      );
+      setRows(withTotals);
     } catch (e) {
       console.error(e);
       message.error("โหลดข้อมูลการชำระเงินล้มเหลว");

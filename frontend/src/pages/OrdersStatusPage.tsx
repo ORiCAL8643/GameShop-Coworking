@@ -20,11 +20,18 @@ const BORDER = "#2b2f3a";
 const TEXT_MAIN = "#e8e8f3";
 const TEXT_SUB = "#a9afc3";
 
+type OrderItemRow = {
+  unit_price?: number; UnitPrice?: number;
+  qty?: number; QTY?: number;
+  line_total?: number; LineTotal?: number;
+};
+
 type Order = {
   ID?: number; id?: number;
   OrderStatus?: string; order_status?: string;
   TotalAmount?: number; total_amount?: number;
   OrderCreate?: string; order_create?: string;
+  OrderItems?: OrderItemRow[]; order_items?: OrderItemRow[];
 };
 
 type RawKeyRow = any;
@@ -247,6 +254,7 @@ export default function OrdersStatusPage() {
                       (it.UnitPrice ?? it.unit_price ?? 0) * (it.QTY ?? it.qty ?? 1)),
                   0,
                 );
+
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
               const canViewKeys = statusAllowsView(status);
