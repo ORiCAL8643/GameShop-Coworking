@@ -2,8 +2,10 @@
 package controllers
 
 import (
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,7 +19,6 @@ import (
 )
 
 var (
-	ErrNotEnoughKeys   = errors.New("not enough keys")
 	ErrAlreadyApproved = errors.New("payment already approved")
 )
 
@@ -27,6 +28,23 @@ func baseURL(c *gin.Context) string {
 		scheme = "https"
 	}
 	return scheme + "://" + c.Request.Host
+}
+
+func generateKeyCode() (string, error) {
+	const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, 19) // xxxx-xxxx-xxxx-xxxx
+	for i := range b {
+		if i == 4 || i == 9 || i == 14 {
+			b[i] = '-'
+			continue
+		}
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return "", err
+		}
+		b[i] = letters[n.Int64()]
+	}
+	return string(b), nil
 }
 
 // ============================
@@ -204,9 +222,6 @@ func UpdatePayment(c *gin.Context) {
 		case errors.Is(err, ErrAlreadyApproved):
 			c.JSON(http.StatusConflict, gin.H{"error": "payment already approved"})
 			return
-		case errors.Is(err, ErrNotEnoughKeys):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-			return
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -249,9 +264,6 @@ func ApprovePayment(c *gin.Context) {
 			return
 		case errors.Is(err, ErrAlreadyApproved):
 			c.JSON(http.StatusConflict, gin.H{"error": "payment already approved"})
-			return
-		case errors.Is(err, ErrNotEnoughKeys):
-			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		default:
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -312,20 +324,44 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 				return err
 			}
 
-			// Allocate game keys and grant games to user
+			// Allocate or create game keys and grant games to user
 			for _, item := range p.Order.OrderItems {
 				var keys []entity.KeyGame
 				if err := tx.Where("game_id = ? AND owned_by_order_item_id IS NULL", item.GameID).
 					Limit(item.QTY).Find(&keys).Error; err != nil {
 					return fmt.Errorf("find keys failed: %w", err)
 				}
-				if len(keys) < item.QTY {
-					return fmt.Errorf("%w: game %d", ErrNotEnoughKeys, item.GameID)
-				}
+
+				// assign existing keys
 				for _, k := range keys {
 					k.OwnedByOrderItemID = &item.ID
 					if err := tx.Save(&k).Error; err != nil {
 						return fmt.Errorf("save key failed: %w", err)
+					}
+					ug := entity.UserGame{
+						UserID:             p.Order.UserID,
+						GameID:             item.GameID,
+						GrantedByPaymentID: p.ID,
+						GrantedAt:          time.Now(),
+					}
+					if err := tx.Create(&ug).Error; err != nil {
+						return fmt.Errorf("create user_game failed: %w", err)
+					}
+				}
+
+				// generate missing keys
+				for i := len(keys); i < item.QTY; i++ {
+					code, err := generateKeyCode()
+					if err != nil {
+						return fmt.Errorf("generate key failed: %w", err)
+					}
+					k := entity.KeyGame{
+						GameID:             item.GameID,
+						KeyCode:            code,
+						OwnedByOrderItemID: &item.ID,
+					}
+					if err := tx.Create(&k).Error; err != nil {
+						return fmt.Errorf("create key failed: %w", err)
 					}
 					ug := entity.UserGame{
 						UserID:             p.Order.UserID,
