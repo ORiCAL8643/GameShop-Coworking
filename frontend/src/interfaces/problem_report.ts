@@ -1,4 +1,5 @@
 import type { ProblemAttachment } from "./problem_attachment";
+import type { ProblemReply } from "../interfaces/problem_reply";
 import type { User } from "./User";
 import type { Game } from "./Game";
 
@@ -26,8 +27,11 @@ export interface ProblemReport {
   game?: Game;
 
   // admin reply
-  reply?: string;
+  reply?: string; // latest reply message
 
   // attachments
   attachments?: ProblemAttachment[];
+
+  // all replies from admin
+  replies?: ProblemReply[];
 }

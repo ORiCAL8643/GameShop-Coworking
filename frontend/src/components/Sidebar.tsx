@@ -1,31 +1,25 @@
+// src/components/Sidebar.tsx
 import { Layout, Menu, Badge } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
-import AdminPageBadge from "./AdminPageBadge";
-import { useReportNewCount } from "../hooks/useReportNewCount"; // 👈 สมมติคุณมี hook นี้
+import { useReportNewCount } from "../hooks/useReportNewCount";
 
 const { Sider } = Layout;
-type GroupItem = Required<MenuProps>["items"][number];
+type ItemType = Required<MenuProps>["items"][number];
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const reportCount = useReportNewCount();
 
-  // เส้นทางที่เป็น "กลุ่ม" (มี children)
-  const rootSubmenuKeys = useMemo(
-    () => ["/information", "/category", "/Admin"],
-    []
-  );
+  // ✅ นับเคสใหม่ทุก 8s (หรือปรับตามต้องการ)
+  const reportCount = useReportNewCount(8000);
 
-  // คีย์ที่เลือกอยู่ (ตามเส้นทางปัจจุบัน)
+  const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
   const selectedKey = location.pathname;
-
   const computeOpenKeys = (path: string) =>
     rootSubmenuKeys.filter((k) => path.startsWith(k));
-
   const [openKeys, setOpenKeys] = useState<string[]>(computeOpenKeys(selectedKey));
 
   useEffect(() => {
@@ -36,7 +30,20 @@ const Sidebar = () => {
     setOpenKeys(keys as string[]);
   };
 
-  const items: GroupItem[] = [
+  // ✅ Label Page + Badge (โชว์แม้เป็น 0)
+  const adminPageLabel = (
+    <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span>Page</span>
+      <Badge
+        count={reportCount}
+        overflowCount={99}
+        color="#f759ab"
+        style={{ marginLeft: 4, boxShadow: "none" }}
+      />
+    </span>
+  );
+
+  const items: ItemType[] = [
     { key: "/home", label: "หน้าแรก" },
     { key: "/request", label: "รีเควสเกม" },
     { key: "/requestinfo", label: "ข้อมูลรีเควส" },
@@ -67,14 +74,7 @@ const Sidebar = () => {
         {
           key: "/Admin/Page",
           icon: <PlusOutlined />,
-          label: (
-            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-              Page
-              {reportCount > 0 && (
-                <Badge count={reportCount} size="small" offset={[4, -2]} />
-              )}
-            </span>
-          ),
+          label: adminPageLabel, // ✅ Page + Badge
         },
         {
           key: "/Admin/PaymentReviewPage",
@@ -82,6 +82,7 @@ const Sidebar = () => {
           icon: <PlusOutlined />,
         },
         { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
+        // ❌ ไม่ใส่ Resolved Reports อีกแล้ว
       ],
     },
   ];
@@ -112,7 +113,6 @@ const Sidebar = () => {
         />
       </Sider>
 
-      {/* เนื้อหาหลัก */}
       <Outlet />
     </Layout>
   );

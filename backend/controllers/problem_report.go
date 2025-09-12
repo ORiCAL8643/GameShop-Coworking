@@ -425,7 +425,7 @@ func createReplyFlow(c *gin.Context, db *gorm.DB, reportID int, adminID int, msg
 		}
 	}
 
-	// สร้าง/อัปเดต Notification ให้ลูกค้า
+	// สร้าง Notification ให้ลูกค้า (สร้างใหม่ทุกครั้ง)
 	makeOrUpdateUserReportNotification(db, report.UserID, "report_reply", uint(report.ID), buildReplyMessage(msg, attachCount))
 
 	// ปิดงานอัตโนมัติกรณี /reports/:id/reply
@@ -471,11 +471,8 @@ func notifyAdminsNewReport(db *gorm.DB, report *entity.ProblemReport) {
 	}
 }
 
+// ✅ เปลี่ยนจาก "หาแล้วอัปเดต" → "สร้างแจ้งเตือนใหม่ทุกครั้ง"
 func makeOrUpdateUserReportNotification(db *gorm.DB, userID uint, typ string, reportID uint, msg string) {
-	var noti entity.Notification
-	err := db.Where("user_id = ? AND type = ? AND report_id = ?", userID, typ, reportID).
-		First(&noti).Error
-
 	title := ""
 	switch typ {
 	case "report_reply":
@@ -486,23 +483,14 @@ func makeOrUpdateUserReportNotification(db *gorm.DB, userID uint, typ string, re
 		title = "การแจ้งเตือนคำร้อง"
 	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		_ = db.Create(&entity.Notification{
-			Title:    title,
-			Message:  msg,
-			Type:     typ,
-			UserID:   userID,
-			ReportID: &reportID,
-			IsRead:   false,
-		}).Error
-		return
-	}
-	if err == nil {
-		noti.Title = title
-		noti.Message = msg
-		noti.IsRead = false
-		_ = db.Save(&noti).Error
-	}
+	_ = db.Create(&entity.Notification{
+		Title:    title,
+		Message:  msg,
+		Type:     typ,
+		UserID:   userID,
+		ReportID: &reportID,
+		IsRead:   false,
+	}).Error
 }
 
 func buildReplyMessage(msg string, attachCount int) string {

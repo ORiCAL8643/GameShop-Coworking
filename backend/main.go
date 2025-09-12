@@ -142,7 +142,7 @@ func main() {
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
 		// เปลี่ยน handler ให้รองรับตาราง Reply/ReplyAttachment
-		router.POST("/reports/:id/reply", controllers.AdminCreateReply)
+		router.POST("/reports/:id/reply", controllers.ReplyReport)
 		// เพิ่มเส้นทางสำหรับแอดมิน (ตอบกลับ/ปิดงาน)
 		router.POST("/admin/reports/:id/replies", controllers.AdminCreateReply)
 		router.PATCH("/admin/reports/:id/resolve", controllers.AdminResolveReport)

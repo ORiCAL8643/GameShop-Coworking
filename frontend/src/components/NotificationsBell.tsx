@@ -1,5 +1,6 @@
+// src/components/NotificationBell.tsx
 import { useEffect, useMemo, useState } from "react";
-import { Badge, Popover, List, Button, Typography, Modal, Divider } from "antd";
+import { Badge, Popover, List, Button, Typography, Modal } from "antd";
 import { BellOutlined } from "@ant-design/icons";
 import {
   fetchNotifications,
@@ -8,7 +9,7 @@ import {
   deleteNotification,
 } from "../services/Notification";
 import { getReportByID } from "../services/Report";
-import type { Notification } from "../interfaces/Notification";
+import type { Notification as AppNotification } from "../interfaces/Notification";
 import type { ProblemReport } from "../interfaces/problem_report";
 
 const { Text, Paragraph } = Typography;
@@ -19,21 +20,25 @@ type Props = {
 };
 
 export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
-  const [items, setItems] = useState<Notification[]>([]);
+  const [items, setItems] = useState<AppNotification[]>([]);
   const [open, setOpen] = useState(false);
 
   // Modal: detail
   const [viewOpen, setViewOpen] = useState(false);
-  const [viewNoti, setViewNoti] = useState<Notification | null>(null);
+  const [viewNoti, setViewNoti] = useState<AppNotification | null>(null);
   const [viewReport, setViewReport] = useState<ProblemReport | null>(null);
 
   // Modal: image preview
   const [imgOpen, setImgOpen] = useState(false);
   const [imgSrc, setImgSrc] = useState<string>("");
 
-  const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8088") as string;
+  const API_URL =
+    (import.meta.env.VITE_API_URL || "http://localhost:8088") as string;
 
-  const unreadCount = useMemo(() => items.filter((n) => !n.is_read).length, [items]);
+  const unreadCount = useMemo(
+    () => items.filter((n) => !n.is_read).length,
+    [items]
+  );
 
   const normalizeUrl = (p: string) => {
     if (!p) return "";
@@ -49,7 +54,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
       const raw = await fetchNotifications(userId);
 
       // ✅ กรองซ้ำ: เก็บเฉพาะอันล่าสุดต่อ key (type + report_id)
-      const map = new Map<string, Notification>();
+      const map = new Map<string, AppNotification>();
       for (const n of raw) {
         const key = `${n.type}:${n.report_id ?? n.ID}`;
         const cur = map.get(key);
@@ -83,7 +88,8 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     if (v) await load();
   };
 
-  const openView = async (n: Notification) => {
+  // ✅ ฟังก์ชันเปิดดูข้อความ
+  const openView = async (n: AppNotification) => {
     try {
       if (!n.is_read) await markNotificationRead(n.ID);
       setViewNoti(n);
@@ -92,13 +98,16 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
       if (n.type === "report_reply" && n.report_id) {
         try {
           const rp = await getReportByID(n.report_id);
-          setViewReport(rp);
+          const replies = rp.replies || [];
+          const latest = replies[replies.length - 1];
+          const withLatest = { ...rp, reply: latest?.message };
+          setViewReport(withLatest);
         } catch (e) {
           console.warn("load report failed:", e);
         }
       }
 
-      setViewOpen(true);
+      setViewOpen(true); // ✅ เปิด modal เสมอ
       await load();
     } catch (e) {
       console.error(e);
@@ -107,10 +116,23 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   const content = (
     <div style={{ width: 380, maxHeight: 420, overflow: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 8,
+          alignItems: "center",
+        }}
+      >
         <Text strong>การแจ้งเตือน</Text>
         {items.length > 0 && (
-          <Button size="small" onClick={async () => { await markAllNotificationsRead(userId); await load(); }}>
+          <Button
+            size="small"
+            onClick={async () => {
+              await markAllNotificationsRead(userId);
+              await load();
+            }}
+          >
             ทำเป็นอ่านแล้วทั้งหมด
           </Button>
         )}
@@ -128,13 +150,30 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
               padding: "10px 12px",
             }}
             actions={[
-              <Button size="small" type="link" onClick={() => openView(n)}>ดูข้อความ</Button>,
+              <Button size="small" type="primary" onClick={() => openView(n)}>
+                ดูข้อความ
+              </Button>,
               !n.is_read ? (
-                <Button size="small" type="link" onClick={async () => { await markNotificationRead(n.ID); await load(); }}>
+                <Button
+                  size="small"
+                  style={{ background: "#52c41a", color: "#fff" }}
+                  onClick={async () => {
+                    await markNotificationRead(n.ID);
+                    await load();
+                  }}
+                >
                   อ่านแล้ว
                 </Button>
               ) : null,
-              <Button size="small" danger type="link" onClick={async () => { await deleteNotification(n.ID); await load(); }}>
+              <Button
+                size="small"
+                danger
+                type="primary"
+                onClick={async () => {
+                  await deleteNotification(n.ID);
+                  await load();
+                }}
+              >
                 ลบ
               </Button>,
             ].filter(Boolean)}
@@ -158,28 +197,37 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // ✅ แสดงเฉพาะไฟล์แนบที่ "แอดมิน" ส่ง (กรอง path ที่อยู่ใต้ /replies/)
+  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน
   const renderReportAttachments = () => {
-    if (!viewReport?.attachments || viewReport.attachments.length === 0) return null;
-
-    const adminOnly = viewReport.attachments.filter((att) => {
-      const raw = (att as any).file_path ?? (att as any).FilePath ?? "";
-      return /(^|\/)uploads\/replies\//i.test(raw) || raw.toLowerCase().includes("/replies/");
-    });
-
+    const replies = viewReport?.replies || [];
+    const adminOnly = replies.flatMap((r) => r.attachments || []);
     if (adminOnly.length === 0) return null;
 
     return (
       <>
         <Text strong>ไฟล์แนบจากแอดมิน:</Text>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
           {adminOnly.map((att) => {
-            const rawPath = (att as any).file_path ?? (att as any).FilePath ?? "";
+            const rawPath = att.file_path ?? att.FilePath ?? "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
 
             return (
-              <div key={att.ID} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div
+                key={att.ID}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                }}
+              >
                 {isImg ? (
                   <img
                     src={url}
@@ -192,7 +240,10 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
                       cursor: "pointer",
                       boxShadow: "0 1px 4px rgba(0,0,0,.25)",
                     }}
-                    onClick={() => { setImgSrc(url); setImgOpen(true); }}
+                    onClick={() => {
+                      setImgSrc(url);
+                      setImgOpen(true);
+                    }}
                   />
                 ) : (
                   <a href={url} target="_blank" rel="noopener noreferrer">
@@ -217,7 +268,13 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   return (
     <>
-      <Popover placement="bottomRight" trigger="click" content={content} open={open} onOpenChange={onOpenChange}>
+      <Popover
+        placement="bottomRight"
+        trigger="click"
+        content={content}
+        open={open}
+        onOpenChange={onOpenChange}
+      >
         <Badge count={unreadCount} size="small">
           <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
         </Badge>
@@ -225,32 +282,26 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
       {/* Modal: รายละเอียดแจ้งเตือน */}
       <Modal
-  open={viewOpen}
-  title={viewNoti?.title || "รายละเอียดแจ้งเตือน"}
-  onCancel={() => setViewOpen(false)}
-  footer={<Button onClick={() => setViewOpen(false)}>ปิด</Button>}
-  destroyOnClose
->
-  {/* ❌ ไม่แสดงข้อความสรุปใน noti ถ้าเป็นประเภท report_reply */}
-  {viewNoti?.type !== "report_reply" && (
-    <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8 }}>
-      {viewNoti?.message}
-    </Paragraph>
-  )}
-
-  {viewNoti?.type === "report_reply" && viewReport && (
-    <>
-      {/* ✅ คงเส้นคั่นและส่วนที่เหลือไว้ */}
-      <Divider style={{ margin: "10px 0" }} />
-      <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
-      <Paragraph style={{ whiteSpace: "pre-line" }}>
-        {viewReport.reply || "-"}
-      </Paragraph>
-      {renderReportAttachments()}
-    </>
-  )}
-</Modal>
-
+        open={viewOpen}
+        title={viewNoti?.title || "รายละเอียดแจ้งเตือน"}
+        onCancel={() => setViewOpen(false)}
+        footer={<Button onClick={() => setViewOpen(false)}>ปิด</Button>}
+        destroyOnClose
+      >
+        {viewReport ? (
+          <>
+            <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
+            <Paragraph style={{ whiteSpace: "pre-line" }}>
+              {viewReport.reply || "-"}
+            </Paragraph>
+            {renderReportAttachments()}
+          </>
+        ) : (
+          <Paragraph style={{ whiteSpace: "pre-line" }}>
+            {viewNoti?.message || "ไม่มีรายละเอียด"}
+          </Paragraph>
+        )}
+      </Modal>
 
       {/* Modal: Preview รูปภาพ */}
       <Modal

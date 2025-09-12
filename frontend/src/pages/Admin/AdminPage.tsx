@@ -9,6 +9,7 @@ import {
   Upload,
   message,
   Modal,
+  notification, // ✅ เพิ่ม
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import {
@@ -20,6 +21,7 @@ import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useNavigate } from "react-router-dom";
 import { markReportsSeen } from "../../hooks/useReportNewCount";
+import { useAuth } from "../../context/AuthContext";
 
 const { Title } = Typography;
 const { TextArea } = Input;
@@ -32,18 +34,17 @@ interface RefundRequest {
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
 }
+
 interface AdminPageProps {
   refunds: RefundRequest[];
   setRefunds: (refunds: RefundRequest[]) => void;
-  addNotification: (msg: string) => void;
-  addRefundUpdate: (msg: string) => void;
+  addNotification?: (msg: string) => void;
+  addRefundUpdate?: (msg: string) => void;
 }
 
-export default function AdminPage({
-  refunds,
-  setRefunds,
-}: AdminPageProps) {
+export default function AdminPage({ refunds, setRefunds }: AdminPageProps) {
   const navigate = useNavigate();
+  const { id: adminId } = useAuth(); // ✅ id แอดมินที่ล็อกอิน
 
   const [problems, setProblems] = useState<ProblemReport[]>([]);
   const [activeTab, setActiveTab] = useState<"refunds" | "problems">("problems");
@@ -53,6 +54,16 @@ export default function AdminPage({
   const [previewImage, setPreviewImage] = useState<string>("");
   const [previewOpen, setPreviewOpen] = useState(false);
 
+  // ✅ helper parse created_at/CreatedAt
+  const parseCreatedAtMs = (r: any) => {
+    const v = r?.created_at ?? r?.CreatedAt ?? r?.createdAt;
+    if (!v) return 0;
+    const s = typeof v === "string" ? v : (v?.Time ?? String(v));
+    const ms = Date.parse(s);
+    return isNaN(ms) ? 0 : ms;
+  };
+
+  // ✅ โหลดข้อมูลรายงาน + ฟัง event แจ้งเตือน
   useEffect(() => {
     const load = async () => {
       try {
@@ -60,9 +71,8 @@ export default function AdminPage({
         const pending = (items || []).filter((it) => it.status !== "resolved");
         setProblems(pending);
 
-        // ✅ ตั้ง "เวลาที่เห็นล่าสุด" = created_at ที่ใหม่ที่สุดในชุดข้อมูล (หรือเวลาปัจจุบันถ้าไม่มี)
         const latestTs = (items || []).reduce((max, r) => {
-          const t = r.created_at ? Date.parse(r.created_at) : 0;
+          const t = parseCreatedAtMs(r);
           return t > max ? t : max;
         }, 0);
         markReportsSeen(latestTs ? new Date(latestTs).toISOString() : undefined);
@@ -70,9 +80,26 @@ export default function AdminPage({
         console.error(e);
       }
     };
+
     load();
+
+    // ✅ ฟัง event ตอนลูกค้าส่ง report ใหม่
+    const handleNewReport = (e: any) => {
+      load(); // reload reports ใหม่
+      notification.open({
+        message: "📩 มีคำร้องใหม่เข้ามา",
+        description: `Report ID: ${e.detail?.reportId || "ไม่ทราบเลข"}`,
+        placement: "bottomRight",
+      });
+    };
+
+    window.addEventListener("admin:report:new", handleNewReport);
+    return () => {
+      window.removeEventListener("admin:report:new", handleNewReport);
+    };
   }, []);
 
+  // ✅ อัปเดตสถานะ refund
   const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
     const updated = refunds.map((r) =>
       r.id === id ? { ...r, status: action } : r
@@ -81,7 +108,7 @@ export default function AdminPage({
     message.success(`Refund #${id} ${action} successfully!`);
   };
 
-  // ✅ ตอบกลับแล้ว ย้ายการ์ดออก (ถือว่าแก้แล้ว)
+  // ✅ ตอบกลับแล้ว -> resolve -> ย้ายการ์ดออก + ยิง noti
   const handleSendReply = async (rep: ProblemReport) => {
     const reply = replies[rep.ID];
     if (!reply || (!reply.text && (reply.fileList?.length ?? 0) === 0)) {
@@ -98,9 +125,12 @@ export default function AdminPage({
         )
         .filter((f: File | null): f is File => f !== null);
 
-      await replyReport(rep.ID, reply.text, files);
-      setProblems((prev) => prev.filter((p) => p.ID !== rep.ID)); // เอาออกจากหน้ารอแก้
-      message.success("ตอบกลับลูกค้าสำเร็จ (ย้ายไปหน้ารายการที่แก้แล้ว)");
+      // ✅ ส่ง admin_id ให้ backend
+      await replyReport(rep.ID, reply.text, files, Number(adminId));
+      await resolveReport(rep.ID); // ✅ mark resolved + backend ยิง noti
+
+      setProblems((prev) => prev.filter((p) => p.ID !== rep.ID));
+      message.success("ตอบกลับลูกค้าและมาร์คเป็นแก้ไขแล้วเรียบร้อย");
     } catch (e: any) {
       console.error("❌ Error while sending reply:", e);
       const detail = e?.response?.data?.error || e?.message || String(e);
@@ -108,17 +138,6 @@ export default function AdminPage({
     }
 
     setReplies((prev) => ({ ...prev, [rep.ID]: { text: "", fileList: [] } }));
-  };
-
-  // ✅ ปิดงานเป็น resolved แล้วลบออกจากลิสต์
-  const handleResolveProblem = async (id: number) => {
-    try {
-      await resolveReport(id);
-      setProblems((prev) => prev.filter((p) => p.ID !== id));
-      message.success(`Problem report #${id} marked as resolved`);
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const handlePreview = (file: UploadFile | string) => {
@@ -138,7 +157,7 @@ export default function AdminPage({
     boxShadow:
       "0 8px 25px rgba(147, 84, 222, 0.3),0 0 15px rgba(255,255,255,0.05) inset",
     backdropFilter: "blur(6px)",
-  };
+  } as const;
 
   const textStyle = {
     fontSize: 16,
@@ -154,7 +173,7 @@ export default function AdminPage({
         background: "#0f0c29",
         minHeight: "100vh",
         padding: "50px",
-        color: "#fff",
+        color: "#540464ff",
         fontFamily: "'Poppins', sans-serif",
         flex: 1,
       }}
@@ -257,7 +276,9 @@ export default function AdminPage({
                       const isImage = path
                         .toLowerCase()
                         .match(/\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i);
-                      const url = `${API_URL}/${path}`;
+                      const url = `${API_URL}${
+                        path.startsWith("/") ? "" : "/"
+                      }${path}`;
                       return isImage ? (
                         <img
                           key={(att as any).ID}
@@ -349,20 +370,7 @@ export default function AdminPage({
                       boxShadow: "0 0 10px #52c41a",
                     }}
                   >
-                    📩 Send Reply
-                  </Button>
-                  <Button
-                    onClick={() => handleResolveProblem(rep.ID)}
-                    style={{
-                      flex: 1,
-                      background: "linear-gradient(90deg, #f759ab, #9254de)",
-                      color: "white",
-                      fontWeight: "bold",
-                      borderRadius: 12,
-                      boxShadow: "0 0 10px #f759ab",
-                    }}
-                  >
-                    ✔ Mark as Resolved
+                    📩 Send Reply & Resolve
                   </Button>
                 </div>
               </div>
