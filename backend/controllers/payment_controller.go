@@ -305,6 +305,29 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 					}
 				}
 			}
+			// grant user ownership of purchased games
+			processed := make(map[uint]struct{})
+			for _, it := range items {
+				if _, ok := processed[it.GameID]; ok {
+					continue
+				}
+				processed[it.GameID] = struct{}{}
+				var count int64
+				if err := tx.Model(&entity.UserGame{}).Where("user_id = ? AND game_id = ?", p.Order.UserID, it.GameID).Count(&count).Error; err != nil {
+					return err
+				}
+				if count == 0 {
+					ug := entity.UserGame{
+						UserID:             p.Order.UserID,
+						GameID:             it.GameID,
+						GrantedAt:          time.Now(),
+						GrantedByPaymentID: p.ID,
+					}
+					if err := tx.Create(&ug).Error; err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 
 		case "REJECTED":

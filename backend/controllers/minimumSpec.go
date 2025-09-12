@@ -10,7 +10,7 @@ import (
 
 func FindMinimumSpec(c *gin.Context) {
 	var minimum_specs []entity.MinimumSpec
-	if err := configs.DB().Preload("Game").Find(&minimum_specs).Error; err != nil {
+	if err := configs.DB().Find(&minimum_specs).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}

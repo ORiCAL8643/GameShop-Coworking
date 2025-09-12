@@ -29,6 +29,7 @@ import AdminPage from "../pages/Admin/AdminPage";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
 
 import OrdersStatusPage from "../pages/OrdersStatusPage";
+import GameDetail from "../pages/Game/GameDetail";
 
 // mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
 const refunds: Refund[] = [
@@ -77,6 +78,8 @@ const router = createBrowserRouter([
       { path: "mod/:id", element: <ModDetail /> },
       // ชี้หน้าอัปโหลดให้เป็นเส้นทางย่อยของ Workshop
       { path: "workshop/upload", element: <Workshop /> },
+      
+       { path: "game/:id", element: <GameDetail /> },
 
       // === promotion
       { path: "promotion", element: <PromotionManager /> },
