@@ -73,10 +73,21 @@ func CreateOrderItem(c *gin.Context) {
 		LineDiscount: 0,
 		LineTotal:    line,
 	}
-	if err := db.Create(&item).Error; err != nil {
+
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&item).Error; err != nil {
+			return err
+		}
+		// create random keygames for this item
+		if err := services.CreateRandomKeyGames(tx, item.GameID, item.QTY); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	_ = recalcOrderTotal(db, body.OrderID)
 	_ = db.Preload("Order").Preload("Game").First(&item, item.ID)
 	c.JSON(http.StatusCreated, item)

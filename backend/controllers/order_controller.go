@@ -8,6 +8,7 @@ import (
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -84,10 +85,22 @@ func CreateOrder(c *gin.Context) {
 	order.TotalAmount = round2(total)
 	order.OrderItems = items
 
-	if err := db.Create(&order).Error; err != nil {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+		// generate keygames for each order item based on qty
+		for _, it := range order.OrderItems {
+			if err := services.CreateRandomKeyGames(tx, it.GameID, it.QTY); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	_ = db.Preload("OrderItems").Preload("User").First(&order, order.ID)
 	c.JSON(http.StatusOK, order)
 }
