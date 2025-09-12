@@ -102,14 +102,40 @@ export default function PromotionDetail() {
             <List
               dataSource={games}
               locale={{ emptyText: <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text> }}
-              renderItem={(g) => (
-                <List.Item actions={[<Button key="buy" onClick={() => navigate(`/game/${g.ID}`)}>ไปหน้าซื้อ</Button>]}> 
-                  <List.Item.Meta
-                    title={<Text style={{ color: "white" }}>{g.game_name}</Text>}
-                    description={<Text style={{ color: "#aaa" }}>Game ID: {g.ID}</Text>}
-                  />
-                </List.Item>
-              )}
+              renderItem={(g) => {
+                const hasDiscount =
+                  typeof g.discounted_price === "number" &&
+                  g.discounted_price > 0 &&
+                  g.discounted_price < g.base_price;
+
+                return (
+                  <List.Item
+                    actions={[
+                      <Button key="buy" onClick={() => navigate(`/game/${g.ID}`)}>
+                        ไปหน้าซื้อ
+                      </Button>,
+                    ]}
+                  >
+                    <List.Item.Meta
+                      title={<Text style={{ color: "white" }}>{g.game_name}</Text>}
+                      description={
+                        <div style={{ color: "#9254de" }}>
+                          {hasDiscount ? (
+                            <>
+                              <span style={{ textDecoration: "line-through", color: "#ccc" }}>
+                                {g.base_price}
+                              </span>
+                              <span style={{ marginLeft: 8 }}>{g.discounted_price}</span>
+                            </>
+                          ) : (
+                            g.base_price
+                          )}
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                );
+              }}
             />
             <div style={{ marginTop: 12 }}>
               <Link to="/promotions">

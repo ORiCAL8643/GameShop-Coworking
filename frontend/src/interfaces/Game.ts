@@ -6,6 +6,7 @@ export interface Game {
       categories: {ID: number, title: string};
       release_date: string;
       base_price: number;
+      discounted_price?: number;
       img_src: string;
       age_rating: number;
       status: string;
