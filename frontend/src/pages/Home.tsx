@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ProductGrid from "../components/ProductGrid";
 import { useAuth } from "../context/AuthContext";
-import { Button, Space, Typography } from "antd";
+import { Button, Space, Typography, Carousel } from "antd";
 import type { Promotion } from "../interfaces/Promotion";
 import { listPromotions } from "../services/promotions";
 
@@ -34,23 +34,50 @@ const Home = () => {
     load();
   }, []);
 
-  const promo = promotions[0];
-
   return (
-    <div style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
+    <div style={{ background: '#141414', flex: 1, minHeight: '100vh' }}>
       <Navbar />
       <div style={{ padding: '16px' }}>
-        {promo && (
-          <img
-            src={resolveImgUrl(promo.promo_image)}
-            alt={promo.title}
-            style={{ height: 180, width: '100%', objectFit: 'cover', borderRadius: 10, marginBottom: 24, cursor: 'pointer' }}
-            onClick={() => navigate(`/promotion/${promo.ID}`)}
-          />
+        {promotions.length > 0 && (
+          promotions.length > 1 ? (
+            <Carousel autoplay style={{ marginBottom: 24 }}>
+              {promotions.map((promo) => (
+                <img
+                  key={promo.ID}
+                  src={resolveImgUrl(promo.promo_image)}
+                  alt={promo.title}
+                  style={{
+                    height: 180,
+                    width: '100%',
+                    objectFit: 'cover',
+                    borderRadius: 10,
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => navigate(`/promotion/${promo.ID}`)}
+                />
+              ))}
+            </Carousel>
+          ) : (
+            <img
+              src={resolveImgUrl(promotions[0].promo_image)}
+              alt={promotions[0].title}
+              style={{
+                height: 180,
+                width: '100%',
+                objectFit: 'cover',
+                borderRadius: 10,
+                marginBottom: 24,
+                cursor: 'pointer',
+              }}
+              onClick={() => navigate(`/promotion/${promotions[0].ID}`)}
+            />
+          )
         )}
         <Title level={3} style={{ color: 'white' }}>Product</Title>
         <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" shape="round">Top</Button>
+          <Button type="primary" shape="round">
+            Top
+          </Button>
           <Button shape="round">Popular</Button>
           <Button shape="round">Recommended</Button>
           <Button shape="round">Filter</Button>
