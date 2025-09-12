@@ -8,18 +8,18 @@ import (
 
 type Game struct {
 	gorm.Model
-	GameName       string     `json:"game_name"`
+	GameName string `json:"game_name"`
 	//KeyGameID      uint       `json:"key_id"`
-	CategoriesID   int        `json:"categories_id"`
-	Categories     Categories `json:"categories" gorm:"foreignkey:CategoriesID"`
-	Date           time.Time  `json:"release_date" gorm:"autoCreateTime"`
-	BasePrice      int        `json:"base_price"`
-	Status         string     `json:"status" gorm:"type:varchar(20);default:'pending';not null;index"`
-	Minimum_specID uint       `json:"minimum_spec_id"`
-	AgeRating      int        `json:"age_rating"`
+	CategoriesID   int         `json:"categories_id"`
+	Categories     Categories  `json:"categories" gorm:"foreignkey:CategoriesID"`
+	Date           time.Time   `json:"release_date" gorm:"autoCreateTime"`
+	BasePrice      int         `json:"base_price"`
+	Status         string      `json:"status" gorm:"type:varchar(20);default:'pending';not null;index"`
+	Minimum_specID uint        `json:"minimum_spec_id"`
+	MinimumSpec    MinimumSpec `json:"minimum_spec"`
+	AgeRating      int         `json:"age_rating"`
 
 	Requests []Request `gorm:"foreignKey:GameRefer"`
-	Market   Market    `json:"market"`
 
 	Threads   []Thread   `gorm:"foreignKey:GameID" json:"threads,omitempty"`
 	UserGames []UserGame `gorm:"foreignKey:GameID" json:"user_games,omitempty"`

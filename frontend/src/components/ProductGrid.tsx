@@ -24,6 +24,7 @@ interface Game {
   age_rating: number | string;
   status: string;
   minimum_spec_id: number;
+  minimum_spec: { ID: number; os: string; processor: string; memory: string; graphics: string; storage: string};
 }
 
 // แปลง img_src ให้เป็น absolute URL เสมอ
