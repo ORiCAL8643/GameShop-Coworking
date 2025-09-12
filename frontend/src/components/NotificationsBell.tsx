@@ -76,7 +76,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     load();
     const t = setInterval(load, pollMs);
     return () => clearInterval(t);
-  }, [userId, pollMs]);
+  }, [userId, pollMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onOpenChange = async (v: boolean) => {
     setOpen(v);
@@ -92,7 +92,10 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
       if (n.type === "report_reply" && n.report_id) {
         try {
           const rp = await getReportByID(n.report_id);
-          setViewReport(rp);
+          const replies = rp.replies || [];
+          const latest = replies[replies.length - 1];
+          const withLatest = { ...rp, reply: latest?.message };
+          setViewReport(withLatest);
         } catch (e) {
           console.warn("load report failed:", e);
         }
@@ -158,15 +161,10 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // ✅ แสดงเฉพาะไฟล์แนบที่ "แอดมิน" ส่ง (กรอง path ที่อยู่ใต้ /replies/)
+  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน
   const renderReportAttachments = () => {
-    if (!viewReport?.attachments || viewReport.attachments.length === 0) return null;
-
-    const adminOnly = viewReport.attachments.filter((att) => {
-      const raw = (att as any).file_path ?? (att as any).FilePath ?? "";
-      return /(^|\/)uploads\/replies\//i.test(raw) || raw.toLowerCase().includes("/replies/");
-    });
-
+    const replies = viewReport?.replies || [];
+    const adminOnly = replies.flatMap((r) => r.attachments || []);
     if (adminOnly.length === 0) return null;
 
     return (
@@ -174,12 +172,15 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         <Text strong>ไฟล์แนบจากแอดมิน:</Text>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
           {adminOnly.map((att) => {
-            const rawPath = (att as any).file_path ?? (att as any).FilePath ?? "";
+            const rawPath = att.file_path ?? att.FilePath ?? "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
 
             return (
-              <div key={att.ID} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div
+                key={att.ID}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+              >
                 {isImg ? (
                   <img
                     src={url}
@@ -192,7 +193,10 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
                       cursor: "pointer",
                       boxShadow: "0 1px 4px rgba(0,0,0,.25)",
                     }}
-                    onClick={() => { setImgSrc(url); setImgOpen(true); }}
+                    onClick={() => {
+                      setImgSrc(url);
+                      setImgOpen(true);
+                    }}
                   />
                 ) : (
                   <a href={url} target="_blank" rel="noopener noreferrer">
