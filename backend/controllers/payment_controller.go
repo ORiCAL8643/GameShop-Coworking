@@ -17,8 +17,7 @@ import (
 )
 
 var (
-	ErrNotEnoughKeys       = errors.New("not enough keys")
-	ErrUserAlreadyOwnsGame = errors.New("user already owns game")
+	ErrNotEnoughKeys = errors.New("not enough keys")
 )
 
 func baseURL(c *gin.Context) string {
@@ -201,7 +200,7 @@ func UpdatePayment(c *gin.Context) {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
-		case errors.Is(err, ErrNotEnoughKeys), errors.Is(err, ErrUserAlreadyOwnsGame):
+		case errors.Is(err, ErrNotEnoughKeys):
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		default:
@@ -244,7 +243,7 @@ func ApprovePayment(c *gin.Context) {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
-		case errors.Is(err, ErrNotEnoughKeys), errors.Is(err, ErrUserAlreadyOwnsGame):
+		case errors.Is(err, ErrNotEnoughKeys):
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
 		default:
@@ -324,9 +323,6 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 						GrantedAt:          time.Now(),
 					}
 					if err := tx.Create(&ug).Error; err != nil {
-						if errors.Is(err, gorm.ErrDuplicatedKey) {
-							return fmt.Errorf("%w: game %d", ErrUserAlreadyOwnsGame, item.GameID)
-						}
 						return fmt.Errorf("create user_game failed: %w", err)
 					}
 				}
