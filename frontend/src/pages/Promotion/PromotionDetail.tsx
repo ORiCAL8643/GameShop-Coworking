@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Layout, Typography, Card, Tag, List, Button, Empty } from "antd";
+import { Layout, Typography, Card, Tag, Button, Empty, Row, Col } from "antd";
 import Sidebar from "../../components/Sidebar";
+import GameCard from "../../components/GameCard";
 import type { Promotion } from "../../interfaces/Promotion";
 import type { Game } from "../../interfaces/Game";
 import { getPromotion } from "../../services/promotions";
@@ -11,6 +12,22 @@ const { Content } = Layout;
 const { Title, Text } = Typography;
 
 const base_url = import.meta.env.VITE_API_URL || "http://localhost:8088";
+
+function applyDiscount(
+  price: number,
+  type: Promotion["discount_type"],
+  value: number,
+): number {
+  if (value <= 0) return price;
+  switch (type) {
+    case "PERCENT":
+      return price * (1 - value / 100);
+    case "AMOUNT":
+      return price < value ? 0 : price - value;
+    default:
+      return price;
+  }
+}
 
 export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
@@ -40,7 +57,24 @@ export default function PromotionDetail() {
         const data = await getPromotion(Number(id), true);
         setPromotion(data);
         if (data.games) {
-          setGames(data.games);
+          const related = data.games.filter((g: any) => {
+            if (Array.isArray(g.promotion_games)) {
+              return g.promotion_games.some(
+                (pg: any) => pg.promotion_id === data.ID,
+              );
+            }
+            return g.promotion_id === data.ID;
+          });
+          setGames(
+            related.map((g: any) => ({
+              ...g,
+              discounted_price: applyDiscount(
+                g.base_price,
+                data.discount_type,
+                data.discount_value,
+              ),
+            })),
+          );
         }
       } catch {
         setPromotion(null);
@@ -99,44 +133,21 @@ export default function PromotionDetail() {
             bodyStyle={{ background: "#141414" }}
             style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
           >
-            <List
-              dataSource={games}
-              locale={{ emptyText: <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text> }}
-              renderItem={(g) => {
-                const hasDiscount =
-                  typeof g.discounted_price === "number" &&
-                  g.discounted_price > 0 &&
-                  g.discounted_price < g.base_price;
-
-                return (
-                  <List.Item
-                    actions={[
-                      <Button key="buy" onClick={() => navigate(`/game/${g.ID}`)}>
-                        ไปหน้าซื้อ
-                      </Button>,
-                    ]}
-                  >
-                    <List.Item.Meta
-                      title={<Text style={{ color: "white" }}>{g.game_name}</Text>}
-                      description={
-                        <div style={{ color: "#9254de" }}>
-                          {hasDiscount ? (
-                            <>
-                              <span style={{ textDecoration: "line-through", color: "#ccc" }}>
-                                {g.base_price}
-                              </span>
-                              <span style={{ marginLeft: 8 }}>{g.discounted_price}</span>
-                            </>
-                          ) : (
-                            g.base_price
-                          )}
-                        </div>
-                      }
+            {games.length > 0 ? (
+              <Row gutter={[16, 16]}>
+                {games.map((g) => (
+                  <Col key={g.ID} xs={24} sm={12} md={8} lg={6}>
+                    <GameCard
+                      game={g}
+                      imgSrc={resolveImgUrl(g.img_src)}
+                      onBuy={() => navigate(`/game/${g.ID}`)}
                     />
-                  </List.Item>
-                );
-              }}
-            />
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text>
+            )}
             <div style={{ marginTop: 12 }}>
               <Link to="/promotions">
                 <Button>ย้อนกลับ</Button>
