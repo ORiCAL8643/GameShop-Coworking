@@ -34,6 +34,7 @@ type Game struct {
 
 // Hook function ไว้หลังสร้างเกมเสร็จแล้ว keygame จะเจนเอง
 /*func (g *Game) AfterCreate(tx *gorm.DB) (err error) {
+/*func (g *Game) AfterCreate(tx *gorm.DB) (err error) {
 	kg := KeyGame{}
 	if err = tx.Create(&kg).Error; err != nil {
 		return err
