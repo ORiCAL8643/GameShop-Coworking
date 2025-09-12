@@ -21,6 +21,21 @@ var (
 	ErrAlreadyApproved = errors.New("payment already approved")
 )
 
+// NotEnoughKeysError is returned when there are not enough keys for a game.
+// It carries the GameID so callers can inform which game is lacking keys.
+type NotEnoughKeysError struct {
+	GameID uint
+}
+
+func (e NotEnoughKeysError) Error() string {
+	return fmt.Sprintf("%s: game %d", ErrNotEnoughKeys.Error(), e.GameID)
+}
+
+// Is allows errors.Is(e, ErrNotEnoughKeys) to match this error.
+func (e NotEnoughKeysError) Is(target error) bool {
+	return target == ErrNotEnoughKeys
+}
+
 func baseURL(c *gin.Context) string {
 	scheme := "http"
 	if c.Request.TLS != nil {
@@ -320,7 +335,7 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 					return fmt.Errorf("find keys failed: %w", err)
 				}
 				if len(keys) < item.QTY {
-					return fmt.Errorf("%w: game %d", ErrNotEnoughKeys, item.GameID)
+					return NotEnoughKeysError{GameID: item.GameID}
 				}
 				for _, k := range keys {
 					k.OwnedByOrderItemID = &item.ID
