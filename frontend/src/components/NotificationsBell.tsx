@@ -9,7 +9,7 @@ import {
   deleteNotification,
 } from "../services/Notification";
 import { getReportByID } from "../services/Report";
-import type { Notification as AppNotification } from "../interfaces/Notification";
+import type { Notification } from "../interfaces/Notification";
 import type { ProblemReport } from "../interfaces/problem_report";
 
 const { Text, Paragraph } = Typography;
@@ -20,12 +20,12 @@ type Props = {
 };
 
 export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
-  const [items, setItems] = useState<AppNotification[]>([]);
+  const [items, setItems] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
 
   // Modal: detail
   const [viewOpen, setViewOpen] = useState(false);
-  const [viewNoti, setViewNoti] = useState<AppNotification | null>(null);
+  const [viewNoti, setViewNoti] = useState<Notification | null>(null);
   const [viewReport, setViewReport] = useState<ProblemReport | null>(null);
 
   // Modal: image preview
@@ -49,13 +49,17 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     try {
       const raw = await fetchNotifications(userId);
 
-      // เก็บเฉพาะอันล่าสุดต่อ (type + report_id)
-      const map = new Map<string, AppNotification>();
+      // ✅ กรองซ้ำ: เก็บเฉพาะอันล่าสุดต่อ key (type + report_id|ID)
+      const map = new Map<string, Notification>();
       for (const n of raw) {
         const key = `${n.type}:${n.report_id ?? n.ID}`;
         const cur = map.get(key);
         if (!cur) map.set(key, n);
-        else if ((n.created_at || "").toString() > (cur.created_at || "").toString()) map.set(key, n);
+        else {
+          const a = (n.created_at || "").toString();
+          const b = (cur.created_at || "").toString();
+          if (a > b) map.set(key, n);
+        }
       }
 
       const data = Array.from(map.values()).sort((a, b) =>
@@ -80,12 +84,13 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     if (v) await load();
   };
 
-  const openView = async (n: AppNotification) => {
+  const openView = async (n: Notification) => {
     try {
       if (!n.is_read) await markNotificationRead(n.ID);
       setViewNoti(n);
       setViewReport(null);
 
+      // ✅ ถ้าเป็น noti ประเภทตอบกลับ report ดึง "reply ล่าสุด" พร้อมไฟล์แนบ
       if (n.type === "report_reply" && n.report_id) {
         try {
           const rp = await getReportByID(n.report_id);
@@ -215,6 +220,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
+  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน (รองรับทั้ง file_path และ FilePath)
   const renderReportAttachments = () => {
     const replies = viewReport?.replies || [];
     const adminOnly = replies.flatMap((r) => r.attachments || []);
@@ -229,7 +235,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
           {adminOnly.map((att) => {
-            const rawPath = att.file_path ?? att.FilePath ?? "";
+            const rawPath = att.file_path ?? (att as any).FilePath ?? "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
             return (
@@ -253,6 +259,9 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
                     📄 {rawPath.split("/").pop()}
                   </a>
                 )}
+                <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, marginTop: 6 }}>
+                  เปิดในแท็บใหม่
+                </a>
               </div>
             );
           })}
@@ -291,7 +300,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         }
         destroyOnClose
         centered
-        /** ✅ ใช้ styles ของ AntD v5 แทนการแก้ global CSS */
+        // ✅ ใช้ styles ของ AntD v5 เพื่อไม่แตะ global CSS
         styles={{
           content: {
             background: "linear-gradient(135deg,#0f0c29,#1b0033)",
@@ -308,6 +317,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
           footer: { background: "transparent", borderTop: "none" },
         }}
       >
+        {/* ❌ ไม่แสดงข้อความสรุปใน noti ถ้าเป็นประเภท report_reply */}
         {viewNoti?.type !== "report_reply" && (
           <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8, color: "#fff" }}>
             {viewNoti?.message}
