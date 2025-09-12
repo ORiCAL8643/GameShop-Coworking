@@ -41,7 +41,7 @@ const PromotionBanner = ({ promotions, onClick }: PromotionBannerProps) => {
               src={resolveImgUrl(promo.promo_image)}
               alt={promo.title}
               style={{
-                height: 180,
+                height: 400,
                 width: "100%",
                 objectFit: "cover",
                 borderRadius: 10,
@@ -63,7 +63,7 @@ const PromotionBanner = ({ promotions, onClick }: PromotionBannerProps) => {
         src={resolveImgUrl(promo.promo_image)}
         alt={promo.title}
         style={{
-          height: 180,
+          height: 400,
           width: "100%",
           objectFit: "cover",
           borderRadius: 10,
