@@ -363,61 +363,25 @@ const GameDetail: React.FC = () => {
       {/* ===== Content ===== */}
       <Layout>
         <Content style={{ padding: 24 }}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={16}>
-              <Card title="About this game" style={{ background: "#12181f", borderColor: "#23313a" }} headStyle={{ color: "#fff" }}>
-                <Paragraph style={{ color: "#c7d0d9", whiteSpace: "pre-wrap" }}>{desc}</Paragraph>
-                <Divider />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Developer</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.developer ?? "Unknown"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Publisher</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.publisher ?? "Unknown"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Release date</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.release_date ?? "N/A"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Genres</Text>
-                    <div>
-                      <Space size={[6, 6]} wrap>
-                        {tags.map((t) => (
-                          <Tag key={t}>{t}</Tag>
-                        ))}
-                        {tags.length === 0 && <Tag>Action</Tag>}
-                      </Space>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Card
-                title="System Requirements (Minimum)"
-                style={{ background: "#12181f", borderColor: "#23313a" }}
-                headStyle={{ color: "#fff" }}
-              >
-                <div style={{ color: "#c7d0d9" }}>
-                  <p><b>OS:</b> {os}</p>
-                  <p><b>Processor:</b> {cpu}</p>
-                  <p><b>Memory:</b> {ram}</p>
-                  <p><b>Graphics:</b> {gpu}</p>
-                  <p><b>Storage:</b> {storage}</p>
-                </div>
-              </Card>
-            </Col>
-          </Row>
+          <Card
+            title="System Requirements (Minimum)"
+            style={{ marginBottom: 16, background: "#12181f", borderColor: "#23313a" }}
+            headStyle={{ color: "#fff" }}
+          >
+            <div style={{ color: "#c7d0d9" }}>
+              <p><b>OS:</b> {os}</p>
+              <p><b>Processor:</b> {cpu}</p>
+              <p><b>Memory:</b> {ram}</p>
+              <p><b>Graphics:</b> {gpu}</p>
+              <p><b>Storage:</b> {storage}</p>
+            </div>
+          </Card>
 
           {/* Workshop items */}
           <Card
             title={<Space><ToolOutlined /> <span>Workshop Items</span></Space>}
             extra={<Button onClick={() => navigate(`/workshop/${gid}`)}>Browse all</Button>}
-            style={{ marginTop: 16, background: "#12181f", borderColor: "#23313a" }}
+            style={{ background: "#12181f", borderColor: "#23313a" }}
             headStyle={{ color: "#fff" }}
           >
             <Row gutter={[16, 16]}>
