@@ -309,15 +309,6 @@ const GameDetail: React.FC = () => {
               {String(desc).length > 280 ? "…" : ""}
             </Paragraph>
 
-            <Space size="middle" wrap>
-              <Button
-                type="primary"
-                icon={<ShoppingCartOutlined />}
-                onClick={handlePurchase} // ← ใช้งานปุ่ม Purchase
-              >
-                Add to Cart
-              </Button>
-            </Space>
           </div>
 
           {/* Price Card */}
