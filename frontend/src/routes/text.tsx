@@ -15,6 +15,8 @@ import WorkshopMain from "../pages/Workshop/MainPage";
 import WorkshopDetail from "../pages/Workshop/WorkshopDetail";
 import ModDetail from "../pages/Workshop/ModDetail";
 import Workshop from "../pages/Workshop/UploadPage";
+import ReportPage from "../pages/Report/ReportPage";
+import ReportSuccessPage from "../pages/Report/ReportSuccess";
 
 import PromotionManager from "../pages/Promotion/PromotionManager";
 import PromotionDetail from "../pages/Promotion/PromotionDetail";
@@ -27,6 +29,7 @@ import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus";
 
 import AdminPage from "../pages/Admin/AdminPage";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
+import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage"; // ✅ เพิ่ม import นี้
 
 import OrdersStatusPage from "../pages/OrdersStatusPage";
 import Reviewpage from "../pages/Review/Reviewpage.tsx";
@@ -51,10 +54,9 @@ const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "home", element: <Home /> },
 
-
       // ✅ Report
-      //{ path: "/report", element: <ReportPage /> },
-      //{ path: "/report/success", element: <ReportSuccessPage /> },
+      { path: "report", element: <ReportPage /> },
+      { path: "report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
       { path: "information/Add", element: <Add /> },
@@ -117,6 +119,9 @@ const router = createBrowserRouter([
       { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
 
       { path: "Admin/RolePage", element: <RoleManagement /> },
+
+      // ✅ เพิ่มเส้นทางหน้ารายการที่แก้ไขแล้ว (ตรงกับปุ่ม navigate("/Admin/Resolved"))
+      { path: "Admin/Resolved", element: <ResolvedReportsPage /> },
 
       // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
       { path: "orders-status", element: <OrdersStatusPage /> },

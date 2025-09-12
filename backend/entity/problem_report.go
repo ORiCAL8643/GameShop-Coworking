@@ -2,25 +2,34 @@ package entity
 
 import (
 	"time"
+
 	"gorm.io/gorm"
 )
 
+// คำร้องจากลูกค้า
 type ProblemReport struct {
-        gorm.Model
-        Title       string `json:"title"`
-        Description string `json:"description"`
+	gorm.Model
 
-	UserID uint  `json:"user_id"`
-	User   *User `gorm:"foreignKey:UserID" json:"user"`
+	Title       string `json:"title"       gorm:"type:varchar(200);not null"`
+	Description string `json:"description" gorm:"type:text;not null"`
+	Category    string `json:"category"    gorm:"type:varchar(100);default:'Other';index"`
 
-        GameID uint  `json:"game_id"`
-        Game   *Game `gorm:"foreignKey:GameID" json:"game"`
+	// ผู้ส่งคำร้อง
+	UserID uint  `json:"user_id" gorm:"not null;index"`
+	User   *User `json:"user"    gorm:"foreignKey:UserID"`
 
-        Status     string    `json:"status" gorm:"default:open"`
-        ResolvedAt time.Time `json:"resolved_at"` // ✅ เพิ่มฟิลด์นี้
+	// เกมที่เกี่ยวข้อง (ถ้ามี)
+	GameID uint  `json:"game_id" gorm:"index"`
+	Game   *Game `json:"game"    gorm:"foreignKey:GameID"`
 
-        // ✅ ข้อความตอบกลับจากแอดมิน (ถ้ามี)
-        Reply string `json:"reply"`
+	// สถานะการดำเนินงาน
+	// ใช้ค่า: open | in_progress | resolved
+	Status     string     `json:"status"      gorm:"type:varchar(30);default:'open';index"`
+	ResolvedAt *time.Time `json:"resolved_at"` // อนุญาตให้เป็น null
 
-        Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID"`
+	// แนบไฟล์ของลูกค้า
+	Attachments []ProblemAttachment `json:"attachments" gorm:"foreignKey:ReportID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+
+	// ความสัมพันธ์กับตารางตอบกลับของแอดมิน
+	Replies []ProblemReply `json:"replies" gorm:"foreignKey:ReportID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
