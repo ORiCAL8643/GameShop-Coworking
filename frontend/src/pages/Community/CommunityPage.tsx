@@ -1,11 +1,10 @@
+// CommunityPage.tsx
 import { useEffect, useMemo, useState } from "react";
-import { ConfigProvider, theme, message, Space, Select, Typography, Card } from "antd";
+import { App, ConfigProvider, theme, message, Space, Select, Typography, Card } from "antd";
 import axios from "axios";
 import ThreadList from "./ThreadList";
 import ThreadDetail from "./ThreadDetail";
-
-// ปรับ path ให้ตรงกับโปรเจกต์ของคุณ
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from "../../context/AuthContext";
 
 type ThreadImg = { id: number; url: string };
 export type Thread = {
@@ -23,12 +22,12 @@ const { Title, Text } = Typography;
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8088";
 const DEV_USER_ID = Number(import.meta.env.VITE_DEV_USER_ID || 0);
 
-// === helpers ===
+// ===== helpers =====
 function mapThread(t: any): Thread {
   const imgs = (t.images || t.ThreadImages || []).map((img: any) => ({
     id: img.id ?? img.ID,
     url: (img.file_url ?? img.FileURL ?? "").startsWith("/")
-      ? (BASE_URL + (img.file_url ?? img.FileURL))
+      ? BASE_URL + (img.file_url ?? img.FileURL)
       : (img.file_url ?? img.FileURL ?? ""),
   }));
   return {
@@ -45,11 +44,9 @@ function mapThread(t: any): Thread {
 
 function authHeaders(token?: string | null, uid?: number | string | null) {
   const h: Record<string, string> = {};
-  if (token) h["Authorization"] = `Bearer ${token}`;
-  if (!h["Authorization"]) {
-    const id = uid ?? (DEV_USER_ID || null);
-    if (id) h["X-User-ID"] = String(id);
-  }
+  if (token) h["Authorization"] = token.startsWith("Bearer ") ? token : `Bearer ${token}`;
+  if (uid != null && uid !== "") h["X-User-ID"] = String(uid);
+  else if (!token && DEV_USER_ID) h["X-User-ID"] = String(DEV_USER_ID);
   return h;
 }
 
@@ -61,7 +58,6 @@ export default function CommunityPage() {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeId, setActiveId] = useState<number | null>(null);
 
-  // โหลดรายชื่อเกม
   useEffect(() => {
     (async () => {
       try {
@@ -80,7 +76,6 @@ export default function CommunityPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // โหลดเธรดของเกม (public)
   const loadThreads = async (gid = gameId) => {
     if (!gid) return;
     try {
@@ -90,8 +85,7 @@ export default function CommunityPage() {
       setThreads((res.data || []).map(mapThread));
     } catch (e: any) {
       console.error(e);
-      const msg = e?.response?.data?.error || e.message || "โหลดเธรดไม่สำเร็จ";
-      message.error(msg);
+      message.error(e?.response?.data?.error || e.message || "โหลดเธรดไม่สำเร็จ");
     }
   };
   useEffect(() => { loadThreads(); /* eslint-disable-line */ }, [gameId]);
@@ -101,7 +95,6 @@ export default function CommunityPage() {
     [threads, activeId]
   );
 
-  // สร้างเธรดใหม่ (ต้อง auth)
   const createThread = async ({ title, content, files }: { title: string; content: string; files: File[] }) => {
     if (!(token || authId || DEV_USER_ID)) {
       message.error("กรุณาเข้าสู่ระบบก่อนโพสต์");
@@ -117,67 +110,93 @@ export default function CommunityPage() {
       fd.append("content", content);
       fd.append("game_id", String(gameId));
       files.forEach((f) => fd.append("images", f, f.name));
-
-      await axios.post(`${BASE_URL}/threads`, fd, {
-        headers: authHeaders(token, authId),
-      });
-
+      await axios.post(`${BASE_URL}/threads`, fd, { headers: authHeaders(token, authId) });
       message.success("สร้างเธรดสำเร็จ");
       await loadThreads();
       return true;
     } catch (e: any) {
       console.error(e);
-      const msg = e?.response?.data?.error || e.message || "สร้างเธรดไม่สำเร็จ";
-      message.error(msg + (!token && !authId && DEV_USER_ID ? " (ใช้ DEV_USER_ID)" : ""));
+      message.error(e?.response?.data?.error || e.message || "สร้างเธรดไม่สำเร็จ");
       return false;
     }
   };
 
+  // ==== เลย์เอาต์เต็มจอ ฝั่งขวา (เหลือเมนูซ้าย) ====
+  const SIDEBAR_W = 220; // ปรับให้ตรงกับความกว้างแถบซ้ายของคุณ
+
   return (
     <ConfigProvider theme={{ algorithm: theme.darkAlgorithm }}>
-      <div style={{ minHeight: "100vh", background: "#0b0e14" }}>
-        {/* Top bar */}
-        <div style={{ position: "sticky", top: 0, zIndex: 5, background: "rgba(15,18,28,.85)", borderBottom: "1px solid #1f2942" }}>
-          <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 24px", display: "flex", gap: 12, alignItems: "center" }}>
-            <Title level={4} style={{ color: "#e6e6e6", margin: 0 }}>GameShop Community</Title>
-            <div style={{ flex: 1 }} />
-            <Text style={{ color: "#93a0c2" }}>
-              {(token || authId || DEV_USER_ID) ? "พร้อมใช้งานสำหรับโพสต์/ถูกใจ" : "อ่านได้ แต่ยังโพสต์/ถูกใจไม่ได้ (ไม่มีตัวตน)"}
-            </Text>
+      <App>
+        {/* ใช้ fixed + เว้น left = width ของ sidebar เพื่อให้เต็มจริง ๆ */}
+        <div
+          style={{
+            position: "fixed",
+            left: SIDEBAR_W,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            background: "#0b0e14",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* Top bar */}
+          <div
+            style={{
+              flex: "0 0 auto",
+              background: "rgba(15,18,28,.85)",
+              borderBottom: "1px solid #1f2942",
+              width: "100%",
+            }}
+          >
+            <div style={{ padding: "14px 24px", display: "flex", gap: 12, alignItems: "center", width: "100%" }}>
+              <Title level={4} style={{ color: "#e6e6e6", margin: 0 }}>GameShop Community</Title>
+              <div style={{ flex: 1 }} />
+              <Text style={{ color: "#93a0c2" }}>
+                {(token || authId || DEV_USER_ID) ? "พร้อมใช้งานสำหรับโพสต์/ถูกใจ" : "อ่านได้ แต่ยังโพสต์/ถูกใจไม่ได้ (ไม่มีตัวตน)"}
+              </Text>
+            </div>
           </div>
-        </div>
 
-        <div style={{ maxWidth: 1100, margin: "0 auto", padding: 24 }}>
-          {activeThread ? (
-            <ThreadDetail
-              threadId={activeThread.id}
-              onBack={async () => { setActiveId(null); await loadThreads(); }}
-            />
-          ) : (
-            <Space direction="vertical" size="large" style={{ width: "100%" }}>
-              <Card styles={{ body: { padding: 16, background: "#121723" } }} style={{ background: "#121723", border: "1px solid #1f2942", borderRadius: 14 }}>
-                <Space wrap>
-                  <Text style={{ color: "#a8b3cf" }}>เลือกเกม:</Text>
-                  <Select
-                    value={gameId ?? undefined}
-                    onChange={(v) => setGameId(v)}
-                    options={games.map((g) => ({ value: g.id, label: g.name }))}
-                    style={{ minWidth: 240 }}
+          {/* เนื้อหาเลื่อนภายใน */}
+          <div style={{ flex: 1, overflow: "auto" }}>
+            <div style={{ padding: 24, width: "100%", boxSizing: "border-box" }}>
+              {activeThread ? (
+                <ThreadDetail
+                  threadId={activeThread.id}
+                  onBack={async () => { setActiveId(null); await loadThreads(); }}
+                />
+              ) : (
+                <Space direction="vertical" size="large" style={{ width: "100%" }}>
+                  <Card
+                    styles={{ body: { padding: 16, background: "#121723" } }}
+                    style={{ background: "#121723", border: "1px solid #1f2942", borderRadius: 14, width: "100%" }}
+                  >
+                    <Space wrap>
+                      <Text style={{ color: "#a8b3cf" }}>เลือกเกม:</Text>
+                      <Select
+                        value={gameId ?? undefined}
+                        onChange={(v) => setGameId(v)}
+                        options={games.map((g) => ({ value: g.id, label: g.name }))}
+                        style={{ minWidth: 240 }}
+                      />
+                    </Space>
+                  </Card>
+
+                  <ThreadList
+                    threads={threads}
+                    sortBy="latest"
+                    gameId={gameId}
+                    onOpen={(id) => setActiveId(id)}
+                    onCreate={({ title, body, files }) => createThread({ title, content: body, files })}
                   />
                 </Space>
-              </Card>
-
-              <ThreadList
-                threads={threads}
-                sortBy="latest"
-                gameId={gameId}
-                onOpen={(id) => setActiveId(id)}
-                onCreate={({ title, body, files }) => createThread({ title, content: body, files })}
-              />
-            </Space>
-          )}
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      </App>
     </ConfigProvider>
   );
 }

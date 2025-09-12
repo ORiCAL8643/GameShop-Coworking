@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Card, Table, Tag, Space, Button, Typography, Modal, Input, Image,
-  App, Tooltip, Select, message as antdMessage
+  App, Tooltip, Select, 
 } from "antd";
 import {
   CheckCircleOutlined, CloseCircleOutlined, EyeOutlined,
@@ -56,8 +56,9 @@ function normalizeRow(r: any): ReviewablePayment {
 }
 
 export default function AdminPaymentReviewPage() {
-  const appCtx = App.useApp?.();
-  const message = appCtx?.message ?? antdMessage;
+  //const appCtx = App.useApp?.();
+  //const message = appCtx?.message ?? antdMessage;
+  const { modal, message } = App.useApp();
 
   const { id: userId, token } = useAuth() as { id: number | null; token?: string };
 
@@ -107,7 +108,7 @@ export default function AdminPaymentReviewPage() {
 
   // ---- อนุมัติ: ใช้ POST /payments/:id/approve (fallback เป็น PATCH ถ้าจำเป็น) ----
   const approve = (id: number) => {
-    Modal.confirm({
+    modal.confirm({
       title: "ยืนยันการชำระเงินถูกต้อง?",
       icon: <ExclamationCircleOutlined />,
       okText: "อนุมัติ",
