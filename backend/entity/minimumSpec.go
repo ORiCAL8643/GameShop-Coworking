@@ -11,5 +11,4 @@ type MinimumSpec struct {
 	Memory    string `json:"memory" gorm:"type:varchar(20)"`
 	Graphics  string `json:"graphics" gorm:"type:varchar(20)"`
 	Storage   string `json:"storage" gorm:"type:varchar(20)"`
-	Game      Game   `json:"game"`
 }
