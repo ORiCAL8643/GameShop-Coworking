@@ -20,9 +20,7 @@ import {
   StarFilled,
   ToolOutlined,
 } from "@ant-design/icons";
-import axios from "axios";
 import { useCart } from "../../context/CartContext";
-import { useAuth } from "../../context/AuthContext";
 import { getGame, listMods } from "../../services/workshop";
 import { findMinimumSpecForGame, type MinimumSpec } from "../../services/minimumspec";
 import ReviewSection from "../../components/ReviewSection";
@@ -57,8 +55,6 @@ const GameDetail: React.FC = () => {
 
   // contexts
   const { addItem } = useCart();
-  const { id: rawUserId } = useAuth() as { id?: number | string };
-  const userId = React.useMemo(() => (rawUserId != null ? Number(rawUserId) : null), [rawUserId]);
 
   const gid = React.useMemo(() => Number(id), [id]);
 
@@ -160,42 +156,15 @@ const GameDetail: React.FC = () => {
   }, [mods]);
 
   // === NEW: Purchase handler (เหมือน ProductGrid) ===
-  const handlePurchase = async () => {
+  const handlePurchase = () => {
     if (!game) return;
 
     const price = Number((game as any)?.discounted_price ?? (game as any)?.base_price) || 0;
     const gameId = (game as any)?.ID ?? (game as any)?.id;
-    const gameKeyId = (game as any)?.key_id ?? (game as any)?.KeyGameID;
 
-    try {
-      if (userId) {
-        // โฟลว์ backend order
-        const res = await axios.post(`${API_BASE}/orders`, {
-          user_id: Number(userId),
-          total_amount: price,
-          order_status: "PENDING",
-          order_items: [
-            {
-              unit_price: price,
-              qty: 1,
-              game_key_id: gameKeyId, // ใช้ key ของเกมในการสั่งซื้อเหมือน ProductGrid
-            },
-          ],
-        });
-        const orderId = res?.data?.ID ?? res?.data?.id;
-        if (orderId) localStorage.setItem("orderId", String(orderId));
-        msg.success("สร้างออเดอร์เรียบร้อย");
-      } else {
-        // โฟลว์ตะกร้า local
-        msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
-      }
-    } catch (err) {
-      console.error("purchase error:", err);
-      msg.error("ไม่สามารถทำรายการได้");
-    } finally {
-      addItem({ id: Number(gameId), title, price, quantity: 1 });
-      navigate("/category/Payment");
-    }
+    addItem({ id: Number(gameId), title, price, quantity: 1 });
+    msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
+    navigate("/category/Payment");
   };
 
   if (loading && !game) {
