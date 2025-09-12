@@ -12,7 +12,15 @@ const base_url = import.meta.env.VITE_API_URL || "http://localhost:8088";
 
 const resolveImgUrl = (src?: string) => {
   if (!src) return "";
-  if (src.startsWith("data:image/") || src.startsWith("http") || src.startsWith("blob:")) return src;
+  if (src.startsWith("blob:")) return "";
+  if (src.startsWith("data:image/")) return src;
+  if (
+    src.startsWith("http://") ||
+    src.startsWith("https://") ||
+    src.startsWith("blob:")
+  ) {
+    return src;
+  }
   const clean = src.startsWith("/") ? src.slice(1) : src;
   return `${base_url}/${clean}`;
 };
@@ -34,14 +42,16 @@ const Home = () => {
     load();
   }, []);
 
+  const promotionsWithImages = promotions.filter((promo) => promo.promo_image);
+
   return (
     <div style={{ background: '#141414', flex: 1, minHeight: '100vh' }}>
       <Navbar />
       <div style={{ padding: '16px' }}>
-        {promotions.length > 0 && (
-          promotions.length > 1 ? (
+        {promotionsWithImages.length > 0 && (
+          promotionsWithImages.length > 1 ? (
             <Carousel autoplay style={{ marginBottom: 24 }}>
-              {promotions.map((promo) => (
+              {promotionsWithImages.map((promo) => (
                 <img
                   key={promo.ID}
                   src={resolveImgUrl(promo.promo_image)}
@@ -59,8 +69,8 @@ const Home = () => {
             </Carousel>
           ) : (
             <img
-              src={resolveImgUrl(promotions[0].promo_image)}
-              alt={promotions[0].title}
+              src={resolveImgUrl(promotionsWithImages[0].promo_image)}
+              alt={promotionsWithImages[0].title}
               style={{
                 height: 180,
                 width: '100%',
@@ -69,7 +79,7 @@ const Home = () => {
                 marginBottom: 24,
                 cursor: 'pointer',
               }}
-              onClick={() => navigate(`/promotion/${promotions[0].ID}`)}
+              onClick={() => navigate(`/promotion/${promotionsWithImages[0].ID}`)}
             />
           )
         )}
