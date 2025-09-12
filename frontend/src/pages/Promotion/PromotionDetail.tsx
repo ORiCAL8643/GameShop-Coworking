@@ -85,15 +85,9 @@ export default function PromotionDetail() {
               {promotion.title}
             </Title>
             <div style={{ marginTop: 8 }}>
-              <Tag color="magenta" style={{ marginRight: 8 }}>
-                {promotion.discount_type === "PERCENT"
-                  ? `-${promotion.discount_value}%`
-                  : `-${promotion.discount_value}`}
-              </Tag>
               <Tag>
                 {dayjs(promotion.start_date).format("YYYY-MM-DD")} → {dayjs(promotion.end_date).format("YYYY-MM-DD")}
               </Tag>
-              <Tag color={promotion.status ? 'green' : undefined}>{promotion.status ? 'ใช้งาน' : 'ปิดใช้งาน'}</Tag>
             </div>
             {promotion.description && (
               <div style={{ color: "#ccc", marginTop: 8 }}>{promotion.description}</div>
