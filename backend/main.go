@@ -69,27 +69,13 @@ func main() {
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียวพอ
+		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
 		// -------- Threads (READ only = public) --------
-		router.GET("/threads", controllers.FindThreads)                     // ?game_id=&q=
-		router.GET("/threads/:id", controllers.FindThreadByID)              // รายละเอียดเธรด
-		router.GET("/threads/:id/comments", controllers.FindCommentsByThread) // คอมเมนต์แบบแถวเดียว
+		router.GET("/threads", controllers.FindThreads)                        // ?game_id=&q=
+		router.GET("/threads/:id", controllers.FindThreadByID)                 // รายละเอียดเธรด
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)  // คอมเมนต์แบบแถวเดียว
 
-		// ===== Threads =====
-		router.POST("/threads", controllers.CreateThread) // multipart: title, content, game_id, user_id, images[]
-		router.GET("/threads", controllers.FindThreads)   // ?game_id=&q=
-		router.GET("/threads/:id", controllers.FindThreadByID)
-		router.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
-		router.DELETE("/threads/:id", controllers.DeleteThread)
-
-		// ===== Comments (flat) =====
-		router.POST("/threads/:id/comments", controllers.CreateComment)
-		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)
-		router.DELETE("/comments/:id", controllers.DeleteComment)
-
-		// ===== Thread Likes =====
-		router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
 		router.GET("/user-games", controllers.FindUserGames) // ?user_id=
@@ -160,21 +146,21 @@ func main() {
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
-	}
 
-		// ===== Mods =====
+		// -------- Mods --------
 		router.GET("/mods", controllers.GetMods)
 		router.GET("/mods/:id", controllers.GetModById)
 		router.POST("/mods", controllers.CreateMod)
 		router.PATCH("/mods/:id", controllers.UpdateMod)
 		router.DELETE("/mods/:id", controllers.DeleteMod)
 
-		// ===== Mod Ratings =====
+		// -------- Mod Ratings --------
 		router.GET("/modratings", controllers.GetModRatings)
 		router.GET("/modratings/:id", controllers.GetModRatingById)
 		router.POST("/modratings", controllers.CreateModRating)
 		router.PATCH("/modratings/:id", controllers.UpdateModRating)
 		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+	}
 
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
 	authList := r.Group("/", AuthRequired())
@@ -202,8 +188,8 @@ func main() {
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 
 		// -------- Threads (WRITE only = ต้อง auth) --------
-		authList.POST("/threads", controllers.CreateThread)          // multipart
-		authList.PUT("/threads/:id", controllers.UpdateThread)
+		authList.POST("/threads", controllers.CreateThread)          // multipart: title, content, game_id, images[]
+		authList.PUT("/threads/:id", controllers.UpdateThread)       // แก้ title/content
 		authList.DELETE("/threads/:id", controllers.DeleteThread)
 		authList.POST("/threads/:id/comments", controllers.CreateComment)
 		authList.DELETE("/comments/:id", controllers.DeleteComment)
