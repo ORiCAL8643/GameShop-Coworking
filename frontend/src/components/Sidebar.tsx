@@ -3,6 +3,7 @@ import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
+import AdminPageBadge from "./AdminPageBadge";
 
 const { Sider } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -50,10 +51,14 @@ const items: GroupItem[] = [
     label:'การคืนเงินผู้ใช้',
   },
   {
+    key: '/report',
+    label: 'รายงานปัญหา',
+  },
+  {
     key: '/Admin',
     label:'Admin',
     children: [
-        { key: '/Admin/Page', label: 'Page', icon:<PlusOutlined />},
+        { key: '/Admin/Page', label: <AdminPageBadge />, icon:<PlusOutlined />},
         { key: '/Admin/PaymentReviewPage', label: 'PaymentReview', icon:<PlusOutlined />},
         { key: '/Admin/RolePage', label: 'Role', icon:<PlusOutlined />},
     ],
