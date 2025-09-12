@@ -1,18 +1,24 @@
-import { Card, Button } from "antd";
+import { Card } from "antd";
 import type { Game } from "../interfaces/Game";
 
 interface GameCardProps {
   game: Game;
   imgSrc: string;
-  onBuy: () => void;
+  onClick?: () => void;
 }
 
-export default function GameCard({ game, imgSrc, onBuy }: GameCardProps) {
+export default function GameCard({ game, imgSrc, onClick }: GameCardProps) {
   const hasDiscount = game.discounted_price < game.base_price;
 
   return (
     <Card
-      style={{ background: "#1f1f1f", color: "white", borderRadius: 10 }}
+      hoverable
+      style={{
+        background: "#1f1f1f",
+        color: "white",
+        borderRadius: 10,
+        cursor: "pointer",
+      }}
       cover={
         <img
           src={imgSrc}
@@ -20,6 +26,7 @@ export default function GameCard({ game, imgSrc, onBuy }: GameCardProps) {
           style={{ height: 150, objectFit: "cover" }}
         />
       }
+      onClick={onClick}
     >
       <Card.Meta
         title={<div style={{ color: "#fff" }}>{game.game_name}</div>}
@@ -36,9 +43,6 @@ export default function GameCard({ game, imgSrc, onBuy }: GameCardProps) {
           game.base_price
         )}
       </div>
-      <Button block style={{ marginTop: 10 }} onClick={onBuy}>
-        ไปหน้าซื้อ
-      </Button>
     </Card>
   );
 }
