@@ -28,6 +28,7 @@ import { useCart } from "../../context/CartContext";
 import { useAuth } from "../../context/AuthContext";
 import { getGame, listMods } from "../../services/workshop";
 import { findMinimumSpecForGame, type MinimumSpec } from "../../services/minimumspec";
+import ReviewSection from "../../components/ReviewSection";
 import type { Game, Mod } from "../../interfaces";
 
 const { Header, Content, Sider } = Layout;
@@ -501,18 +502,26 @@ const GameDetail: React.FC = () => {
                   </Col>
                 );
               })}
-              {topMods.length === 0 && (
-                <Col span={24} style={{ textAlign: "center", color: "#9aa4ad" }}>
-                  No workshop items for this game yet.
-                </Col>
-              )}
-            </Row>
-          </Card>
-        </Content>
+          {topMods.length === 0 && (
+            <Col span={24} style={{ textAlign: "center", color: "#9aa4ad" }}>
+              No workshop items for this game yet.
+            </Col>
+          )}
+        </Row>
+      </Card>
 
-        {/* Side info */}
-        <Sider width={320} style={{ background: "#0f1419", padding: "24px 16px" }}>
-          <Card
+      <Card
+        title={<Space><StarFilled /><span>User Reviews</span></Space>}
+        style={{ marginTop: 16, background: "#12181f", borderColor: "#23313a" }}
+        headStyle={{ color: "#fff" }}
+      >
+        <ReviewSection gameId={gid} allowCreate className="mt-4" />
+      </Card>
+    </Content>
+
+    {/* Side info */}
+    <Sider width={320} style={{ background: "#0f1419", padding: "24px 16px" }}>
+      <Card
             size="small"
             title={<Space><TagsOutlined /> <span>Tags</span></Space>}
             style={{ background: "#12181f", borderColor: "#23313a", marginBottom: 16 }}
