@@ -18,12 +18,7 @@ func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 // ดึงราคาหลังโปรจริง ๆ ให้ไปเติม logic preload promotion ที่นี่ถ้ามี
 func getDiscountedPriceForGame(db *gorm.DB, gameID uint, now time.Time) (float64, error) {
-	var g entity.Game
-	if err := db.First(&g, gameID).Error; err != nil {
-		return 0, err
-	}
-	// TODO: preload promotion คำนวณราคาจริง ณ เวลา now
-	return float64(g.BasePrice), nil
+	return services.GetDiscountedPriceForGame(db, gameID, now)
 }
 
 type CreateOrderItemInput struct {

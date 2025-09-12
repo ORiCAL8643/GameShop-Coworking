@@ -194,6 +194,9 @@ func main() {
 		authList.POST("/threads/:id/comments", controllers.CreateComment)
 		authList.DELETE("/comments/:id", controllers.DeleteComment)
 		authList.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
+
+		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
+		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
 	}
 
 	// 6) Run server
