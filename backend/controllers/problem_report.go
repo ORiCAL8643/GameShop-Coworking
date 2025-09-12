@@ -1,4 +1,4 @@
-// controllers/report_controller.go
+// backend/controllers/problem_report.go
 package controllers
 
 import (
@@ -17,69 +17,72 @@ import (
 	"gorm.io/gorm"
 )
 
+// ===============================
+// Reports
+// ===============================
+
 // POST /reports (multipart/form-data)
+// fields: title, description, category, user_id, attachments[]
 func CreateReport(c *gin.Context) {
 	db := configs.DB()
 
 	title := strings.TrimSpace(c.PostForm("title"))
 	desc := strings.TrimSpace(c.PostForm("description"))
+	category := strings.TrimSpace(c.PostForm("category"))
 	status := strings.TrimSpace(c.PostForm("status"))
 	if status == "" {
 		status = "open"
 	}
-	userID, _ := strconv.Atoi(c.PostForm("user_id"))
-	gameID, _ := strconv.Atoi(c.PostForm("game_id"))
 
-	if title == "" || desc == "" || userID <= 0 || gameID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
+	// ✅ อ่าน user id จาก X-User-ID ก่อน แล้วค่อย fallback ไป form "user_id"
+	uidStr := strings.TrimSpace(c.GetHeader("X-User-ID"))
+	if uidStr == "" {
+		uidStr = strings.TrimSpace(c.PostForm("user_id"))
+	}
+	userID, _ := strconv.Atoi(uidStr)
+
+	if title == "" || desc == "" || userID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields (title, description, user_id)"})
 		return
 	}
 
-	// ตรวจ FK user / game
-	var u entity.User
-	if err := db.First(&u, userID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
-		} else {
+	// ✅ SOFT-CHECK ผู้ใช้: ถ้าไม่พบก็ยังอนุญาตให้สร้างรายงานต่อได้ (กันเคส dev/test ที่ยังไม่มี record)
+	if err := db.First(&entity.User{}, userID).Error; err != nil {
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
 		}
-		return
+		// ถ้า ErrRecordNotFound: ข้ามไป สร้างต่อได้เลย
 	}
-	var g entity.Game
-	if err := db.First(&g, gameID).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "game not found"})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		}
-		return
-	}
+
+	// ❗ ไม่ใช้ game_id ในระบบนี้แล้ว
 
 	report := entity.ProblemReport{
 		Title:       title,
 		Description: desc,
+		Category:    category,
 		Status:      status,
 		UserID:      uint(userID),
-		GameID:      uint(gameID),
 	}
+
 	if err := db.Create(&report).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// แนบไฟล์ (ของผู้ใช้) → uploads/reports/yyyymmdd/...
+	// แนบไฟล์ผู้ใช้ → uploads/reports/{reportID}/...
 	if form, _ := c.MultipartForm(); form != nil {
 		files := form.File["attachments"]
 		if len(files) == 0 {
 			files = form.File["file"]
 		}
 		if len(files) > 0 {
-			dir := filepath.Join("uploads", "reports", time.Now().Format("20060102"))
+			dir := filepath.Join("uploads", "reports", fmt.Sprintf("%d", report.ID))
 			_ = os.MkdirAll(dir, 0o755)
 			for _, f := range files {
-				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
+				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(f.Filename))
 				dst := filepath.Join(dir, name)
-				relPath := filepath.ToSlash(filepath.Join("uploads", "reports", time.Now().Format("20060102"), name))
+				relPath := "/" + filepath.ToSlash(dst)
 
 				if err := c.SaveUploadedFile(f, dst); err != nil {
 					continue
@@ -92,8 +95,18 @@ func CreateReport(c *gin.Context) {
 		}
 	}
 
-	_ = db.Preload("User").Preload("Attachments").First(&report, report.ID).Error
-	c.JSON(http.StatusCreated, report)
+	// แจ้งเตือนแอดมินทุกคนว่ามีคำร้องใหม่
+	notifyAdminsNewReport(db, &report)
+
+	_ = db.
+		Preload("User").
+		Preload("Attachments").
+		Preload("Replies").
+		Preload("Replies.Admin").
+		Preload("Replies.Attachments").
+		First(&report, report.ID).Error
+
+	c.JSON(http.StatusCreated, gin.H{"data": report})
 }
 
 // GET /reports?user_id=&game_id=&status=&page=&limit=
@@ -117,7 +130,6 @@ func FindReports(c *gin.Context) {
 		}
 	}
 
-	// ✅ รองรับการกรองสถานะ open/resolved (หรือค่าอื่น ๆ)
 	status := strings.TrimSpace(c.Query("status"))
 
 	if v := c.Query("page"); v != "" {
@@ -148,6 +160,9 @@ func FindReports(c *gin.Context) {
 	if err := q.
 		Preload("User").
 		Preload("Attachments").
+		Preload("Replies").
+		Preload("Replies.Admin").
+		Preload("Replies.Attachments").
 		Order("created_at DESC").
 		Offset(offset).
 		Limit(limit).
@@ -156,7 +171,7 @@ func FindReports(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, items)
+	c.JSON(http.StatusOK, gin.H{"data": items})
 }
 
 // GET /reports/:id
@@ -165,7 +180,13 @@ func GetReportByID(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 
 	var rp entity.ProblemReport
-	if err := db.Preload("User").Preload("Attachments").First(&rp, id).Error; err != nil {
+	if err := db.
+		Preload("User").
+		Preload("Attachments").
+		Preload("Replies").
+		Preload("Replies.Admin").
+		Preload("Replies.Attachments").
+		First(&rp, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
 			return
@@ -173,12 +194,13 @@ func GetReportByID(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, rp)
+	c.JSON(http.StatusOK, gin.H{"data": rp})
 }
 
 type updateReportInput struct {
 	Title       *string `json:"title,omitempty"`
 	Description *string `json:"description,omitempty"`
+	Category    *string `json:"category,omitempty"`
 	Status      *string `json:"status,omitempty"`
 	Resolve     *bool   `json:"resolve,omitempty"`
 }
@@ -210,17 +232,21 @@ func UpdateReport(c *gin.Context) {
 	if in.Description != nil {
 		rp.Description = strings.TrimSpace(*in.Description)
 	}
+	if in.Category != nil {
+		rp.Category = strings.TrimSpace(*in.Category)
+	}
 	if in.Status != nil {
 		rp.Status = strings.TrimSpace(*in.Status)
 	}
 	if in.Resolve != nil {
 		if *in.Resolve {
-			rp.ResolvedAt = time.Now()
-			if rp.Status == "open" {
+			now := time.Now()
+			rp.ResolvedAt = &now
+			if rp.Status == "open" || rp.Status == "" {
 				rp.Status = "resolved"
 			}
 		} else {
-			rp.ResolvedAt = time.Time{}
+			rp.ResolvedAt = nil
 			if rp.Status == "resolved" {
 				rp.Status = "open"
 			}
@@ -231,8 +257,14 @@ func UpdateReport(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
-	c.JSON(http.StatusOK, rp)
+	_ = db.
+		Preload("User").
+		Preload("Attachments").
+		Preload("Replies").
+		Preload("Replies.Admin").
+		Preload("Replies.Attachments").
+		First(&rp, rp.ID).Error
+	c.JSON(http.StatusOK, gin.H{"data": rp})
 }
 
 // DELETE /reports/:id
@@ -246,9 +278,63 @@ func DeleteReport(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// ✅ POST /reports/:id/reply
-// ส่งข้อความ/ไฟล์ตอบกลับ แล้ว "สร้าง/อัปเดต" Notification ให้เหลือเพียงเรคคอร์ดเดียวเสมอ ต่อ (user_id, type, report_id)
+// ===============================
+// Admin Replies (แอดมินตอบกลับลูกค้า)
+// ===============================
+
+// POST /reports/:id/reply (multipart/form-data)
+// fields: [admin_id], message หรือ text, attachments[]
+// ใช้โดยหน้า AdminPage ฝั่งคุณ
 func ReplyReport(c *gin.Context) {
+	db := configs.DB()
+	reportID, _ := strconv.Atoi(c.Param("id"))
+	adminID, _ := strconv.Atoi(c.PostForm("admin_id")) // optional
+
+	// ยอมรับทั้ง "message" หรือ "text"
+	msg := strings.TrimSpace(c.PostForm("text"))
+	if msg == "" {
+		msg = strings.TrimSpace(c.PostForm("message"))
+	}
+
+	if reportID <= 0 || msg == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
+		return
+	}
+
+	reply, err := createReplyFlow(c, db, reportID, adminID, msg, /*autoResolve*/ true, /*requireAdmin*/ false)
+	if err != nil {
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": reply})
+}
+
+// POST /admin/reports/:id/replies (multipart/form-data)
+// fields: admin_id, message (หรือ text), attachments[]
+func AdminCreateReply(c *gin.Context) {
+	db := configs.DB()
+	reportID, _ := strconv.Atoi(c.Param("id"))
+	adminID, _ := strconv.Atoi(c.PostForm("admin_id"))
+
+	// ยอมรับทั้ง "message" หรือ "text"
+	msg := strings.TrimSpace(c.PostForm("message"))
+	if msg == "" {
+		msg = strings.TrimSpace(c.PostForm("text"))
+	}
+
+	if reportID <= 0 || adminID <= 0 || msg == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
+		return
+	}
+
+	reply, err := createReplyFlow(c, db, reportID, adminID, msg, /*autoResolve*/ false, /*requireAdmin*/ true)
+	if err != nil {
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": reply})
+}
+
+// PATCH /admin/reports/:id/resolve
+func AdminResolveReport(c *gin.Context) {
 	db := configs.DB()
 	id, _ := strconv.Atoi(c.Param("id"))
 
@@ -262,80 +348,172 @@ func ReplyReport(c *gin.Context) {
 		return
 	}
 
-	text := strings.TrimSpace(c.PostForm("text"))
-
-	// ✅ บันทึกข้อความตอบกลับลงใน report
-	if text != "" {
-		rp.Reply = text
-	}
-
-	// ✅ แนบไฟล์จากแอดมิน (เก็บไว้ที่ uploads/replies/yyyymmdd/...)
-	attachCount := 0
-	if form, _ := c.MultipartForm(); form != nil {
-		files := form.File["attachments"]
-		attachCount = len(files)
-		if attachCount > 0 {
-			dir := filepath.Join("uploads", "replies", time.Now().Format("20060102"))
-			_ = os.MkdirAll(dir, 0o755)
-			for _, f := range files {
-				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), f.Filename)
-				dst := filepath.Join(dir, name)
-				relPath := filepath.ToSlash(filepath.Join("uploads", "replies", time.Now().Format("20060102"), name))
-
-				if err := c.SaveUploadedFile(f, dst); err != nil {
-					continue
-				}
-				_ = db.Create(&entity.ProblemAttachment{
-					FilePath: relPath,
-					ReportID: rp.ID,
-				}).Error
-			}
-		}
-	}
-
-	// ✅ ทำข้อความแจ้งเตือน
-	msg := text
-	if msg == "" {
-		if attachCount > 0 {
-			msg = "แอดมินได้ตอบกลับพร้อมไฟล์แนบ"
-		} else {
-			msg = "แอดมินได้ตอบกลับคำร้องของคุณ"
-		}
-	} else if attachCount > 0 {
-		msg = fmt.Sprintf("%s (แนบไฟล์ %d ไฟล์)", msg, attachCount)
-	}
-
-	// ✅ สร้าง/อัปเดตแจ้งเตือนให้มีเพียงเรคคอร์ดเดียว ต่อ (user_id, type, report_id)
-	var noti entity.Notification
-	err := db.Where("user_id = ? AND type = ? AND report_id = ?", rp.UserID, "report_reply", rp.ID).
-		First(&noti).Error
-
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		_ = db.Create(&entity.Notification{
-			Title:    fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID),
-			Message:  msg,
-			Type:     "report_reply",
-			UserID:   rp.UserID,
-			ReportID: &rp.ID,
-			IsRead:   false,
-		}).Error
-	} else if err == nil {
-		noti.Title = fmt.Sprintf("ตอบกลับคำร้อง #%d", rp.ID)
-		noti.Message = msg
-		noti.IsRead = false
-		_ = db.Save(&noti).Error
-	} else {
-		// error อื่น ๆ ไม่ให้ล้ม flow หลัก
-	}
-
-	// ✅ ปิดงานเป็น resolved
+	now := time.Now()
 	rp.Status = "resolved"
-	rp.ResolvedAt = time.Now()
+	rp.ResolvedAt = &now
+
 	if err := db.Save(&rp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	_ = db.Preload("User").Preload("Attachments").First(&rp, rp.ID).Error
-	c.JSON(http.StatusOK, rp)
+	// แจ้งลูกค้าว่าปิดงานแล้ว
+	makeOrUpdateUserReportNotification(db, rp.UserID, "report_resolved", uint(rp.ID), fmt.Sprintf("คำร้อง #%d ถูกปิดงานเรียบร้อย", rp.ID))
+
+	c.JSON(http.StatusOK, gin.H{"data": gin.H{"id": rp.ID, "status": rp.Status}})
+}
+
+// ===============================
+// Helpers (Reply Flow + Notification)
+// ===============================
+
+func createReplyFlow(c *gin.Context, db *gorm.DB, reportID int, adminID int, msg string, autoResolve bool, requireAdmin bool) (*entity.ProblemReply, error) {
+	// โหลด Report
+	var report entity.ProblemReport
+	if err := db.First(&report, reportID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "report not found"})
+			return nil, err
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil, err
+	}
+
+	// require admin?
+	if requireAdmin && adminID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing admin_id"})
+		return nil, errors.New("missing admin_id")
+	}
+
+	// สร้าง Reply
+	reply := entity.ProblemReply{
+		ReportID: uint(reportID),
+		Message:  msg,
+	}
+	if adminID > 0 {
+		reply.AdminID = uint(adminID)
+	}
+	if err := db.Create(&reply).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return nil, err
+	}
+
+	// แนบไฟล์ → uploads/replies/{replyID}/...
+	attachCount := 0
+	if form, _ := c.MultipartForm(); form != nil {
+		files := form.File["attachments"]
+		if len(files) == 0 {
+			files = form.File["file"]
+		}
+		if len(files) > 0 {
+			attachCount = len(files)
+			dir := filepath.Join("uploads", "replies", fmt.Sprintf("%d", reply.ID))
+			_ = os.MkdirAll(dir, 0o755)
+			for _, f := range files {
+				name := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(f.Filename))
+				dst := filepath.Join(dir, name)
+				relPath := "/" + filepath.ToSlash(dst)
+
+				if err := c.SaveUploadedFile(f, dst); err != nil {
+					continue
+				}
+				_ = db.Create(&entity.ProblemReplyAttachment{
+					ReplyID:  reply.ID,
+					FilePath: relPath,
+				}).Error
+			}
+		}
+	}
+
+	// สร้าง/อัปเดต Notification ให้ลูกค้า
+	makeOrUpdateUserReportNotification(db, report.UserID, "report_reply", uint(report.ID), buildReplyMessage(msg, attachCount))
+
+	// ปิดงานอัตโนมัติกรณี /reports/:id/reply
+	if autoResolve {
+		now := time.Now()
+		report.Status = "resolved"
+		report.ResolvedAt = &now
+		_ = db.Save(&report).Error
+	}
+
+	_ = db.
+		Preload("Admin").
+		Preload("Attachments").
+		First(&reply, reply.ID).Error
+
+	return &reply, nil
+}
+
+func notifyAdminsNewReport(db *gorm.DB, report *entity.ProblemReport) {
+	// เลือกผู้ใช้ที่เป็น Admin ทั้งหมด (สมมติว่ามี roles.name = 'Admin')
+	type adminUser struct {
+		ID   uint
+		Name string
+	}
+	var admins []adminUser
+
+	// หาก schema ของคุณไม่มี roles ให้ปรับส่วนนี้ให้เข้ากับของจริง
+	db.Table("users").
+		Joins("JOIN roles ON roles.id = users.role_id").
+		Where("roles.name = ?", "Admin").
+		Select("users.id, users.name").
+		Scan(&admins)
+
+	for _, a := range admins {
+		_ = db.Create(&entity.Notification{
+			Title:    "📩 มีคำร้องใหม่",
+			Message:  fmt.Sprintf("%s: %s", strings.TrimSpace(report.Category), strings.TrimSpace(report.Title)),
+			Type:     "report_new",
+			UserID:   a.ID,       // ผู้รับ = แอดมิน
+			ReportID: &report.ID, // อ้างอิงคำร้อง
+			IsRead:   false,
+		}).Error
+	}
+}
+
+func makeOrUpdateUserReportNotification(db *gorm.DB, userID uint, typ string, reportID uint, msg string) {
+	var noti entity.Notification
+	err := db.Where("user_id = ? AND type = ? AND report_id = ?", userID, typ, reportID).
+		First(&noti).Error
+
+	title := ""
+	switch typ {
+	case "report_reply":
+		title = fmt.Sprintf("ตอบกลับคำร้อง #%d", reportID)
+	case "report_resolved":
+		title = fmt.Sprintf("ปิดงานคำร้อง #%d", reportID)
+	default:
+		title = "การแจ้งเตือนคำร้อง"
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		_ = db.Create(&entity.Notification{
+			Title:    title,
+			Message:  msg,
+			Type:     typ,
+			UserID:   userID,
+			ReportID: &reportID,
+			IsRead:   false,
+		}).Error
+		return
+	}
+	if err == nil {
+		noti.Title = title
+		noti.Message = msg
+		noti.IsRead = false
+		_ = db.Save(&noti).Error
+	}
+}
+
+func buildReplyMessage(msg string, attachCount int) string {
+	if msg == "" && attachCount > 0 {
+		return "แอดมินได้ตอบกลับพร้อมไฟล์แนบ"
+	}
+	if msg != "" && attachCount > 0 {
+		return fmt.Sprintf("%s (แนบไฟล์ %d ไฟล์)", msg, attachCount)
+	}
+	if msg != "" {
+		return msg
+	}
+	return "แอดมินได้ตอบกลับคำร้องของคุณ"
 }
