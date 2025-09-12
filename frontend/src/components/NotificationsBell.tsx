@@ -219,7 +219,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     <>
       <Popover placement="bottomRight" trigger="click" content={content} open={open} onOpenChange={onOpenChange}>
         <Badge count={unreadCount} size="small">
-          <Button type="text" icon={<BellOutlined style={{ fontSize: 20 }} />} />
+          <Button type="text" icon={<BellOutlined style={{ fontSize: 20, color: "#d3d3d3ff" }} />} />
         </Badge>
       </Popover>
 
