@@ -285,7 +285,26 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 			if err := tx.Save(&p.Order).Error; err != nil {
 				return err
 			}
-			// TODO: จ่ายคีย์เกม/เขียน UserGame ที่นี่ (ภายใน TX นี้)
+			// assign available keygames to each order item
+			var items []entity.OrderItem
+			if err := tx.Where("order_id = ?", p.OrderID).Find(&items).Error; err != nil {
+				return err
+			}
+			for _, it := range items {
+				var keys []entity.KeyGame
+				if err := tx.Where("game_id = ? AND owned_by_order_item_id IS NULL", it.GameID).Limit(it.QTY).Find(&keys).Error; err != nil {
+					return err
+				}
+				if len(keys) < it.QTY {
+					return fmt.Errorf("not enough keygames for game %d", it.GameID)
+				}
+				for _, kg := range keys {
+					oid := it.ID
+					if err := tx.Model(&entity.KeyGame{}).Where("id = ?", kg.ID).Update("owned_by_order_item_id", oid).Error; err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 
 		case "REJECTED":
