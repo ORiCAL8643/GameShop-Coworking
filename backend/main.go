@@ -76,6 +76,20 @@ func main() {
 		router.GET("/threads/:id", controllers.FindThreadByID)              // รายละเอียดเธรด
 		router.GET("/threads/:id/comments", controllers.FindCommentsByThread) // คอมเมนต์แบบแถวเดียว
 
+		// ===== Threads =====
+		router.POST("/threads", controllers.CreateThread) // multipart: title, content, game_id, user_id, images[]
+		router.GET("/threads", controllers.FindThreads)   // ?game_id=&q=
+		router.GET("/threads/:id", controllers.FindThreadByID)
+		router.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
+		router.DELETE("/threads/:id", controllers.DeleteThread)
+
+		// ===== Comments (flat) =====
+		router.POST("/threads/:id/comments", controllers.CreateComment)
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)
+		router.DELETE("/comments/:id", controllers.DeleteComment)
+
+		// ===== Thread Likes =====
+		router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
 		router.GET("/user-games", controllers.FindUserGames) // ?user_id=
