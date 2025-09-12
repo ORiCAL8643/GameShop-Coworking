@@ -15,6 +15,8 @@ import WorkshopMain from "../pages/Workshop/MainPage";
 import WorkshopDetail from "../pages/Workshop/WorkshopDetail";
 import ModDetail from "../pages/Workshop/ModDetail";
 import Workshop from "../pages/Workshop/UploadPage";
+import ReportPage from "../pages/Report/ReportPage";
+import ReportSuccessPage from "../pages/Report/ReportSuccess";
 
 import PromotionManager from "../pages/Promotion/PromotionManager";
 import PromotionDetail from "../pages/Promotion/PromotionDetail";
@@ -51,8 +53,8 @@ const router = createBrowserRouter([
 
 
       // ✅ Report
-      //{ path: "/report", element: <ReportPage /> },
-      //{ path: "/report/success", element: <ReportSuccessPage /> },
+      { path: "report", element: <ReportPage /> },
+      { path: "report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
       { path: "information/Add", element: <Add /> },
