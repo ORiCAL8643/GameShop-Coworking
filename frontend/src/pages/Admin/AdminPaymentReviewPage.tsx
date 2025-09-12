@@ -46,7 +46,7 @@ function normalizeRow(r: any): ReviewablePayment {
     order_id: Number(r.order_id ?? r.OrderID),
     order_no: r.order_no ?? r.OrderNo ?? `ORD-${String(r.order_id ?? r.OrderID ?? "")}`,
     user_name: r.user_name ?? r.UserName ?? "ไม่ระบุ",
-    amount: Number(r.amount ?? r.Amount ?? 0),
+    amount: Number(r.order_total ?? r.OrderTotal ?? r.amount ?? r.Amount ?? 0),
     slip_url: r.slip_url ?? r.SlipURL ?? r.slip_path ?? r.SlipPath ?? "",
     uploaded_at: r.uploaded_at ?? r.UploadedAt ?? r.created_at ?? r.CreatedAt ?? "",
     status: (["PENDING", "APPROVED", "REJECTED"].includes(statusRaw) ? statusRaw : "PENDING") as PaymentStatus,

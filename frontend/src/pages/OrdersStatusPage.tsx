@@ -242,13 +242,19 @@ export default function OrdersStatusPage() {
             {rows.map((o) => {
               const oid = o.ID ?? o.id!;
               const status = (o.OrderStatus ?? o.order_status ?? "").toUpperCase();
-              const items = (o.OrderItems ?? o.order_items ?? []) as OrderItemRow[];
-              const total = items.length
-                ? items.reduce((s, it) =>
-                    s + (it.line_total ?? it.LineTotal ?? (it.unit_price ?? it.UnitPrice ?? 0) * (it.qty ?? it.QTY ?? 0)),
-                    0,
-                  )
-                : (o.TotalAmount ?? o.total_amount ?? 0);
+              const items = (o.OrderItems ?? o.order_items ?? []) as any[];
+              const total =
+                o.TotalAmount ??
+                o.total_amount ??
+                items.reduce(
+                  (sum, it) =>
+                    sum +
+                    (it.LineTotal ??
+                      it.line_total ??
+                      (it.UnitPrice ?? it.unit_price ?? 0) * (it.QTY ?? it.qty ?? 1)),
+                  0,
+                );
+
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
               const canViewKeys = statusAllowsView(status);
