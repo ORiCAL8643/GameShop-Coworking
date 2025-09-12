@@ -72,9 +72,9 @@ func main() {
 		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
 		// -------- Threads (READ only = public) --------
-		router.GET("/threads", controllers.FindThreads)                        // ?game_id=&q=
-		router.GET("/threads/:id", controllers.FindThreadByID)                 // รายละเอียดเธรด
-		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)  // คอมเมนต์แบบแถวเดียว
+		router.GET("/threads", controllers.FindThreads)                       // ?game_id=&q=
+		router.GET("/threads/:id", controllers.FindThreadByID)                // รายละเอียดเธรด
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread) // คอมเมนต์แบบแถวเดียว
 
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
@@ -147,19 +147,11 @@ func main() {
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
 
-		// -------- Mods --------
-		router.GET("/mods", controllers.GetMods)
-		router.GET("/mods/:id", controllers.GetModById)
-		router.POST("/mods", controllers.CreateMod)
-		router.PATCH("/mods/:id", controllers.UpdateMod)
-		router.DELETE("/mods/:id", controllers.DeleteMod)
+		// -------- Mods (READ only = public) --------
+		router.GET("/mods", controllers.GetMods)       // รองรับ ?game_id= & uploader_id= & q=
+		router.GET("/mods/:id", controllers.GetModById) // รายละเอียดม็อดเดียว
 
-		// -------- Mod Ratings --------
-		router.GET("/modratings", controllers.GetModRatings)
-		router.GET("/modratings/:id", controllers.GetModRatingById)
-		router.POST("/modratings", controllers.CreateModRating)
-		router.PATCH("/modratings/:id", controllers.UpdateModRating)
-		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+		// ⚠️ ย้าย POST/PATCH/DELETE ไปกลุ่ม Auth ด้านล่าง
 	}
 
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
@@ -194,6 +186,12 @@ func main() {
 		authList.POST("/threads/:id/comments", controllers.CreateComment)
 		authList.DELETE("/comments/:id", controllers.DeleteComment)
 		authList.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
+
+		// -------- Mods (WRITE + Mine = ต้อง auth) --------
+		authList.POST("/mods", controllers.CreateMod)      // บันทึก user_id ของผู้อัปโหลด
+		authList.PATCH("/mods/:id", controllers.UpdateMod) // แก้ข้อมูลม็อด
+		authList.DELETE("/mods/:id", controllers.DeleteMod)
+		authList.GET("/mods/mine", controllers.GetMyMods)  // ดึงเฉพาะม็อดของฉัน
 	}
 
 	// 6) Run server
@@ -258,7 +256,7 @@ func AuthRequired() gin.HandlerFunc {
 			}
 		}
 
-		// 2) สำรอง: X-User-ID
+		// 2) สำรอง: X-User-ID (ใช้ได้ตอน dev/testing)
 		if userID == 0 {
 			if v := c.GetHeader("X-User-ID"); v != "" {
 				if n, err := strconv.Atoi(v); err == nil && n > 0 {
