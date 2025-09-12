@@ -84,6 +84,15 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
       // sort ล่าสุดขึ้นก่อน
       normalized.sort((a, b) => (b.UpdatedAt || "").localeCompare(a.UpdatedAt || ""));
 
+      // หากมีรีวิวของผู้ใช้เอง ให้ย้ายขึ้นมาไว้ด้านบนสุด
+      if (typeof userId === "number") {
+        const myIndex = normalized.findIndex((r) => r.user_id === userId);
+        if (myIndex >= 0) {
+          const [mine] = normalized.splice(myIndex, 1);
+          normalized.unshift(mine);
+        }
+      }
+
       // หา user_id ที่ยังไม่มี username แล้วดึงชื่อมาเติม
       const missingIds = Array.from(
         new Set(
@@ -168,7 +177,19 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
           },
           token || undefined
         );
-        setItems((prev) => prev.map((it) => (it.ID === editing.ID ? { ...it, ...saved, rating } : it)));
+        setItems((prev) => {
+          const updated = prev.map((it) =>
+            it.ID === editing.ID ? { ...it, ...saved, rating } : it
+          );
+          if (typeof userId === "number") {
+            const myIndex = updated.findIndex((r) => r.user_id === userId);
+            if (myIndex >= 0) {
+              const [mine] = updated.splice(myIndex, 1);
+              updated.unshift(mine);
+            }
+          }
+          return updated;
+        });
         message.success("อัปเดตรีวิวแล้ว");
       } else {
         if (!userId) {
