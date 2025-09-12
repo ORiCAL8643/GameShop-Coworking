@@ -29,11 +29,8 @@ import AdminPage from "../pages/Admin/AdminPage";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
 
 import OrdersStatusPage from "../pages/OrdersStatusPage";
-<<<<<<< HEAD
 import Reviewpage from "../pages/Review/Reviewpage.tsx";
-=======
 import GameDetail from "../pages/Game/GameDetail";
->>>>>>> main
 
 // mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
 const refunds: Refund[] = [
