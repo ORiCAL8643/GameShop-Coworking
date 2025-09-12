@@ -1,7 +1,8 @@
 import { Layout, Space, Button, Select } from 'antd';
 import Navbar from "../components/Navbar";
-import { Typography, Input, DatePicker, Result } from "antd";
+import { Typography, Input, DatePicker, Result} from "antd";
 import { Col, Row } from 'antd';
+import { Link } from 'react-router-dom';
 import  axios  from 'axios';
 import type { Game } from '../interfaces';
 import { useState, useEffect} from 'react';
@@ -46,7 +47,7 @@ const Request = () => {
     }, [])
 
     const pendingGames = game ? game.filter(g => g.status === "pending") : [];
-    return(<div style={{background: '#141414', flex: 1 , minHeight: '100vh'}}>{(game || pendingGames.length !== 0) ? (
+    return(<div style={{background: '#141414', flex: 1 , minHeight: '100vh'}}>{(pendingGames.length !== 0) ? (
         <Layout style={{flex: 1}}>
             <Layout style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
                 <Navbar />
@@ -79,7 +80,7 @@ const Request = () => {
                     </Row>
                 </div>
             </Layout>
-        </Layout> ) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist."</div>} extra={<Button type="primary" style={{justifyContent: "center", color:'#ffffffff'}}>Back Home</Button>}/>)
+        </Layout> ) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist.maybe not have game is pending."</div>}  extra={[<Link to="/home"><Button type="primary">Back Home</Button></Link>]}/>)
         }</div>
     );
 };

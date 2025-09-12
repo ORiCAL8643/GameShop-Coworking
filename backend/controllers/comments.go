@@ -8,14 +8,19 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // POST /threads/:id/comments
 type createCommentBody struct {
-	UserID  *uint  `json:"user_id"` // optional
 	Content string `json:"content" binding:"required"`
 }
 func CreateComment(c *gin.Context) {
+	uid := c.GetUint("userID")
+	if uid == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	var body createCommentBody
 	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Content) == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "content required"})
@@ -29,47 +34,32 @@ func CreateComment(c *gin.Context) {
 		return
 	}
 
-	// ถ้ามี user_id -> เช็คว่ามีจริง (optional)
-	if body.UserID != nil && *body.UserID > 0 {
-		var u entity.User
-		if tx := db.First(&u, *body.UserID); tx.RowsAffected == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "user_id not found"})
-			return
-		}
-	}
-
 	row := entity.Comment{
 		Content:  strings.TrimSpace(body.Content),
 		ThreadID: th.ID,
-		UserID:   body.UserID,
+		UserID:   uid,
 	}
 	if err := db.Create(&row).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	// เพิ่มตัวนับ comment
+	db.Model(&entity.Thread{}).Where("id = ?", th.ID).
+		UpdateColumn("comment_count", gorm.Expr("comment_count + 1"))
 
-	// เพิ่มตัวนับคอมเมนต์
-	_ = db.Model(&entity.Thread{}).Where("id = ?", th.ID).Update("comment_count", th.CommentCount+1).Error
-
-	_ = db.Preload("User").Preload("Thread").First(&row, row.ID)
+	_ = db.Preload("User").First(&row, row.ID)
 	c.JSON(http.StatusCreated, row)
 }
 
 // GET /threads/:id/comments?limit=&offset=
 func FindCommentsByThread(c *gin.Context) {
-	var th entity.Thread
-	if tx := configs.DB().First(&th, c.Param("id")); tx.RowsAffected == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
-		return
-	}
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "200"))
 	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
 
 	var rows []entity.Comment
-	if err := configs.DB().
-		Preload("User").
-		Where("thread_id = ?", th.ID).
-		Order("id ASC"). // เรียงบนลงล่าง
+	if err := configs.DB().Preload("User").
+		Where("thread_id = ?", c.Param("id")).
+		Order("id ASC"). // เรียงเป็นแถวเดียว
 		Limit(limit).Offset(offset).
 		Find(&rows).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -81,7 +71,6 @@ func FindCommentsByThread(c *gin.Context) {
 // DELETE /comments/:id
 func DeleteComment(c *gin.Context) {
 	db := configs.DB()
-
 	var row entity.Comment
 	if tx := db.First(&row, c.Param("id")); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "id not found"})
@@ -91,10 +80,7 @@ func DeleteComment(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	// ลดตัวนับคอมเมนต์
-	_ = db.Model(&entity.Thread{}).
-		Where("id = ?", row.ThreadID).
-		Update("comment_count", gormExprDecrement("comment_count", 1)).Error
-
+	db.Model(&entity.Thread{}).Where("id = ?", row.ThreadID).
+		UpdateColumn("comment_count", gorm.Expr("CASE WHEN comment_count > 0 THEN comment_count - 1 ELSE 0 END"))
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successful"})
 }

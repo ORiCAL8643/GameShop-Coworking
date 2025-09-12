@@ -1,6 +1,7 @@
 import { Card, Table, Typography, Select, Button, message } from "antd";
 import { Col, Row , Result} from 'antd';
 import type { ColumnsType } from "antd/es/table";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import type { Request } from "../interfaces/Request";
@@ -78,7 +79,7 @@ export default function Requestinfo() {
     const pendingGames = game ? game.filter(g => g.status === "pending") : [];
 
 
-  return (<div>{(game || pendingGames.length !== 0) ? (
+  return (<div><div>{(pendingGames.length !== 0) ? (
     <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
         bodyStyle={{ padding: 20 }}
@@ -135,7 +136,7 @@ export default function Requestinfo() {
           </Button>
         </Col>
       </Row>
-    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist."</div>} extra={<Button type="primary" style={{justifyContent: "center", color:'#ffffffff'}}>Back Home</Button>}/>)
-  }</div>
+    </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist.maybe not have game is pending."</div>} extra={[<Link to="/home"><Button type="primary">Back Home</Button></Link>]}/>)
+  }</div></div>
   );
 }

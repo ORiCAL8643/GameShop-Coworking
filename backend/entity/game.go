@@ -9,7 +9,7 @@ import (
 type Game struct {
 	gorm.Model
 	GameName       string     `json:"game_name"`
-	KeyGameID      uint       `json:"key_id"`
+	//KeyGameID      uint       `json:"key_id"`
 	CategoriesID   int        `json:"categories_id"`
 	Categories     Categories `json:"categories" gorm:"foreignkey:CategoriesID"`
 	Date           time.Time  `json:"release_date" gorm:"autoCreateTime"`
@@ -33,10 +33,12 @@ type Game struct {
 }
 
 // Hook function ไว้หลังสร้างเกมเสร็จแล้ว keygame จะเจนเอง
-func (g *Game) AfterCreate(tx *gorm.DB) (err error) {
+/*func (g *Game) AfterCreate(tx *gorm.DB) (err error) {
+/*func (g *Game) AfterCreate(tx *gorm.DB) (err error) {
 	kg := KeyGame{}
 	if err = tx.Create(&kg).Error; err != nil {
 		return err
 	}
 	return tx.Model(g).Update("key_game_id", kg.ID).Error
 }
+*/

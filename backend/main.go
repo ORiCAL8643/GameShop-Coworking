@@ -1,3 +1,4 @@
+// main.go
 package main
 
 import (
@@ -24,14 +25,12 @@ func main() {
 
 	// 2) Static & CORS
 	r.Use(gin.Logger(), gin.Recovery(), CORSMiddleware())
-
-	// static สำหรับไฟล์อัปโหลด
 	r.Static("/uploads", "./uploads")
 
 	// 3) health check
 	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
 
-	// 4) กลุ่มเส้นทางหลัก (public)
+	// 4) กลุ่มเส้นทางสาธารณะ (ไม่ต้อง auth)
 	router := r.Group("/")
 	{
 		// -------- Auth --------
@@ -71,23 +70,13 @@ func main() {
 		router.GET("/game", controllers.FindGames)
 		router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		// ✅ ลงทะเบียนครั้งเดียวพอ (แก้ปัญหา panic: handlers are already registered)
-		router.POST("/upload/game", controllers.UploadGame)
+		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
-		// ===== Threads =====
-		router.POST("/threads", controllers.CreateThread)             // multipart: title, content, game_id, user_id, images[]
-		router.GET("/threads", controllers.FindThreads)               // ?game_id=&q=
-		router.GET("/threads/:id", controllers.FindThreadByID)
-		router.PUT("/threads/:id", controllers.UpdateThread)          // แก้ title/content
-		router.DELETE("/threads/:id", controllers.DeleteThread)
+		// -------- Threads (READ only = public) --------
+		router.GET("/threads", controllers.FindThreads)                        // ?game_id=&q=
+		router.GET("/threads/:id", controllers.FindThreadByID)                 // รายละเอียดเธรด
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)  // คอมเมนต์แบบแถวเดียว
 
-		// ===== Comments (flat) =====
-		router.POST("/threads/:id/comments", controllers.CreateComment)
-		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)
-		router.DELETE("/comments/:id", controllers.DeleteComment)
-
-// ===== Thread Likes =====
-router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
 		router.GET("/user-games", controllers.FindUserGames) // ?user_id=
@@ -141,14 +130,13 @@ router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// -------- KeyGames --------
 		router.POST("/keygames", controllers.CreateKeyGame)
 		router.GET("/keygames", controllers.FindKeyGames)
-		// router.GET("/keygames/:id", controllers.FindKeyGameByID)
 		router.DELETE("/keygames/:id", controllers.DeleteKeyGame)
 
 		// -------- MinimumSpec --------
 		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
-		// ===== Problem Reports =====
+		// -------- Problem Reports --------
 		router.POST("/reports", controllers.CreateReport)
 		router.GET("/reports", controllers.FindReports)
 		router.GET("/reports/:id", controllers.GetReportByID)
@@ -156,17 +144,29 @@ router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
 
-		// ❌ (ลบอันที่ซ้ำออก) ห้ามลงทะเบียน /upload/game ซ้ำ
-		// router.POST("/upload/game", controllers.UploadGame)
-
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
+
+		// -------- Mods --------
+		router.GET("/mods", controllers.GetMods)
+		router.GET("/mods/:id", controllers.GetModById)
+		router.POST("/mods", controllers.CreateMod)
+		router.PATCH("/mods/:id", controllers.UpdateMod)
+		router.DELETE("/mods/:id", controllers.DeleteMod)
+
+		// -------- Mod Ratings --------
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
+		router.PATCH("/modratings/:id", controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", controllers.DeleteModRating)
 	}
 
-	// -------- Routes ที่ต้อง Auth --------
+	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
 	authList := r.Group("/", AuthRequired())
 	{
+		// ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
 		withUserQuery := authList.Group("/", InjectUserIDQuery())
 		{
 			withUserQuery.GET("/orders", controllers.FindOrders)
@@ -185,19 +185,24 @@ router.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
-		authList.GET("/payments", controllers.FindPayments)
 		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
+
+		// -------- Threads (WRITE only = ต้อง auth) --------
+		authList.POST("/threads", controllers.CreateThread)          // multipart: title, content, game_id, images[]
+		authList.PUT("/threads/:id", controllers.UpdateThread)       // แก้ title/content
+		authList.DELETE("/threads/:id", controllers.DeleteThread)
+		authList.POST("/threads/:id/comments", controllers.CreateComment)
+		authList.DELETE("/comments/:id", controllers.DeleteComment)
+		authList.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
 	}
 
-	// 5) Run server
-	// ใช้ localhost ตามเดิมเพื่อไม่กระทบสภาพแวดล้อมอื่น
+	// 6) Run server
 	r.Run("localhost:" + PORT)
 }
 
 // ---------------------- Middlewares ----------------------
 
-// CORS แบบผ่อนคลาย
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
@@ -214,27 +219,24 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-// AuthRequired:
-// - อ่าน user id จาก Bearer JWT (sub หรือ user_id) หรือ X-User-ID
-// - เซ็ต c.Set("userID", <uint>) และ (option) c.Set("roleID", <uint>)
+// AuthRequired: อ่าน user id จาก Bearer JWT (sub/user_id) หรือ X-User-ID
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var userID uint
 
-		// 1) ลองจาก Bearer token
+		// 1) Bearer token
 		authz := c.GetHeader("Authorization")
 		if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
 			raw := strings.TrimSpace(authz[7:])
 			if raw != "" {
 				secret := []byte(os.Getenv("JWT_SECRET"))
 				if len(secret) == 0 {
-					secret = []byte("secret") // fallback ให้ตรงกับตอน Login ถ้าใช้ค่าคงที่
+					secret = []byte("secret")
 				}
 				if token, _ := jwt.Parse(raw, func(t *jwt.Token) (interface{}, error) {
 					return secret, nil
 				}); token != nil && token.Valid {
 					if claims, ok := token.Claims.(jwt.MapClaims); ok {
-						// sub เป็น string ตาม RegisteredClaims
 						if sub, ok2 := claims["sub"].(string); ok2 {
 							if n, err := strconv.Atoi(sub); err == nil && n > 0 {
 								userID = uint(n)
@@ -271,10 +273,10 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 
-		// set ลง context
+		// set context
 		c.Set("userID", userID)
 
-		// (option) เติม roleID — รองรับทั้ง *uint และ uint
+		// เติม roleID (รองรับทั้ง *uint และ uint)
 		var u entity.User
 		if err := configs.DB().Select("id, role_id").First(&u, userID).Error; err == nil {
 			switch v := any(getRoleField(u)).(type) {
@@ -288,17 +290,14 @@ func AuthRequired() gin.HandlerFunc {
 				}
 			}
 		}
-
 		c.Next()
 	}
 }
 
-// getRoleField ดึงค่า role_id ออกมา รองรับ model ที่ประกาศ role เป็น *uint หรือ uint
-func getRoleField(u entity.User) interface{} {
-	return any(u.RoleID)
-}
+// รองรับ role_id ที่อาจประกาศเป็น pointer หรือไม่เป็น
+func getRoleField(u entity.User) interface{} { return any(u.RoleID) }
 
-// InjectUserIDQuery: ใช้เฉพาะ GET /orders และ GET /payments
+// InjectUserIDQuery: ใส่ user_id ลง query ให้ /orders และ /payments (เฉพาะ GET)
 func InjectUserIDQuery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		fp := c.FullPath()
