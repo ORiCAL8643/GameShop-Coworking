@@ -1,164 +1,100 @@
-// src/pages/Community/ThreadList.tsx
 import { useMemo, useState } from "react";
-import {
-  Avatar, Badge, Button, Card, Input, Space, Typography, Upload
-} from "antd";
-import {
-  LikeOutlined, MessageOutlined, PictureOutlined, SendOutlined, UserOutlined
-} from "@ant-design/icons";
-import type { UploadFile } from "antd/es/upload/interface"; // ✅
-import type { Thread, CreateThreadPayload } from "./types";
+import { Button, Card, Input, Space, Typography, Upload } from "antd";
+import { PlusOutlined, UploadOutlined } from "@ant-design/icons";
+import type { UploadFile } from "antd/es/upload/interface";
+import type { Thread } from "./CommunityPage";
 
 const { Title, Text } = Typography;
 
 type Props = {
   threads: Thread[];
   sortBy: "latest" | "likes" | "comments";
-  onOpen: (threadId: number) => void;
-  onCreate: (payload: CreateThreadPayload & { images?: string[] }) => void; // ✅
+  gameId: number | null;
+  onOpen: (id: number) => void;
+  onCreate: (payload: { title: string; body: string; files: File[] }) => void;
 };
 
-export default function ThreadList({ threads, sortBy, onOpen, onCreate }: Props) {
+export default function ThreadList({ threads, sortBy, gameId, onOpen, onCreate }: Props) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [files, setFiles] = useState<UploadFile[]>([]); // ✅ เก็บไฟล์ภาพที่เลือก
+  // เก็บเป็น UploadFile[] (ของ antd) เพื่อให้มี uid ใช้กับ Upload ได้
+  const [files, setFiles] = useState<UploadFile[]>([]);
 
-  const canSubmit = title.trim() && body.trim();
+  const disabled = !gameId || !title.trim() || !body.trim();
 
-  // แปลงไฟล์เป็น preview URL
-  const toUrls = (list: UploadFile[]) =>
-    list
-      .map((f) => (f.originFileObj ? URL.createObjectURL(f.originFileObj) : (f.url as string)))
-      .filter(Boolean) as string[];
-
-  const resetForm = () => {
-    // cleanup object URLs
-    files.forEach((f) => {
-      if (f.originFileObj) URL.revokeObjectURL(URL.createObjectURL(f.originFileObj));
-    });
-    setTitle("");
-    setBody("");
-    setFiles([]);
-  };
-
-  const sortedThreads = useMemo(() => {
+  const sorted = useMemo(() => {
     const arr = [...threads];
-    return arr.sort((a, b) => {
-      if (sortBy === "likes") return b.likes - a.likes;
-      if (sortBy === "comments")
-        return b.commentCount - a.commentCount;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
+    if (sortBy === "likes") arr.sort((a, b) => b.likeCount - a.likeCount);
+    else if (sortBy === "comments") arr.sort((a, b) => b.commentCount - a.commentCount);
+    else arr.sort((a, b) => b.id - a.id); // latest
+    return arr;
   }, [threads, sortBy]);
 
-  const sortLabel =
-    sortBy === "likes" ? "Likes" : sortBy === "comments" ? "Comments" : "Latest";
+  const handleCreate = () => {
+    const fileObjs: File[] = files
+      .map(f => f.originFileObj as File | undefined)
+      .filter((f): f is File => !!f);
+    onCreate({ title: title.trim(), body: body.trim(), files: fileObjs });
+  };
 
   return (
     <Space direction="vertical" size="large" style={{ width: "100%" }}>
-      {/* กล่องสร้างเธรดใหม่ */}
-      <Card className="community-card">
-        <Title level={4} style={{ color: "#fff", marginTop: 0 }}>
-          เริ่มกระดานสนทนาใหม่
-        </Title>
-
-        <div className="dark-input">
+      {/* ฟอร์มสร้างเธรด */}
+      <Card
+        styles={{ body: { background: "#121723", padding: 18 } }}
+        style={{ background: "#121723", border: "1px solid #1f2942", borderRadius: 14 }}
+        title={<Title level={5} style={{ color: "#e6e6e6", margin: 0 }}>สร้างเธรดใหม่</Title>}
+      >
+        <Space direction="vertical" style={{ width: "100%" }} size="middle">
           <Input
+            placeholder="หัวข้อ"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="กรอกหัวข้อ"
-            style={{ marginBottom: 8 }}
+            style={{ background: "#0f1420", color: "#e6e6e6", borderColor: "#2a3655" }}
           />
           <Input.TextArea
+            placeholder="รายละเอียดเธรด"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             autoSize={{ minRows: 3, maxRows: 8 }}
-            placeholder="พูดอะไรสักอย่างสิ"
-            style={{ marginBottom: 8 }}
+            style={{ background: "#0f1420", color: "#e6e6e6", borderColor: "#2a3655" }}
           />
-        </div>
 
-        {/* ✅ ปุ่ม/รายการรูปภาพ (เฉพาะสร้างเธรด) */}
-        <Upload
-          multiple
-          accept="image/*"
-          listType="picture-card"
-          fileList={files}
-          beforeUpload={() => false}               // ไม่อัปโหลดขึ้นเซิร์ฟเวอร์ทันที
-          onChange={({ fileList }) => setFiles(fileList)}
-          onRemove={(file) => {
-            setFiles((prev) => prev.filter((f) => f.uid !== file.uid));
-          }}
-        >
-          {/* ปุ่มเพิ่มภาพ */}
-          <div style={{ color: "#fff" }}>
-            <PictureOutlined /> <div style={{ marginTop: 4 }}>แนบรูป</div>
-          </div>
-        </Upload>
-
-        <Space style={{ marginTop: 8 }}>
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
-            disabled={!canSubmit}
-            onClick={() => {
-              onCreate({
-                title: title.trim(),
-                body: body.trim(),
-                images: toUrls(files),          // ✅ ส่ง URL ของรูปไปเก็บกับเธรด
-              });
-              resetForm();
-            }}
+          {/* แนบรูป — คุมด้วย fileList + onChange */}
+          <Upload
+            multiple
+            accept="image/*"
+            fileList={files}
+            beforeUpload={() => false}           // ไม่อัปโหลดอัตโนมัติ
+            onChange={({ fileList }) => setFiles(fileList)} // antd จะจัดการ uid ให้เอง
           >
-            โพสต์กระดานสนทนา
-          </Button>
+            <Button icon={<UploadOutlined />}>แนบรูป</Button>
+          </Upload>
+
+          <div style={{ display: "flex", gap: 12 }}>
+            <Button type="primary" icon={<PlusOutlined />} disabled={disabled} onClick={handleCreate}>
+              โพสต์เธรด
+            </Button>
+            {!gameId && <Text type="secondary">กรุณาเลือกเกมก่อน</Text>}
+          </div>
         </Space>
       </Card>
 
-      <Text style={{ color: "#ccc" }}>Sorted by: {sortLabel}</Text>
-
-      {/* รายการเธรดทั้งหมด */}
-      {sortedThreads.map((t) => (
+      {/* รายการเธรด */}
+      {sorted.map((t) => (
         <Card
           key={t.id}
-          className="community-card"
-          bodyStyle={{ padding: 20 }}
-          hoverable
+          styles={{ body: { background: "#101524", padding: 18 } }}
+          style={{ background: "#101524", border: "1px solid #1f2942", borderRadius: 14, cursor: "pointer" }}
           onClick={() => onOpen(t.id)}
         >
-          <Space direction="vertical" size="small" style={{ width: "100%" }}>
-            <Title level={4} style={{ color: "#fff", margin: 0 }}>
-              {t.title}
-            </Title>
-            <Text style={{ color: "#ccc" }}>{t.body}</Text>
-
-            {/* แสดงรูปแนบ (ถ้ามี) */}
-            {!!t.images?.length && (
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                {t.images.map((src, i) => (
-                  <img
-                    key={i}
-                    src={src}
-                    alt={`thread-img-${i}`}
-                    style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 8, border: "1px solid #303030" }}
-                  />
-                ))}
-              </div>
-            )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Avatar icon={<UserOutlined />} />
-                <Text style={{ color: "#aaa" }}>by {t.author} · {t.createdAt}</Text>
-              </div>
-              <Space>
-                <Button icon={<LikeOutlined />} shape="circle" />
-                <Badge count={t.commentCount} size="small">
-                  <Button icon={<MessageOutlined />} shape="circle" />
-                </Badge>
-              </Space>
-            </div>
-          </Space>
+          <Title level={5} style={{ color: "#e6e6e6", marginTop: 0 }}>{t.title}</Title>
+          <Text style={{ color: "#a8b3cf" }}>{t.author || "ไม่ระบุ"}</Text>
+          <div style={{ color: "#93a0c2", fontSize: 12 }}>
+            {t.createdAt ? new Date(t.createdAt).toLocaleString() : ""}
+          </div>
+          <div style={{ height: 6 }} />
+          <div style={{ color: "#cfd7ef" }}>{t.content}</div>
         </Card>
       ))}
     </Space>
