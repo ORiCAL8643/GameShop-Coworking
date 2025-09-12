@@ -269,7 +269,7 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 	db := configs.DB()
 
 	var p entity.Payment
-	if err := db.Preload("Order").First(&p, paymentID).Error; err != nil {
+	if err := db.Preload("Order").Preload("Order.OrderItems").First(&p, paymentID).Error; err != nil {
 		return err
 	}
 
@@ -285,7 +285,34 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 			if err := tx.Save(&p.Order).Error; err != nil {
 				return err
 			}
-			// TODO: จ่ายคีย์เกม/เขียน UserGame ที่นี่ (ภายใน TX นี้)
+
+			// Allocate game keys and grant games to user
+			for _, item := range p.Order.OrderItems {
+				var keys []entity.KeyGame
+				if err := tx.Where("game_id = ? AND owned_by_order_item_id IS NULL", item.GameID).
+					Limit(item.QTY).Find(&keys).Error; err != nil {
+					return err
+				}
+				if len(keys) < item.QTY {
+					return fmt.Errorf("not enough keys for game %d", item.GameID)
+				}
+				for _, k := range keys {
+					k.OwnedByOrderItemID = &item.ID
+					if err := tx.Save(&k).Error; err != nil {
+						return err
+					}
+					ug := entity.UserGame{
+						UserID:             p.Order.UserID,
+						GameID:             item.GameID,
+						GrantedByPaymentID: p.ID,
+						GrantedAt:          time.Now(),
+					}
+					if err := tx.Create(&ug).Error; err != nil {
+						return err
+					}
+				}
+			}
+
 			return nil
 
 		case "REJECTED":
