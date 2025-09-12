@@ -1,5 +1,5 @@
 import type { ProblemAttachment } from "./problem_attachment";
-import type { ProblemReply } from "../interfaces/problem_reply";
+import type { ProblemReply } from "./problem_reply";
 import type { User } from "./User";
 import type { Game } from "./Game";
 

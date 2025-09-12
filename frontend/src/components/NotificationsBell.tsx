@@ -76,8 +76,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     load();
     const t = setInterval(load, pollMs);
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, pollMs]);
+  }, [userId, pollMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onOpenChange = async (v: boolean) => {
     setOpen(v);
@@ -220,7 +219,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน (รองรับทั้ง file_path และ FilePath)
+  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน
   const renderReportAttachments = () => {
     const replies = viewReport?.replies || [];
     const adminOnly = replies.flatMap((r) => r.attachments || []);
@@ -235,11 +234,14 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
           {adminOnly.map((att) => {
-            const rawPath = att.file_path ?? (att as any).FilePath ?? "";
+            const rawPath = att.file_path ?? att.FilePath ?? "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
             return (
-              <div key={att.ID} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div
+                key={att.ID}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+              >
                 {isImg ? (
                   <img
                     src={url}
@@ -252,7 +254,10 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
                       cursor: "pointer",
                       boxShadow: "0 0 12px rgba(146,84,222,.8)",
                     }}
-                    onClick={() => { setImgSrc(url); setImgOpen(true); }}
+                    onClick={() => {
+                      setImgSrc(url);
+                      setImgOpen(true);
+                    }}
                   />
                 ) : (
                   <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#ff85c0" }}>
