@@ -12,7 +12,9 @@ import (
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/middlewares"
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 )
 
@@ -116,7 +118,46 @@ func FindThreadByID(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "thread not found"})
 		return
 	}
-	c.JSON(http.StatusOK, row)
+
+	// optional: get user id from Authorization or X-User-ID header
+	var uid uint
+	if auth := c.GetHeader("Authorization"); strings.HasPrefix(auth, "Bearer ") {
+		tokenStr := strings.TrimPrefix(auth, "Bearer ")
+		secret := os.Getenv("JWT_SECRET")
+		if secret == "" {
+			secret = "dev-secret"
+		}
+		token, err := jwt.ParseWithClaims(tokenStr, &middlewares.Claims{}, func(token *jwt.Token) (interface{}, error) {
+			return []byte(secret), nil
+		})
+		if err == nil && token.Valid {
+			claims := token.Claims.(*middlewares.Claims)
+			uid = claims.UserID
+			if uid == 0 && claims.Subject != "" {
+				if n, err := strconv.Atoi(claims.Subject); err == nil {
+					uid = uint(n)
+				}
+			}
+		}
+	} else if v := c.GetHeader("X-User-ID"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			uid = uint(n)
+		}
+	}
+
+	liked := false
+	if uid != 0 {
+		var tl entity.ThreadLike
+		if err := configs.DB().Where("thread_id = ? AND user_id = ?", row.ID, uid).First(&tl).Error; err == nil {
+			liked = true
+		}
+	}
+
+	type response struct {
+		entity.Thread
+		Liked bool `json:"liked"`
+	}
+	c.JSON(http.StatusOK, response{Thread: row, Liked: liked})
 }
 
 // PUT /threads/:id  (แก้ title/content)
@@ -124,6 +165,7 @@ type updateThreadBody struct {
 	Title   string `json:"title"`
 	Content string `json:"content"`
 }
+
 func UpdateThread(c *gin.Context) {
 	var body updateThreadBody
 	if err := c.ShouldBindJSON(&body); err != nil {

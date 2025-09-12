@@ -263,29 +263,9 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
   return (
     <>
-      <Popover
-        placement="bottomRight"
-        trigger="click"
-        content={content}
-        open={open}
-        onOpenChange={onOpenChange}
-        overlayInnerStyle={{
-          background: "linear-gradient(135deg,#0b0a14,#1a0933)",
-          borderRadius: 16,
-          border: "1px solid rgba(146,84,222,.6)",
-          boxShadow: "0 0 22px rgba(146,84,222,.7)",
-          padding: 10,
-        }}
-      >
-        <Badge
-          count={unreadCount}
-          size="small"
-          style={{
-            background: "linear-gradient(90deg,#9254de,#ff5ca8)",
-            boxShadow: "0 0 10px rgba(146,84,222,.8)",
-          }}
-        >
-          <Button type="text" icon={<BellOutlined style={{ fontSize: 20, color: "#b37feb" }} />} />
+      <Popover placement="bottomRight" trigger="click" content={content} open={open} onOpenChange={onOpenChange}>
+        <Badge count={unreadCount} size="small">
+          <Button type="text" icon={<BellOutlined style={{ fontSize: 20, color: "#d3d3d3ff" }} />} />
         </Badge>
       </Popover>
 

@@ -8,6 +8,7 @@ import (
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -17,12 +18,7 @@ func round2(v float64) float64 { return math.Round(v*100) / 100 }
 
 // ดึงราคาหลังโปรจริง ๆ ให้ไปเติม logic preload promotion ที่นี่ถ้ามี
 func getDiscountedPriceForGame(db *gorm.DB, gameID uint, now time.Time) (float64, error) {
-	var g entity.Game
-	if err := db.First(&g, gameID).Error; err != nil {
-		return 0, err
-	}
-	// TODO: preload promotion คำนวณราคาจริง ณ เวลา now
-	return float64(g.BasePrice), nil
+	return services.GetDiscountedPriceForGame(db, gameID, now)
 }
 
 type CreateOrderItemInput struct {
@@ -84,10 +80,22 @@ func CreateOrder(c *gin.Context) {
 	order.TotalAmount = round2(total)
 	order.OrderItems = items
 
-	if err := db.Create(&order).Error; err != nil {
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&order).Error; err != nil {
+			return err
+		}
+		// generate keygames for each order item based on qty
+		for _, it := range order.OrderItems {
+			if err := services.CreateRandomKeyGames(tx, it.GameID, it.QTY); err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
 	_ = db.Preload("OrderItems").Preload("User").First(&order, order.ID)
 	c.JSON(http.StatusOK, order)
 }

@@ -206,7 +206,7 @@ export default function PaymentPage() {
                 </Col>
               </Row>
               <Typography.Paragraph style={{ marginTop: -4, color: TEXT_SUB }}>
-                *ราคาสุทธิจะถูกคำนวณอีกครั้งเมื่อสร้างคำสั่งซื้อ (อิงโปรโมชันขณะชำระ)
+                *โปรดชำระเงินให้ตรงกับยอดที่แสดง
               </Typography.Paragraph>
 
               <Space direction="vertical" style={{ width: "100%" }} size={10}>
@@ -214,7 +214,7 @@ export default function PaymentPage() {
                   type="primary"
                   size="large"
                   block
-                  style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
+                  style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#ffffffff" }}
                   onClick={() => setPayOpen(true)}
                   disabled={!items.length}
                 >
@@ -254,7 +254,7 @@ export default function PaymentPage() {
                 style={{ width: 280, maxWidth: "100%", borderRadius: 12, boxShadow: "0 0 0 1px " + BORDER }}
               />
               <Typography.Paragraph style={{ marginTop: 12, color: TEXT_MAIN }}>
-                <strong>จำนวนเงินโดยประมาณ:</strong>{" "}
+                <strong>จำนวนเงิน</strong>{" "}
                 <span style={{ color: THEME_PRIMARY }}>{formatTHB(total)}</span>
               </Typography.Paragraph>
             </div>
