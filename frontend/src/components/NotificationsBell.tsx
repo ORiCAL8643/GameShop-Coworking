@@ -1,6 +1,7 @@
+// src/components/NotificationBell.tsx
 import { useEffect, useMemo, useState } from "react";
 import { Badge, Popover, List, Button, Typography, Modal, Divider } from "antd";
-import { BellOutlined } from "@ant-design/icons";
+import { BellOutlined, PaperClipOutlined } from "@ant-design/icons";
 import {
   fetchNotifications,
   markNotificationRead,
@@ -48,14 +49,13 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     try {
       const raw = await fetchNotifications(userId);
 
-      // ✅ กรองซ้ำ: เก็บเฉพาะอันล่าสุดต่อ key (type + report_id)
+      // ✅ กรองซ้ำ: เก็บเฉพาะอันล่าสุดต่อ key (type + report_id|ID)
       const map = new Map<string, Notification>();
       for (const n of raw) {
         const key = `${n.type}:${n.report_id ?? n.ID}`;
         const cur = map.get(key);
-        if (!cur) {
-          map.set(key, n);
-        } else {
+        if (!cur) map.set(key, n);
+        else {
           const a = (n.created_at || "").toString();
           const b = (cur.created_at || "").toString();
           if (a > b) map.set(key, n);
@@ -76,7 +76,7 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     load();
     const t = setInterval(load, pollMs);
     return () => clearInterval(t);
-  }, [userId, pollMs]);
+  }, [userId, pollMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onOpenChange = async (v: boolean) => {
     setOpen(v);
@@ -89,10 +89,14 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
       setViewNoti(n);
       setViewReport(null);
 
+      // ✅ ถ้าเป็น noti ประเภทตอบกลับ report ดึง "reply ล่าสุด" พร้อมไฟล์แนบ
       if (n.type === "report_reply" && n.report_id) {
         try {
           const rp = await getReportByID(n.report_id);
-          setViewReport(rp);
+          const replies = rp.replies || [];
+          const latest = replies[replies.length - 1];
+          const withLatest = { ...rp, reply: latest?.message };
+          setViewReport(withLatest);
         } catch (e) {
           console.warn("load report failed:", e);
         }
@@ -106,11 +110,29 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
   };
 
   const content = (
-    <div style={{ width: 380, maxHeight: 420, overflow: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, alignItems: "center" }}>
-        <Text strong>การแจ้งเตือน</Text>
+    <div style={{ width: 400, maxHeight: 440, overflow: "auto", color: "#fff" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginBottom: 12,
+          alignItems: "center",
+        }}
+      >
+        <Text strong style={{ color: "#b37feb", fontSize: 16 }}>🔔 การแจ้งเตือน</Text>
         {items.length > 0 && (
-          <Button size="small" onClick={async () => { await markAllNotificationsRead(userId); await load(); }}>
+          <Button
+            size="small"
+            onClick={async () => { await markAllNotificationsRead(userId); await load(); }}
+            style={{
+              borderRadius: 8,
+              background: "linear-gradient(90deg,#9254de,#ff5ca8)",
+              border: "none",
+              color: "#fff",
+              fontWeight: 600,
+              boxShadow: "0 0 12px rgba(146,84,222,.7)",
+            }}
+          >
             ทำเป็นอ่านแล้วทั้งหมด
           </Button>
         )}
@@ -118,34 +140,73 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
       <List
         dataSource={items}
-        locale={{ emptyText: "ยังไม่มีการแจ้งเตือน" }}
+        locale={{ emptyText: <span style={{ color: "#cfc5ff" }}>ยังไม่มีการแจ้งเตือน</span> }}
         renderItem={(n) => (
           <List.Item
             style={{
-              background: n.is_read ? "transparent" : "rgba(146,84,222,0.12)",
-              borderRadius: 8,
-              marginBottom: 6,
-              padding: "10px 12px",
+              background: n.is_read
+                ? "rgba(36,18,62,0.85)"
+                : "linear-gradient(90deg,#2a0d3d,#3d155f)",
+              borderRadius: 12,
+              marginBottom: 10,
+              padding: "12px 16px",
+              boxShadow: "0 0 15px rgba(146,84,222,0.6)",
+              border: "1px solid rgba(146,84,222,.35)",
             }}
             actions={[
-              <Button size="small" type="link" onClick={() => openView(n)}>ดูข้อความ</Button>,
+              <Button
+                size="small"
+                onClick={() => openView(n)}
+                style={{
+                  background: "linear-gradient(90deg,#6a11cb,#2575fc)",
+                  border: "none",
+                  borderRadius: 8,
+                  fontWeight: "bold",
+                  color: "#fff",
+                  boxShadow: "0 0 8px rgba(106,17,203,0.7)",
+                }}
+              >
+                ดูข้อความ
+              </Button>,
               !n.is_read ? (
-                <Button size="small" type="link" onClick={async () => { await markNotificationRead(n.ID); await load(); }}>
+                <Button
+                  size="small"
+                  onClick={async () => { await markNotificationRead(n.ID); await load(); }}
+                  style={{
+                    background: "linear-gradient(90deg,#ff5ca8,#9254de)",
+                    border: "none",
+                    borderRadius: 8,
+                    fontWeight: "bold",
+                    color: "#fff",
+                    boxShadow: "0 0 8px rgba(255,92,168,0.7)",
+                  }}
+                >
                   อ่านแล้ว
                 </Button>
               ) : null,
-              <Button size="small" danger type="link" onClick={async () => { await deleteNotification(n.ID); await load(); }}>
+              <Button
+                size="small"
+                onClick={async () => { await deleteNotification(n.ID); await load(); }}
+                style={{
+                  background: "linear-gradient(90deg,#ff4d4f,#a8071a)",
+                  border: "none",
+                  borderRadius: 8,
+                  fontWeight: "bold",
+                  color: "#fff",
+                  boxShadow: "0 0 8px rgba(255,77,79,0.7)",
+                }}
+              >
                 ลบ
               </Button>,
             ].filter(Boolean)}
           >
             <List.Item.Meta
-              title={<Text strong>{n.title || "แจ้งเตือน"}</Text>}
+              title={<Text strong style={{ color: "#fff", fontSize: 15 }}>{n.title || "แจ้งเตือน"}</Text>}
               description={
                 <div>
-                  <div style={{ whiteSpace: "pre-line" }}>{n.message}</div>
+                  <div style={{ whiteSpace: "pre-line", color: "#ddd" }}>{n.message}</div>
                   {!!n.created_at && (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
+                    <Text style={{ fontSize: 12, color: "#aaa" }}>
                       {new Date(n.created_at).toLocaleString()}
                     </Text>
                   )}
@@ -158,53 +219,52 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
     </div>
   );
 
-  // ✅ แสดงเฉพาะไฟล์แนบที่ "แอดมิน" ส่ง (กรอง path ที่อยู่ใต้ /replies/)
+  // ✅ แสดงไฟล์แนบจากการตอบกลับของแอดมิน
   const renderReportAttachments = () => {
-    if (!viewReport?.attachments || viewReport.attachments.length === 0) return null;
-
-    const adminOnly = viewReport.attachments.filter((att) => {
-      const raw = (att as any).file_path ?? (att as any).FilePath ?? "";
-      return /(^|\/)uploads\/replies\//i.test(raw) || raw.toLowerCase().includes("/replies/");
-    });
-
+    const replies = viewReport?.replies || [];
+    const adminOnly = replies.flatMap((r) => r.attachments || []);
     if (adminOnly.length === 0) return null;
 
     return (
       <>
-        <Text strong>ไฟล์แนบจากแอดมิน:</Text>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
+        <Divider style={{ borderColor: "rgba(146,84,222,.3)", margin: "12px 0" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <PaperClipOutlined style={{ color: "#b37feb" }} />
+          <Text strong style={{ color: "#b37feb" }}>ไฟล์แนบจากแอดมิน</Text>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 10 }}>
           {adminOnly.map((att) => {
-            const rawPath = (att as any).file_path ?? (att as any).FilePath ?? "";
+            const rawPath = att.file_path ?? att.FilePath ?? "";
             const url = normalizeUrl(rawPath);
             const isImg = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(rawPath);
-
             return (
-              <div key={att.ID} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <div
+                key={att.ID}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center" }}
+              >
                 {isImg ? (
                   <img
                     src={url}
                     alt="attachment"
                     style={{
-                      width: 100,
-                      height: 100,
+                      width: 130,
+                      height: 130,
                       objectFit: "cover",
-                      borderRadius: 8,
+                      borderRadius: 12,
                       cursor: "pointer",
-                      boxShadow: "0 1px 4px rgba(0,0,0,.25)",
+                      boxShadow: "0 0 12px rgba(146,84,222,.8)",
                     }}
-                    onClick={() => { setImgSrc(url); setImgOpen(true); }}
+                    onClick={() => {
+                      setImgSrc(url);
+                      setImgOpen(true);
+                    }}
                   />
                 ) : (
-                  <a href={url} target="_blank" rel="noopener noreferrer">
+                  <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#ff85c0" }}>
                     📄 {rawPath.split("/").pop()}
                   </a>
                 )}
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ fontSize: 12, marginTop: 6 }}
-                >
+                <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, marginTop: 6 }}>
                   เปิดในแท็บใหม่
                 </a>
               </div>
@@ -225,32 +285,60 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
 
       {/* Modal: รายละเอียดแจ้งเตือน */}
       <Modal
-  open={viewOpen}
-  title={viewNoti?.title || "รายละเอียดแจ้งเตือน"}
-  onCancel={() => setViewOpen(false)}
-  footer={<Button onClick={() => setViewOpen(false)}>ปิด</Button>}
-  destroyOnClose
->
-  {/* ❌ ไม่แสดงข้อความสรุปใน noti ถ้าเป็นประเภท report_reply */}
-  {viewNoti?.type !== "report_reply" && (
-    <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8 }}>
-      {viewNoti?.message}
-    </Paragraph>
-  )}
+        open={viewOpen}
+        title={<span style={{ color: "#eae6ff" }}>{viewNoti?.title || "รายละเอียดแจ้งเตือน"}</span>}
+        onCancel={() => setViewOpen(false)}
+        footer={
+          <Button
+            onClick={() => setViewOpen(false)}
+            style={{
+              background: "linear-gradient(90deg,#9254de,#ff5ca8)",
+              border: "none",
+              color: "#fff",
+              borderRadius: 10,
+              fontWeight: 700,
+              boxShadow: "0 0 12px rgba(146,84,222,.6)",
+            }}
+          >
+            ปิด
+          </Button>
+        }
+        destroyOnClose
+        centered
+        // ✅ ใช้ styles ของ AntD v5 เพื่อไม่แตะ global CSS
+        styles={{
+          content: {
+            background: "linear-gradient(135deg,#0f0c29,#1b0033)",
+            borderRadius: 16,
+            border: "1px solid rgba(146,84,222,.45)",
+            boxShadow: "0 0 26px rgba(146,84,222,.75)",
+            color: "#fff",
+          },
+          header: {
+            background: "transparent",
+            borderBottom: "1px solid rgba(146,84,222,.3)",
+          },
+          body: { background: "transparent", color: "#fff" },
+          footer: { background: "transparent", borderTop: "none" },
+        }}
+      >
+        {/* ❌ ไม่แสดงข้อความสรุปใน noti ถ้าเป็นประเภท report_reply */}
+        {viewNoti?.type !== "report_reply" && (
+          <Paragraph style={{ whiteSpace: "pre-line", marginBottom: 8, color: "#fff" }}>
+            {viewNoti?.message}
+          </Paragraph>
+        )}
 
-  {viewNoti?.type === "report_reply" && viewReport && (
-    <>
-      {/* ✅ คงเส้นคั่นและส่วนที่เหลือไว้ */}
-      <Divider style={{ margin: "10px 0" }} />
-      <Text strong>ข้อความตอบกลับจากแอดมิน</Text>
-      <Paragraph style={{ whiteSpace: "pre-line" }}>
-        {viewReport.reply || "-"}
-      </Paragraph>
-      {renderReportAttachments()}
-    </>
-  )}
-</Modal>
-
+        {viewNoti?.type === "report_reply" && viewReport && (
+          <>
+            <Text strong style={{ color: "#b37feb" }}>ข้อความตอบกลับจากแอดมิน</Text>
+            <Paragraph style={{ whiteSpace: "pre-line", color: "#fff" }}>
+              {viewReport.reply || "-"}
+            </Paragraph>
+            {renderReportAttachments()}
+          </>
+        )}
+      </Modal>
 
       {/* Modal: Preview รูปภาพ */}
       <Modal
@@ -259,12 +347,27 @@ export default function NotificationBell({ userId, pollMs = 5000 }: Props) {
         footer={null}
         width={920}
         destroyOnClose
+        centered
+        styles={{
+          content: {
+            background: "linear-gradient(135deg,#0f0c29,#1b0033)",
+            borderRadius: 16,
+            border: "1px solid rgba(146,84,222,.45)",
+            boxShadow: "0 0 26px rgba(146,84,222,.75)",
+          },
+          body: { background: "transparent", textAlign: "center" },
+        }}
       >
         {imgSrc ? (
           <img
             src={imgSrc}
             alt="preview"
-            style={{ width: "100%", height: "auto", borderRadius: 12 }}
+            style={{
+              width: "100%",
+              height: "auto",
+              borderRadius: 16,
+              boxShadow: "0 0 25px rgba(146,84,222,.8)",
+            }}
           />
         ) : null}
       </Modal>
