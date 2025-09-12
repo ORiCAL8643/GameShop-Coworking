@@ -10,10 +10,10 @@ import (
 type UserGame struct {
 	gorm.Model
 
-	UserID uint  `json:"user_id" gorm:"index:idx_user_game_unique,unique"`
+	UserID uint  `json:"user_id"`
 	User   *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
 
-	GameID uint  `json:"game_id" gorm:"index:idx_user_game_unique,unique"`
+	GameID uint  `json:"game_id"`
 	Game   *Game `gorm:"foreignKey:GameID" json:"game,omitempty"`
 
 	GrantedAt          time.Time `json:"granted_at"`
