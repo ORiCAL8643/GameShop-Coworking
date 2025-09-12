@@ -11,7 +11,7 @@ type Props = {
   sortBy: "latest" | "likes" | "comments";
   gameId: number | null;
   onOpen: (id: number) => void;
-  onCreate: (payload: { title: string; body: string; files: File[] }) => void;
+  onCreate: (payload: { title: string; body: string; files: File[] }) => Promise<boolean>;
 };
 
 export default function ThreadList({ threads, sortBy, gameId, onOpen, onCreate }: Props) {
@@ -30,11 +30,16 @@ export default function ThreadList({ threads, sortBy, gameId, onOpen, onCreate }
     return arr;
   }, [threads, sortBy]);
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     const fileObjs: File[] = files
       .map(f => f.originFileObj as File | undefined)
       .filter((f): f is File => !!f);
-    onCreate({ title: title.trim(), body: body.trim(), files: fileObjs });
+    const ok = await onCreate({ title: title.trim(), body: body.trim(), files: fileObjs });
+    if (ok) {
+      setTitle("");
+      setBody("");
+      setFiles([]);
+    }
   };
 
   return (

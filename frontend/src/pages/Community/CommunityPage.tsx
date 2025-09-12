@@ -103,7 +103,14 @@ export default function CommunityPage() {
 
   // สร้างเธรดใหม่ (ต้อง auth)
   const createThread = async ({ title, content, files }: { title: string; content: string; files: File[] }) => {
-    if (!gameId) return message.warning("กรุณาเลือกเกมก่อน");
+    if (!(token || authId || DEV_USER_ID)) {
+      message.error("กรุณาเข้าสู่ระบบก่อนโพสต์");
+      return false;
+    }
+    if (!gameId) {
+      message.warning("กรุณาเลือกเกมก่อน");
+      return false;
+    }
     try {
       const fd = new FormData();
       fd.append("title", title);
@@ -117,10 +124,12 @@ export default function CommunityPage() {
 
       message.success("สร้างเธรดสำเร็จ");
       await loadThreads();
+      return true;
     } catch (e: any) {
       console.error(e);
       const msg = e?.response?.data?.error || e.message || "สร้างเธรดไม่สำเร็จ";
       message.error(msg + (!token && !authId && DEV_USER_ID ? " (ใช้ DEV_USER_ID)" : ""));
+      return false;
     }
   };
 
