@@ -58,7 +58,7 @@ export default function PromotionDetail() {
         setPromotion(data);
         if (data.games) {
           setGames(
-            data.games.map((g: any) => ({
+            data.games.map((g: Game) => ({
               ...g,
               discounted_price: applyDiscount(
                 g.base_price,
@@ -132,7 +132,7 @@ export default function PromotionDetail() {
                     <GameCard
                       game={g}
                       imgSrc={resolveImgUrl(g.img_src)}
-                      onBuy={() => navigate(`/game/${g.ID}`)}
+                      onClick={() => navigate(`/game/${g.ID}`)}
                     />
                   </Col>
                 ))}
