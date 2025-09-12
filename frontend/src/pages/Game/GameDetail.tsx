@@ -190,11 +190,11 @@ const GameDetail: React.FC = () => {
         addItem({ id: Number(gameId), title, price, quantity: 1 });
         msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
       }
-    
-    navigate("/category/Payment");
     } catch (err) {
       console.error("purchase error:", err);
       msg.error("ไม่สามารถทำรายการได้");
+    } finally {
+      navigate("/category/Payment");
     }
   };
 
