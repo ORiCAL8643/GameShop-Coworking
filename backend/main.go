@@ -73,9 +73,9 @@ func main() {
 		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
 		// -------- Threads (READ only = public) --------
-		router.GET("/threads", controllers.FindThreads)                        // ?game_id=&q=
-		router.GET("/threads/:id", controllers.FindThreadByID)                 // รายละเอียดเธรด
-		router.GET("/threads/:id/comments", controllers.FindCommentsByThread)  // คอมเมนต์แบบแถวเดียว
+		router.GET("/threads", controllers.FindThreads)                       // ?game_id=&q=
+		router.GET("/threads/:id", controllers.FindThreadByID)                // รายละเอียดเธรด
+		router.GET("/threads/:id/comments", controllers.FindCommentsByThread) // คอมเมนต์แบบแถวเดียว
 
 		// -------- UserGames --------
 		router.POST("/user-games", controllers.CreateUserGame)
@@ -189,12 +189,15 @@ func main() {
 		authList.POST("/payments/:id/reject", controllers.RejectPayment)
 
 		// -------- Threads (WRITE only = ต้อง auth) --------
-		authList.POST("/threads", controllers.CreateThread)          // multipart: title, content, game_id, images[]
-		authList.PUT("/threads/:id", controllers.UpdateThread)       // แก้ title/content
+		authList.POST("/threads", controllers.CreateThread)    // multipart: title, content, game_id, images[]
+		authList.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
 		authList.DELETE("/threads/:id", controllers.DeleteThread)
 		authList.POST("/threads/:id/comments", controllers.CreateComment)
 		authList.DELETE("/comments/:id", controllers.DeleteComment)
 		authList.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
+
+		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
+		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
 	}
 
 	// 6) Run server
