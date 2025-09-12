@@ -52,35 +52,40 @@ const Home = () => {
           promotionsWithImages.length > 1 ? (
             <Carousel autoplay style={{ marginBottom: 24 }}>
               {promotionsWithImages.map((promo) => (
-                <img
+                <div
                   key={promo.ID}
-                  src={resolveImgUrl(promo.promo_image)}
-                  alt={promo.title}
-                  style={{
-                    height: 180,
-                    width: '100%',
-                    objectFit: 'cover',
-                    borderRadius: 10,
-                    cursor: 'pointer',
-                  }}
                   onClick={() => navigate(`/promotion/${promo.ID}`)}
-                />
+                  style={{ cursor: 'pointer' }}
+                >
+                  <img
+                    src={resolveImgUrl(promo.promo_image)}
+                    alt={promo.title}
+                    style={{
+                      height: 180,
+                      width: '100%',
+                      objectFit: 'cover',
+                      borderRadius: 10,
+                    }}
+                  />
+                </div>
               ))}
             </Carousel>
           ) : (
-            <img
-              src={resolveImgUrl(promotionsWithImages[0].promo_image)}
-              alt={promotionsWithImages[0].title}
-              style={{
-                height: 180,
-                width: '100%',
-                objectFit: 'cover',
-                borderRadius: 10,
-                marginBottom: 24,
-                cursor: 'pointer',
-              }}
+            <div
               onClick={() => navigate(`/promotion/${promotionsWithImages[0].ID}`)}
-            />
+              style={{ cursor: 'pointer', marginBottom: 24 }}
+            >
+              <img
+                src={resolveImgUrl(promotionsWithImages[0].promo_image)}
+                alt={promotionsWithImages[0].title}
+                style={{
+                  height: 180,
+                  width: '100%',
+                  objectFit: 'cover',
+                  borderRadius: 10,
+                }}
+              />
+            </div>
           )
         )}
         <Title level={3} style={{ color: 'white' }}>Product</Title>
