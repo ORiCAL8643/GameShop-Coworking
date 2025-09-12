@@ -162,6 +162,20 @@ func main() {
 		router.GET("/request", controllers.FindRequest)
 	}
 
+		// ===== Mods =====
+		router.GET("/mods", controllers.GetMods)
+		router.GET("/mods/:id", controllers.GetModById)
+		router.POST("/mods", controllers.CreateMod)
+		router.PATCH("/mods/:id", controllers.UpdateMod)
+		router.DELETE("/mods/:id", controllers.DeleteMod)
+
+		// ===== Mod Ratings =====
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
+		router.PATCH("/modratings/:id", controllers.UpdateModRating)
+		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
 	authList := r.Group("/", AuthRequired())
 	{
