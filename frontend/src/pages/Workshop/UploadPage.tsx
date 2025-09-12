@@ -1,21 +1,16 @@
 // src/pages/Workshop/UploadPage.tsx
-import React, { useState, useEffect } from "react";
-import { Typography, Card, Input, Button, Upload, message } from "antd";
+import React, { useState, useEffect, useRef } from "react";
+import { Typography, Card, Input, Button, Upload, message, Space } from "antd";
 import {
   UploadOutlined,
   FileTextOutlined,
   PictureOutlined,
   InboxOutlined,
+  CheckCircleFilled,
 } from "@ant-design/icons";
-import { useSearchParams } from "react-router-dom";
-import {
-  getGame,
-  listUserGames,
-  getMod,
-  createMod,
-  updateMod,
-} from "../../services/workshop";
-import type { Game, UserGame } from "../../interfaces";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { getGame, getMod, createMod, updateMod } from "../../services/workshop";
+import type { Game } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Title } = Typography;
@@ -29,20 +24,16 @@ const Ok: React.FC<{ ok: boolean }> = ({ ok }) => (
 );
 
 const UploadPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const gameIdParam = searchParams.get("gameId");
   const modIdParam = searchParams.get("modId");
   const gameId = gameIdParam ? Number(gameIdParam) : undefined;
   const modId = modIdParam ? Number(modIdParam) : undefined;
 
-  // สมมติ useAuth() คืน id กับ token (ถ้าไม่มี token ก็ไม่เป็นไร)
   const { id: userId, token } = useAuth() as { id?: number; token?: string };
 
-  // Game + UserGame
   const [game, setGame] = useState<Game | null>(null);
-  const [userGames, setUserGames] = useState<UserGame[]>([]);
-  const [userGameId, setUserGameId] = useState<number | null>(null);
-
   const isEditing = modId !== undefined;
 
   useEffect(() => {
@@ -62,8 +53,8 @@ const UploadPage: React.FC = () => {
         .then((m: any) => {
           setModTitle(m?.title ?? "");
           setModDescription(m?.description ?? "");
-          const ugid = m?.user_game_id ?? m?.userGameId ?? m?.UserGameID ?? null;
-          setUserGameId(typeof ugid === "number" ? ugid : (Number(ugid) || null));
+          const ugid = m?.user_game_id ?? m?.userGameId ?? m?.UserGameID ?? undefined;
+          setUserGameId(typeof ugid === "number" ? ugid : (ugid != null ? Number(ugid) : undefined));
         })
         .catch((e) => {
           console.error("[getMod] failed:", e);
@@ -72,35 +63,6 @@ const UploadPage: React.FC = () => {
     }
   }, [modId]);
 
-  useEffect(() => {
-    if (!userId) return;
-    listUserGames(userId)
-      .then((rows: any[]) => {
-        console.log("[listUserGames] raw:", rows);
-        setUserGames(Array.isArray(rows) ? rows : []);
-
-        if (gameId) {
-          const found = (rows ?? []).find(
-            (r) => (r.game_id ?? r.gameId ?? r.GameID) === gameId
-          );
-          const ugid =
-            found?.id ??
-            found?.ID ??
-            found?.Id ??
-            found?.user_game_id ??
-            found?.userGameId ??
-            null;
-
-          console.log("[resolve userGameId]", { gameId, found, ugid });
-          setUserGameId(typeof ugid === "number" ? ugid : (Number(ugid) || null));
-        }
-      })
-      .catch((e) => {
-        console.error("[listUserGames] failed:", e);
-        message.error(e?.message || "โหลดรายการเกมของฉันไม่สำเร็จ");
-      });
-  }, [userId, gameId]);
-
   // Form states
   const [modTitle, setModTitle] = useState("");
   const [modDescription, setModDescription] = useState("");
@@ -108,6 +70,13 @@ const UploadPage: React.FC = () => {
   const [modImage, setModImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+
+  // success banner (ลอยด้านบนจอ)
+  const [showSuccess, setShowSuccess] = useState(false);
+  const redirectTimer = useRef<number | undefined>(undefined);
+
+  // (ออปชัน) สำหรับ compatibility เดิม
+  const [userGameId, setUserGameId] = useState<number | undefined>(undefined);
 
   // --- file handlers ---
   const handleModFile = (file: File) => {
@@ -125,7 +94,7 @@ const UploadPage: React.FC = () => {
     setModImage(file);
     setImagePreview(URL.createObjectURL(file));
     message.success(`${file.name} selected`);
-    return false; // stop auto-upload
+    return false;
   };
   const handleModImageChange: React.ComponentProps<typeof Upload>["onChange"] = (info) => {
     const f = info.file?.originFileObj as File | undefined;
@@ -141,36 +110,23 @@ const UploadPage: React.FC = () => {
 
   const handleUpload = async () => {
     const toastKey = "modUpload";
-    console.log("[Upload] clicked", {
-      isEditing,
-      gameId,
-      userGameId,
-      modTitle,
-      hasFile: !!modFile,
-      hasImage: !!modImage,
-    });
-
     try {
       if (!gameId) {
-        console.error("No gameId");
         message.error("ไม่พบรหัสเกม");
         return;
       }
+      if (!userId) {
+        message.error("กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด");
+        return;
+      }
       if (!modTitle.trim()) {
-        console.error("No title");
         message.error("กรุณาใส่ชื่อม็อด");
         return;
       }
 
       if (!isEditing) {
         if (!modFile) {
-          console.error("No mod file");
           message.error("กรุณาเลือกไฟล์ม็อด");
-          return;
-        }
-        if (userGameId == null) {
-          console.error("No userGameId");
-          message.error("คุณไม่มีเกมนี้ในคลัง จึงไม่สามารถอัปโหลดม็อดได้");
           return;
         }
 
@@ -181,17 +137,20 @@ const UploadPage: React.FC = () => {
         fd.append("title", modTitle);
         fd.append("description", modDescription);
         fd.append("game_id", String(gameId));
-        fd.append("user_game_id", String(userGameId));
         fd.append("file", modFile);
         if (modImage) fd.append("image", modImage);
 
-        console.log("[Upload] POST /mods", { gameId, userGameId, modTitle, hasImage: !!modImage });
+        await createMod(fd, token); // ควรคืน obj ก็ได้ แต่ไม่จำเป็นสำหรับการรีไดเรกต์ครั้งนี้
+        message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 0.8 });
 
-        await createMod(fd, token);
+        // แสดงแบนเนอร์สำเร็จ + รีไดเรกต์กลับ Workshop Detail
+        setShowSuccess(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        redirectTimer.current = window.setTimeout(() => {
+          navigate(`/workshop/${gameId}`, { replace: true });
+        }, 1400);
 
-        message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 1.8 });
-
-        // reset form
+        // reset ฟอร์ม
         setModTitle("");
         setModDescription("");
         setModFile(null);
@@ -201,18 +160,18 @@ const UploadPage: React.FC = () => {
         setUploading(true);
         message.open({ key: toastKey, type: "loading", content: "กำลังบันทึก...", duration: 0 });
 
-        const payload = {
-          title: modTitle,
-          description: modDescription,
-          game_id: gameId,
-          user_game_id: userGameId ?? undefined,
-        };
-
-        console.log("[Edit] PATCH /mods/:id", { modId, payload });
+        const payload: any = { title: modTitle, description: modDescription, game_id: gameId };
+        if (userGameId != null) payload.user_game_id = userGameId;
 
         await updateMod(modId!, payload, token);
 
-        message.open({ key: toastKey, type: "success", content: "บันทึกเรียบร้อยแล้ว!", duration: 1.8 });
+        message.open({ key: toastKey, type: "success", content: "บันทึกเรียบร้อยแล้ว!", duration: 0.8 });
+
+        setShowSuccess(true);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        redirectTimer.current = window.setTimeout(() => {
+          navigate(`/workshop/${gameId}`, { replace: true });
+        }, 1200);
       }
     } catch (err: any) {
       console.error("[Upload] failed:", err);
@@ -227,36 +186,65 @@ const UploadPage: React.FC = () => {
     }
   };
 
-  // ปุ่มปิดเฉพาะตอนกำลังอัปโหลดเท่านั้น
+  // cleanup timer เมื่อออกจากหน้า
+  useEffect(() => {
+    return () => {
+      if (redirectTimer.current) {
+        window.clearTimeout(redirectTimer.current);
+      }
+    };
+  }, []);
+
   const disableSubmit = uploading;
 
-  // Checklist แสดงสถานะฟอร์มให้เห็นชัด
   const checks = {
     gameId: !!gameId,
     title: !!modTitle.trim(),
     fileReady: isEditing ? true : !!modFile,
-    owned: isEditing ? true : userGameId != null,
   };
 
-  // Log เพื่อตรวจสภาพฟอร์มทุกครั้งที่เปลี่ยน
   useEffect(() => {
     console.log("[Form check]", {
       gameId,
       title: checks.title,
       modFile: !!modFile,
-      userGameId,
       isEditing,
     });
-  }, [gameId, modTitle, modFile, userGameId, isEditing]);
+  }, [gameId, modTitle, modFile, isEditing]);
 
   return (
-    <div style={{ background: "#141414", minHeight: "100vh", flex: 1 }}>
+    <div style={{ background: "#141414", minHeight: "100vh", flex: 1, position: "relative" }}>
+      {/* === Success Banner (ลอยกึ่งกลางด้านบนจอ) === */}
+      {showSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            zIndex: 1000,
+            top: 24,
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "linear-gradient(135deg, #1f2937 0%, #111827 100%)",
+            border: "1px solid #2b3a42",
+            color: "#e5e7eb",
+            padding: "10px 16px",
+            borderRadius: 10,
+            boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+          }}
+        >
+          <Space size="middle">
+            <CheckCircleFilled style={{ color: "#52c41a", fontSize: 18 }} />
+            <span style={{ fontWeight: 600 }}>
+              {isEditing ? "บันทึกม็อดเรียบร้อย" : "อัปโหลดม็อดเรียบร้อย"}
+            </span>
+            <span style={{ color: "#9aa4ad" }}>กำลังกลับไปยังหน้า Workshop…</span>
+          </Space>
+        </div>
+      )}
+
       <div style={{ padding: "16px", maxWidth: "800px", margin: "0 auto" }}>
         <Title level={2} style={{ color: "white" }}>
           {game
-            ? `${isEditing ? "Edit" : "Upload"} Mods for ${
-                (game as any)?.game_name ?? (game as any)?.name ?? ""
-              }`
+            ? `${isEditing ? "Edit" : "Upload"} Mods for ${(game as any)?.game_name ?? (game as any)?.name ?? ""}`
             : "Upload Game Mods"}
         </Title>
 
@@ -395,7 +383,7 @@ const UploadPage: React.FC = () => {
           />
         </Card>
 
-        {/* Checklist แสดงสถานะฟอร์ม */}
+        {/* Checklist */}
         <Card
           title={<span style={{ color: "white" }}>Checklist</span>}
           style={{
@@ -410,10 +398,7 @@ const UploadPage: React.FC = () => {
             <li><Ok ok={!!gameId} /> มีรหัสเกมใน URL (เช่น <code>?gameId=123</code>)</li>
             <li><Ok ok={!!modTitle.trim()} /> กรอกชื่อม็อด</li>
             {!isEditing && (
-              <>
-                <li><Ok ok={!!modFile} /> เลือกไฟล์ม็อด (.zip/.rar/.7z)</li>
-                <li><Ok ok={userGameId != null} /> มีเกมนี้ในคลัง (คุณเป็นเจ้าของเกมนี้)</li>
-              </>
+              <li><Ok ok={!!modFile} /> เลือกไฟล์ม็อด (.zip/.rar/.7z)</li>
             )}
           </ul>
         </Card>
@@ -424,7 +409,7 @@ const UploadPage: React.FC = () => {
             type="primary"
             size="large"
             loading={uploading}
-            disabled={disableSubmit}
+            disabled={uploading}
             style={{ background: "#9254de", borderColor: "#9254de" }}
             onClick={handleUpload}
           >

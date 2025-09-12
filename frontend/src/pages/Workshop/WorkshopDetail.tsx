@@ -1,3 +1,4 @@
+// src/pages/Workshop/WorkshopDetail.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -18,27 +19,41 @@ import type { Game, Mod } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Content, Sider, Header } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 const { Search } = Input;
+
+// ✅ ตั้งค่า BASE ของ API (ปรับค่า VITE_API_BASE ใน .env ได้)
+const API_BASE = (import.meta as any)?.env?.VITE_API_BASE ?? "http://localhost:8088";
+
+// ✅ helper: แปลง path สัมพัทธ์ให้เป็น URL เต็ม (รองรับ data:/http(s) ด้วย)
+const resolveImgUrl = (src?: string) => {
+  if (!src) return "";
+  const s = src.replace(/\\/g, "/"); // กันเคส Windows path
+  if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:")) return s;
+  const clean = s.startsWith("/") ? s.slice(1) : s;
+  return `${API_BASE}/${clean}`;
+};
+
+type FilterKey = "all" | "mine";
 
 const WorkshopDetail: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { id: rawUserId } = useAuth() as { id?: number | string };
 
-  // antd v5: useMessage ให้ toast แสดงแน่นอน
-  const [msg, contextHolder] = message.useMessage();
-
+  const [msgCtx, contextHolder] = message.useMessage();
   const userId = useMemo(() => (rawUserId != null ? Number(rawUserId) : undefined), [rawUserId]);
 
   const [game, setGame] = useState<Game | null>(null);
   const [mods, setMods] = useState<Mod[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [filteredMods, setFilteredMods] = useState<Mod[]>([]);
-  const [userGames, setUserGames] = useState<number[]>([]); // game_id list ที่ผู้ใช้มี
-
-  // 🆕 Sort
   const [sortKey, setSortKey] = useState<"views" | "downloads">("views");
+
+  // 🆕 filter: All / My uploads
+  const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
+
+  // 🆕 my user-game IDs (สำรอง ใช้เดาว่าเป็นของเรา ถ้า mod มี user_game_id)
+  const [myUserGameIds, setMyUserGameIds] = useState<number[]>([]);
 
   // โหลดข้อมูลเกมและม็อด
   useEffect(() => {
@@ -62,81 +77,116 @@ const WorkshopDetail: React.FC = () => {
 
     listMods(gameId)
       .then((ms) => {
-        setMods(ms);
-        setFilteredMods(ms);
+        setMods(ms || []);
       })
       .catch((e) => {
         console.warn("listMods failed or not implemented:", e);
         setMods([]);
-        setFilteredMods([]);
       });
   }, [id]);
 
-  // โหลดรายการเกมที่ผู้ใช้มี
+  // 🆕 โหลด user-games ของเรา (เพื่อช่วยฟิลเตอร์ของฉันผ่าน user_game_id)
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setMyUserGameIds([]);
+      return;
+    }
     listUserGames(userId)
       .then((rows: any[]) => {
         const ids = (rows ?? [])
-          .map((r) => Number(r.game_id ?? r.gameId ?? r.GameID))
+          .map((r) => Number(r.id ?? r.ID ?? r.user_game_id ?? r.UserGameID))
           .filter((n) => Number.isFinite(n)) as number[];
-        setUserGames(ids);
+        setMyUserGameIds(ids);
       })
-      .catch(console.error);
+      .catch((e) => {
+        console.warn("listUserGames failed:", e);
+        setMyUserGameIds([]);
+      });
   }, [userId]);
 
+  // ✅ อนุญาตทุกคนที่ล็อกอินอัปโหลดได้ ไม่ต้องเป็นเจ้าของ
   const handleUpload = () => {
     const gid = (game as any)?.ID ?? (game as any)?.id;
 
     if (!game || !gid) {
-      msg.error({ content: "ไม่พบข้อมูลเกม", duration: 2 });
+      msgCtx.error({ content: "ไม่พบข้อมูลเกม", duration: 2 });
       return;
     }
     if (!userId) {
-      msg.error({ content: "กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด", duration: 2 });
+      msgCtx.error({ content: "กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด", duration: 2 });
       return;
     }
-
-    const isOwner = userGames.includes(Number(gid));
-    if (!isOwner) {
-      msg.error({
-        content: "ไม่สามารถอัปโหลดม็อดของเกมนี้ได้ เนื่องจากคุณไม่ได้เป็นเจ้าของเกมนี้",
-        duration: 2.5,
-      });
-      return; // ไม่พาไปหน้าอัปโหลด
-    }
-
-    // เป็นเจ้าของ → ไปหน้าอัปโหลด
-    navigate(`/upload?gameId=${gid}`);
+    navigate(`/workshop/upload?gameId=${gid}`); // ✅ path ตรงกับ router
   };
 
-  const handleSearch = (value: string) => {
-    setSearchText(value);
-    const result = mods.filter((m) => (m.title ?? "").toLowerCase().includes(value.toLowerCase()));
-    setFilteredMods(result);
+  // ค้นหา
+  const handleSearch = (value: string) => setSearchText(value);
+
+  // ✅ หา url รูปของม็อดให้ robust + แปลงเป็น URL เต็ม
+  const getModImg = (m: any): string => {
+    const raw =
+      m?.image_path ??
+      m?.ImagePath ??
+      m?.imageUrl ??
+      m?.ImageURL ??
+      m?.image ??
+      m?.img_src ??
+      m?.img ??
+      "";
+    return resolveImgUrl(raw);
   };
 
-  useEffect(() => {
-    setFilteredMods(mods);
-  }, [mods]);
-
-  // ใช้ค่านี้เพื่อปรับสไตล์ปุ่ม (กดได้เสมอ แต่ถ้าไม่เป็นเจ้าของทำให้อ่อนลงนิดหน่อย)
-  const isOwner = useMemo(() => {
-    const gid = (game as any)?.ID ?? (game as any)?.id;
-    return gid != null && userGames.includes(Number(gid));
-  }, [game, userGames]);
-
-  // helper: หา url รูปของม็อดอย่างปลอดภัย
-  const getModImg = (m: any): string =>
-    m?.image_path ?? m?.image ?? m?.imageUrl ?? m?.img_src ?? "";
-
-  const bannerImg = (game as any)?.img_src ?? "";
+  // ✅ banner เกมก็ใช้ตัวช่วยเดียวกัน
+  const bannerImg = resolveImgUrl(
+    (game as any)?.img_src ??
+      (game as any)?.image_path ??
+      (game as any)?.ImagePath ??
+      (game as any)?.cover ??
+      ""
+  );
 
   // 🆕 Helpers สำหรับดึงค่าดู/ดาวน์โหลดให้ robust
   const getViews = (m: any) =>
     Number(m.view_count ?? m.views ?? m.viewCount ?? m.Views ?? 0);
   const getDownloads = (m: any) =>
     Number(m.downloads ?? m.download_count ?? m.downloadCount ?? m.Downloads ?? 0);
+
+  // 🆕 ตรวจว่าเป็นม็อดของฉันไหม (พยายามครอบคลุมหลายสคีมา)
+  const extractUploaderId = (m: any): number | undefined => {
+    const cand =
+      m?.user_id ?? m?.UserID ??
+      m?.uploader_id ?? m?.UploaderID ??
+      m?.author_id ?? m?.AuthorID ??
+      m?.owner_id ?? m?.OwnerID;
+    const n = Number(cand);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const extractUserGameId = (m: any): number | undefined => {
+    const cand = m?.user_game_id ?? m?.UserGameID ?? m?.userGameId;
+    const n = Number(cand);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const isMine = (m: any): boolean => {
+    if (!userId) return false;
+    const uid = extractUploaderId(m);
+    if (uid && uid === Number(userId)) return true;
+    const ugid = extractUserGameId(m);
+    if (ugid && myUserGameIds.includes(ugid)) return true;
+    return false;
+  };
+
+  // 🧠 ฟิลเตอร์ + ค้นหา แบบรวมศูนย์
+  const filteredMods = useMemo(() => {
+    let base = mods.slice();
+    if (activeFilter === "mine") {
+      base = base.filter(isMine);
+    }
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase();
+      base = base.filter((m: any) => (m.title ?? "").toLowerCase().includes(q));
+    }
+    return base;
+  }, [mods, activeFilter, searchText, userId, myUserGameIds]);
 
   // 🆕 รายการหลังจัดเรียง
   const sortedMods = useMemo(() => {
@@ -148,6 +198,20 @@ const WorkshopDetail: React.FC = () => {
     });
     return modsCopy;
   }, [filteredMods, sortKey]);
+
+  // UI helper: สไตล์ปุ่มเมนูฝั่งขวา
+  const itemStyle = (active: boolean): React.CSSProperties => ({
+    color: active ? "white" : "#d0d0d0",
+    cursor: "pointer",
+    border: "none",
+    padding: "8px 12px",
+    marginBottom: 4,
+    borderRadius: 6,
+    background: active ? "#1890ff33" : "transparent",
+    borderLeft: active ? "3px solid #1890ff" : "3px solid transparent",
+    fontWeight: active ? 600 : 500,
+    transition: "all 0.2s",
+  });
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
@@ -305,7 +369,7 @@ const WorkshopDetail: React.FC = () => {
             {sortedMods.map((mod) => {
               const modImg = getModImg(mod);
               return (
-                <Col xs={24} sm={12} md={8} lg={6} key={mod.ID}>
+                <Col xs={24} sm={12} md={8} lg={6} key={mod.ID ?? (mod as any)?.id}>
                   <Card
                     hoverable
                     style={{
@@ -329,8 +393,12 @@ const WorkshopDetail: React.FC = () => {
                               transform: "scale(1.02)",
                               transition: "transform .3s ease",
                             }}
-                            onMouseEnter={(e) => ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.05)")}
-                            onMouseLeave={(e) => ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.02)")}
+                            onMouseEnter={(e) =>
+                              ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.05)")
+                            }
+                            onMouseLeave={(e) =>
+                              ((e.currentTarget as HTMLImageElement).style.transform = "scale(1.02)")
+                            }
                           />
                           <div
                             style={{
@@ -357,7 +425,7 @@ const WorkshopDetail: React.FC = () => {
                         </div>
                       )
                     }
-                    onClick={() => navigate(`/mod/${mod.ID}`)}
+                    onClick={() => navigate(`/mod/${mod.ID ?? (mod as any)?.id}`)}
                   >
                     {/* body: พื้นหลังภาพแบบจาง+เบลอ */}
                     <div
@@ -440,33 +508,21 @@ const WorkshopDetail: React.FC = () => {
         >
           <h3 style={{ color: "white" }}>Browse Items</h3>
           <List
-            dataSource={[{ name: "All", key: "all" as const }]}
+            dataSource={[
+              { name: "All", key: "all" as const },
+              { name: "My uploads", key: "mine" as const },
+            ]}
             renderItem={(item) => (
               <List.Item
-                style={{
-                  color: "white",
-                  cursor: "default",
-                  border: "none",
-                  padding: "8px 12px",
-                  marginBottom: 4,
-                  borderRadius: 6,
-                  background: "#1890ff33", // ✅ active ตลอด
-                  borderLeft: "3px solid #1890ff",
-                  fontWeight: 600,
-                  transition: "all 0.2s",
-                }}
+                style={itemStyle(activeFilter === item.key)}
+                onClick={() => setActiveFilter(item.key)}
               >
                 {item.name}
               </List.Item>
             )}
           />
 
-          <Button
-            type="primary"
-            block
-            style={{ marginTop: 20, opacity: isOwner ? 1 : 0.85 }}
-            onClick={handleUpload}
-          >
+          <Button type="primary" block style={{ marginTop: 20 }} onClick={handleUpload}>
             Upload Mod
           </Button>
         </Sider>

@@ -3,13 +3,12 @@ import type {
   Game,
   UserGame,
   Mod,
-  Comment,
-  CreateCommentRequest,
   ModRating,
   CreateModRatingRequest,
 } from "../interfaces";
 
-const API_URL = "http://localhost:8088";
+// อ่านจาก ENV ได้ และ fallback เป็น localhost
+const API_URL = (import.meta as any)?.env?.VITE_API_BASE ?? "http://localhost:8088";
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -21,7 +20,7 @@ async function handleResponse<T>(res: Response): Promise<T> {
   return (txt ? JSON.parse(txt) : (null as any)) as T;
 }
 
-// ---------- helpers: normalize keys ----------
+/* ------------------------ normalize helpers ------------------------ */
 const toNum = (v: any): number | undefined => {
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
@@ -52,7 +51,6 @@ function addAliases<T extends Record<string, any>>(row: T) {
   };
 }
 
-// ช่วย normalize array
 const asArray = (v: any): any[] => {
   if (Array.isArray(v)) return v;
   if (Array.isArray(v?.items)) return v.items;
@@ -69,6 +67,7 @@ export async function listGames(): Promise<Game[]> {
 }
 
 export async function getGame(id: number): Promise<Game> {
+  // backend ยังไม่มี /game/:id => ค้นจาก list
   const games = await listGames();
   const found = games.find((g: any) => (g?.ID ?? g?.id ?? g?.Id) === id);
   if (!found) throw new Error(`Game ${id} not found`);
@@ -137,51 +136,55 @@ export async function updateMod(
   return addAliases<Mod>(raw);
 }
 
-/* ----------------------------- Comments ------------------------------ */
-export async function listComments(threadId: number): Promise<Comment[]> {
-  const url = new URL(`${API_URL}/comments`);
-  url.searchParams.set("thread_id", String(threadId));
+/* --------------------------- Mod Ratings ----------------------------- */
+/**
+ * ดึงเรตติ้ง/คอมเมนต์ของม็อด
+ * - ใช้ /modratings?mod_id=xxx (ถ้า backend ยังไม่รองรับ query นี้ ก็ยัง filter ฝั่ง client ต่อ)
+ * - map ค่า review -> comment (backward-compat)
+ */
+export async function listModRatings(modId: number): Promise<ModRating[]> {
+  // พยายามส่ง query ไปก่อน
+  const url = new URL(`${API_URL}/modratings`);
+  url.searchParams.set("mod_id", String(modId));
+
   const res = await fetch(url.toString());
   const raw = await handleResponse<any>(res);
-  return asArray(raw).map((r) => addAliases<Comment>(r));
-}
+  const rows = asArray(raw);
 
-export async function createComment(
-  payload: CreateCommentRequest,
-  authToken?: string
-): Promise<Comment> {
-  const res = await fetch(`${API_URL}/comments`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-    },
-    body: JSON.stringify(payload),
+  const mapped = rows.map((r) => {
+    const row = addAliases<ModRating>(r);
+    const comment = (r?.comment ?? r?.Comment ?? r?.review ?? r?.Review) ?? "";
+    return { ...row, comment } as any as ModRating;
   });
-  const raw = await handleResponse<any>(res);
-  return addAliases<Comment>(raw);
+
+  // เผื่อ backend ยังคืนทั้งหมดมา → filter ฝั่ง client
+  return mapped.filter((r: any) => (r?.mod_id ?? r?.modId ?? r?.ModID) === modId);
 }
 
-/* --------------------------- Mod Ratings ----------------------------- */
-export async function listModRatings(modId: number): Promise<ModRating[]> {
-  const res = await fetch(`${API_URL}/modratings`);
-  const raw = await handleResponse<any>(res);
-  const ratings = asArray(raw).map((r) => addAliases<ModRating>(r));
-  return ratings.filter((r: any) => (r?.mod_id ?? r?.modId ?? r?.ModID) === modId);
-}
-
+/**
+ * สร้างเรตติ้ง/คอมเมนต์ของม็อด
+ * ส่ง { rating, comment, mod_id, user_game_id, purchase_date? }
+ * (ถ้า caller ยังส่ง review มา เราจะแมปเป็น comment ให้อัตโนมัติ)
+ */
 export async function createModRating(
   payload: CreateModRatingRequest,
   authToken?: string
 ): Promise<ModRating> {
+  const body = {
+    ...payload,
+    comment: (payload as any).comment ?? (payload as any).review ?? "",
+  };
+
   const res = await fetch(`${API_URL}/modratings`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(body),
   });
   const raw = await handleResponse<any>(res);
-  return addAliases<ModRating>(raw);
+  const row = addAliases<ModRating>(raw);
+  const comment = (raw?.comment ?? raw?.Comment ?? raw?.review ?? raw?.Review) ?? "";
+  return { ...row, comment } as any as ModRating;
 }
