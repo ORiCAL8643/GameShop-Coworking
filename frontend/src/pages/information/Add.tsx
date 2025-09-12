@@ -13,6 +13,7 @@ import { useState,useEffect } from 'react';
 import axios from 'axios';
 import { message } from "antd";
 import type { UploadProps } from "antd";
+import { useAuth } from '../../context/AuthContext';
 const base_url = 'http://localhost:8088'
 const Add = () => {
     interface Category {
