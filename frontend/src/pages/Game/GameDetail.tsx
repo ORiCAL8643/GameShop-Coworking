@@ -13,6 +13,7 @@ import {
   Divider,
   Space,
   Tooltip,
+  Rate,
   message,
 } from "antd";
 import {
@@ -56,6 +57,7 @@ const GameDetail: React.FC = () => {
   const [mods, setMods] = React.useState<Mod[]>([]);
   const [minSpec, setMinSpec] = React.useState<MinimumSpec | null>(null);
   const [msg, ctx] = message.useMessage();
+  const [avgRating, setAvgRating] = React.useState(0);
 
   // contexts
   const { addItem } = useCart();
@@ -511,11 +513,27 @@ const GameDetail: React.FC = () => {
       </Card>
 
       <Card
-        title={<Space><StarFilled /><span>User Reviews</span></Space>}
+        title={
+          <Space>
+            <StarFilled />
+            <span>User Reviews</span>
+            {avgRating > 0 && (
+              <Space size={4} style={{ color: "#fadb14" }}>
+                <Rate disabled allowHalf value={avgRating} />
+                <span>{avgRating.toFixed(1)}</span>
+              </Space>
+            )}
+          </Space>
+        }
         style={{ marginTop: 16, background: "#12181f", borderColor: "#23313a" }}
         headStyle={{ color: "#fff" }}
       >
-        <ReviewSection gameId={gid} allowCreate className="mt-4" />
+        <ReviewSection
+          gameId={gid}
+          allowCreate
+          className="mt-4"
+          onStatsChange={(s) => setAvgRating(s.average)}
+        />
       </Card>
     </Content>
 

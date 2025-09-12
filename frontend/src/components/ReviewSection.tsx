@@ -17,6 +17,7 @@ export type ReviewSectionProps = {
   gameId: number;
   allowCreate?: boolean;
   className?: string;
+  onStatsChange?: (stats: { count: number; average: number }) => void;
 };
 
 /** ให้ rating เป็นจำนวนเต็ม 1–5 */
@@ -41,7 +42,12 @@ async function fetchUsernameById(id: number) {
   }
 }
 
-const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = true, className }) => {
+const ReviewSection: React.FC<ReviewSectionProps> = ({
+  gameId,
+  allowCreate = true,
+  className,
+  onStatsChange,
+}) => {
   const { id: authId, token } = useAuth();
   const userId = authId ? Number(authId) : undefined;
 
@@ -50,6 +56,17 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({ gameId, allowCreate = tru
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<ReviewItem | null>(null);
   const [form] = Form.useForm<{ title?: string; content: string; rating: number }>();
+
+  const avgRating = useMemo(
+    () =>
+      items.length
+        ? items.reduce((s, r) => s + clampIntRating(r.rating), 0) / items.length
+        : 0,
+    [items]
+  );
+  useEffect(() => {
+    onStatsChange?.({ count: items.length, average: avgRating });
+  }, [items, avgRating, onStatsChange]);
 
   /** ------- โหลดรีวิว + เติมชื่อผู้ใช้ -------- */
   const load = async () => {
