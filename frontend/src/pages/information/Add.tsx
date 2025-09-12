@@ -13,7 +13,6 @@ import { useState,useEffect } from 'react';
 import axios from 'axios';
 import { message } from "antd";
 import type { UploadProps } from "antd";
-
 const base_url = 'http://localhost:8088'
 const Add = () => {
     interface Category {
@@ -32,6 +31,8 @@ const Add = () => {
     const [memory, setMemory] = useState("");
     const [graphics, setGraphics] = useState("");
     const [storage, setStorage] = useState("");
+    const { id } = useAuth(); //คนใช้งานระบบ
+    const [useron, Setuseron] = useState<useronline | null>(null)
 
     async function uploadGameImage(file: File): Promise<string> {
         const fd = new FormData();
