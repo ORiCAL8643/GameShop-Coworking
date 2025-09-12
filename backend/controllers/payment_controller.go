@@ -17,7 +17,8 @@ import (
 )
 
 var (
-	ErrNotEnoughKeys = errors.New("not enough keys")
+	ErrNotEnoughKeys   = errors.New("not enough keys")
+	ErrAlreadyApproved = errors.New("payment already approved")
 )
 
 func baseURL(c *gin.Context) string {
@@ -200,6 +201,9 @@ func UpdatePayment(c *gin.Context) {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
 			return
+		case errors.Is(err, ErrAlreadyApproved):
+			c.JSON(http.StatusConflict, gin.H{"error": "payment already approved"})
+			return
 		case errors.Is(err, ErrNotEnoughKeys):
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 			return
@@ -242,6 +246,9 @@ func ApprovePayment(c *gin.Context) {
 		switch {
 		case errors.Is(err, gorm.ErrRecordNotFound):
 			c.JSON(http.StatusNotFound, gin.H{"error": "payment not found"})
+			return
+		case errors.Is(err, ErrAlreadyApproved):
+			c.JSON(http.StatusConflict, gin.H{"error": "payment already approved"})
 			return
 		case errors.Is(err, ErrNotEnoughKeys):
 			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
@@ -286,6 +293,10 @@ func changePaymentStatus(paymentID uint, newStatus string, rejectReason *string)
 	var p entity.Payment
 	if err := db.Preload("Order").Preload("Order.OrderItems").First(&p, paymentID).Error; err != nil {
 		return err
+	}
+
+	if newStatus == "APPROVED" && p.Status == entity.PaymentStatus("APPROVED") {
+		return ErrAlreadyApproved
 	}
 
 	return db.Transaction(func(tx *gorm.DB) error {
