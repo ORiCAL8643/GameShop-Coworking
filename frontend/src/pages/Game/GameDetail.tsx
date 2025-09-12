@@ -8,16 +8,13 @@ import {
   Card,
   Row,
   Col,
-  Carousel,
   Skeleton,
   Divider,
   Space,
-  Tooltip,
   Rate,
   message,
 } from "antd";
 import {
-  HeartOutlined,
   ShoppingCartOutlined,
   PictureOutlined,
   StarFilled,
@@ -114,19 +111,9 @@ const GameDetail: React.FC = () => {
     };
   }, [gid]);
 
-  // รูป/สกรีนช็อต
+  // รูปปก
   const coverRaw = (game as any)?.img_src || (game as any)?.cover || "";
   const cover = resolveImgUrl(coverRaw);
-
-  const screenshots: string[] = (() => {
-    const raw = (game as any)?.screenshots ?? (game as any)?.images ?? [];
-    const arr = Array.isArray(raw)
-      ? raw
-      : typeof raw === "string"
-      ? raw.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
-    return arr.map((s) => resolveImgUrl(s));
-  })();
 
   // ข้อความ/แท็ก
   const title = (game as any)?.game_name ?? (game as any)?.name ?? "Untitled Game";
@@ -174,7 +161,7 @@ const GameDetail: React.FC = () => {
   }, [mods]);
 
   // === NEW: Purchase handler (เหมือน ProductGrid) ===
-  const handlePurchase = async (e: React.MouseEvent) => {
+  const handlePurchase = async () => {
     if (!game) return;
 
     const price = Number((game as any)?.discounted_price ?? (game as any)?.base_price) || 0;
@@ -376,36 +363,6 @@ const GameDetail: React.FC = () => {
       {/* ===== Content ===== */}
       <Layout>
         <Content style={{ padding: 24 }}>
-          {/* Screenshots */}
-          <Card
-            title="Screenshots"
-            style={{ marginBottom: 16, background: "#12181f", borderColor: "#23313a" }}
-            headStyle={{ color: "#fff" }}
-            bodyStyle={{ padding: 0 }}
-          >
-            {screenshots.length > 0 ? (
-              <Carousel autoplay draggable>
-                {screenshots.map((src, i) => (
-                  <div key={i} style={{ height: 380, overflow: "hidden" }}>
-                    <img src={src} alt={`shot-${i}`} style={{ width: "100%", height: 380, objectFit: "cover" }} />
-                  </div>
-                ))}
-              </Carousel>
-            ) : (
-              <div
-                style={{
-                  height: 200,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#7a8a99",
-                }}
-              >
-                <PictureOutlined style={{ fontSize: 28 }} /> &nbsp; No screenshots
-              </div>
-            )}
-          </Card>
-
           <Row gutter={[16, 16]}>
             <Col xs={24} md={16}>
               <Card title="About this game" style={{ background: "#12181f", borderColor: "#23313a" }} headStyle={{ color: "#fff" }}>
