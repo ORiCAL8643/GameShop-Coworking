@@ -20,11 +20,18 @@ const BORDER = "#2b2f3a";
 const TEXT_MAIN = "#e8e8f3";
 const TEXT_SUB = "#a9afc3";
 
+type OrderItemRow = {
+  unit_price?: number; UnitPrice?: number;
+  qty?: number; QTY?: number;
+  line_total?: number; LineTotal?: number;
+};
+
 type Order = {
   ID?: number; id?: number;
   OrderStatus?: string; order_status?: string;
   TotalAmount?: number; total_amount?: number;
   OrderCreate?: string; order_create?: string;
+  OrderItems?: OrderItemRow[]; order_items?: OrderItemRow[];
 };
 
 type RawKeyRow = any;
@@ -235,7 +242,13 @@ export default function OrdersStatusPage() {
             {rows.map((o) => {
               const oid = o.ID ?? o.id!;
               const status = (o.OrderStatus ?? o.order_status ?? "").toUpperCase();
-              const total = o.TotalAmount ?? o.total_amount ?? 0;
+              const items = (o.OrderItems ?? o.order_items ?? []) as OrderItemRow[];
+              const total = items.length
+                ? items.reduce((s, it) =>
+                    s + (it.line_total ?? it.LineTotal ?? (it.unit_price ?? it.UnitPrice ?? 0) * (it.qty ?? it.QTY ?? 0)),
+                    0,
+                  )
+                : (o.TotalAmount ?? o.total_amount ?? 0);
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
               const canViewKeys = statusAllowsView(status);
