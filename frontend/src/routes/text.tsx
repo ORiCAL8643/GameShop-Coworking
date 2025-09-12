@@ -32,6 +32,7 @@ import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
 import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage"; // ✅ เพิ่ม import นี้
 
 import OrdersStatusPage from "../pages/OrdersStatusPage";
+import Reviewpage from "../pages/Review/Reviewpage.tsx";
 import GameDetail from "../pages/Game/GameDetail";
 
 // mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
@@ -93,6 +94,15 @@ const router = createBrowserRouter([
       // === refund
       { path: "refund", element: <RefundPage /> },
       { path: "refund-status", element: <RefundStatusPage refunds={refunds} /> },
+      { path: "/promotion", element: <PromotionManager /> },
+      { path: "/promotion/:id", element: <PromotionDetail /> },
+      // Review page for a specific game
+      { path: "/reviews/:gameId", element: <Reviewpage /> },
+
+
+      // 🟣 Refund
+      { path: "/refund", element: <RefundPage /> },
+      { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
 
       // === admin
       {

@@ -5,9 +5,10 @@ import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { PlusOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useReportNewCount } from "../hooks/useReportNewCount";
+import type { ItemType } from "antd/es/menu/interface";
 
-const { Sider } = Layout;
-type ItemType = Required<MenuProps>["items"][number];
+const { Sider, Content } = Layout;
+type GroupItem = Required<MenuProps>["items"][number];
 
 const Sidebar = () => {
   const navigate = useNavigate();
@@ -90,30 +91,29 @@ const Sidebar = () => {
   return (
     <Layout style={{ minHeight: "100vh" }}>
       <Sider theme="dark" width={220}>
-        <div
-          style={{
-            color: "#9254de",
-            fontSize: 20,
-            textAlign: "center",
-            padding: "16px 0",
-            fontWeight: 600,
-          }}
-        >
+        <div style={{ color: "#9254de", fontSize: 20, textAlign: "center", padding: "16px 0", fontWeight: 600 }}>
           GAME STORE
         </div>
-
         <Menu
           theme="dark"
           mode="inline"
           items={items}
           selectedKeys={[selectedKey]}
           openKeys={openKeys}
-          onOpenChange={onOpenChange}
+          onOpenChange={(keys) => setOpenKeys(keys as string[])}
           onClick={({ key }) => navigate(String(key))}
         />
       </Sider>
 
-      <Outlet />
+      {/* ✅ โซนเนื้อหาหลักต้องอยู่ใน Content */}
+      <Layout style={{ background: "#0f0f0f" }}>
+        <Content style={{ margin: 0, padding: 0, minHeight: "100vh" }}>
+          {/* padding รวมของทุกหน้า (ถ้าบางหน้าต้องเต็มขอบ ก็ย้าย paddingไปรอบในหน้านั้นได้) */}
+          <div style={{ padding: "16px 24px" }}>
+            <Outlet />
+          </div>
+        </Content>
+      </Layout>
     </Layout>
   );
 };
