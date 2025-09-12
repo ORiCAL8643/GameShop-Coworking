@@ -12,6 +12,22 @@ const { Title, Text } = Typography;
 
 const base_url = import.meta.env.VITE_API_URL || "http://localhost:8088";
 
+function applyDiscount(
+  price: number,
+  type: Promotion["discount_type"],
+  value: number,
+): number {
+  if (value <= 0) return price;
+  switch (type) {
+    case "PERCENT":
+      return price * (1 - value / 100);
+    case "AMOUNT":
+      return price < value ? 0 : price - value;
+    default:
+      return price;
+  }
+}
+
 export default function PromotionDetail() {
   const { id } = useParams<{ id: string }>();
   const [promotion, setPromotion] = useState<Promotion | null>(null);
@@ -40,7 +56,16 @@ export default function PromotionDetail() {
         const data = await getPromotion(Number(id), true);
         setPromotion(data);
         if (data.games) {
-          setGames(data.games);
+          setGames(
+            data.games.map((g) => ({
+              ...g,
+              discounted_price: applyDiscount(
+                g.base_price,
+                data.discount_type,
+                data.discount_value,
+              ),
+            })),
+          );
         }
       } catch {
         setPromotion(null);
@@ -103,10 +128,7 @@ export default function PromotionDetail() {
               dataSource={games}
               locale={{ emptyText: <Text style={{ color: "#888" }}>ยังไม่มีเกม</Text> }}
               renderItem={(g) => {
-                const hasDiscount =
-                  typeof g.discounted_price === "number" &&
-                  g.discounted_price > 0 &&
-                  g.discounted_price < g.base_price;
+                const hasDiscount = g.discounted_price < g.base_price;
 
                 return (
                   <List.Item
