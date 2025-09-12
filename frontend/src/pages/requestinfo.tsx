@@ -79,7 +79,7 @@ export default function Requestinfo() {
     const pendingGames = game ? game.filter(g => g.status === "pending") : [];
 
 
-  return (<div>{(pendingGames.length !== 0) ? (
+  return (<div><div>{(pendingGames.length !== 0) ? (
     <div style={{ padding: 16, background:'#141414', minHeight:'100vh'}}>
       <Card
         bodyStyle={{ padding: 20 }}
@@ -137,6 +137,6 @@ export default function Requestinfo() {
         </Col>
       </Row>
     </div>) : (<Result style={{ flex: 1, background:'#313131ff', justifyContent: "left", minHeight:'100vh', alignItems: "baseline", minWidth:'180vh'}} status={"404"} title={<div style={{color:'#ffffffff'}}>"404"</div>} subTitle={<div style={{color:'#ffffffff'}}>"Sorry, request does not exist.maybe not have game is pending."</div>} extra={[<Link to="/home"><Button type="primary">Back Home</Button></Link>]}/>)
-  }</div>
+  }</div></div>
   );
 }
