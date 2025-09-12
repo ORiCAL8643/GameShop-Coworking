@@ -145,11 +145,15 @@ func FindPayments(c *gin.Context) {
 				userName = fmt.Sprintf("User#%d", p.Order.User.ID)
 			}
 		}
+		amt := p.Order.TotalAmount
+		if amt <= 0 {
+			amt = p.Amount
+		}
 		out = append(out, adminPaymentDTO{
 			ID:           fmt.Sprintf("%d", p.ID),
 			OrderNo:      orderNo,
 			UserName:     userName,
-			Amount:       p.Amount,
+			Amount:       amt,
 			SlipURL:      baseURL(c) + "/uploads/" + p.SlipPath,
 			UploadedAt:   p.CreatedAt.Format(time.RFC3339), // ใช้ CreatedAt
 			Status:       string(p.Status),
