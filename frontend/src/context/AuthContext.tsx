@@ -1,20 +1,27 @@
-import { createContext, useState, useContext } from 'react';
+import { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import api from '../lib/api';
 
 interface AuthContextType {
   id: number | null;
   token: string | null;
   username: string | null;
+  roles: string[];
+  perms: string[];
   login: (id:number, token: string, username: string) => void;
   logout: () => void;
+  refreshPermissions: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   id: null,
   token: null,
   username: null,
+  roles: [],
+  perms: [],
   login: () => {},
   logout: () => {},
+  refreshPermissions: async () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -24,6 +31,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const s = localStorage.getItem("userid");
     return s ? Number(s) : null;
   });
+  const [roles, setRoles] = useState<string[]>([]);
+  const [perms, setPerms] = useState<string[]>([]);
+
+  const refreshPermissions = async () => {
+    if (!token) {
+      setRoles([]);
+      setPerms([]);
+      return;
+    }
+    try {
+      const res = await api.get('/me/permissions', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setRoles(res.data.roles || []);
+      setPerms(res.data.perms || []);
+    } catch {
+      setRoles([]);
+      setPerms([]);
+    }
+  };
+
   const login = (newId: number, newToken: string, name: string) => {
     setId(newId);
     setToken(newToken);
@@ -31,6 +59,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('token', newToken);
     localStorage.setItem('username', name);
     localStorage.setItem('userid', String(newId));
+    refreshPermissions();
   };
 
   const logout = () => {
@@ -40,10 +69,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('userid');
+    setRoles([]);
+    setPerms([]);
   };
 
+  useEffect(() => {
+    if (token) {
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete api.defaults.headers.common['Authorization'];
+    }
+    refreshPermissions();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  useEffect(() => {
+    const interceptor = api.interceptors.response.use(
+      resp => resp,
+      async err => {
+        if (err.response && err.response.status === 403) {
+          await refreshPermissions();
+        }
+        return Promise.reject(err);
+      }
+    );
+    return () => {
+      api.interceptors.response.eject(interceptor);
+    };
+  }, [token]);
+
   return (
-    <AuthContext.Provider value={{ id, token, username, login, logout }}>
+    <AuthContext.Provider value={{ id, token, username, roles, perms, login, logout, refreshPermissions }}>
       {children}
     </AuthContext.Provider>
   );

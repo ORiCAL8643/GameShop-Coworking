@@ -53,7 +53,16 @@ func AuthRequired() gin.HandlerFunc {
 			return
 		}
 		c.Set("userID", uid)
-		c.Set("roleID", claims.RoleID)
+		roleID := claims.RoleID
+		if roleID == 0 {
+			var u entity.User
+			if err := configs.DB().Select("role_id").First(&u, uid).Error; err == nil {
+				roleID = u.RoleID
+			}
+		}
+		if roleID > 0 {
+			c.Set("roleID", roleID)
+		}
 		c.Next()
 	}
 }

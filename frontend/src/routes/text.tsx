@@ -2,6 +2,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
+import { RequireAuth, RequirePerm } from "../components/Require";
 
 // pages
 import Home from "../pages/Home";
@@ -71,7 +72,13 @@ const router = createBrowserRouter([
         path: "category",
         children: [
           { path: "Community", element: <CommunityPage /> },
-          { path: "Payment", element: <PaymentPage /> },
+          { path: "Payment", element: (
+            <RequireAuth>
+              <RequirePerm need={["order:create", "payment:create"]}>
+                <PaymentPage />
+              </RequirePerm>
+            </RequireAuth>
+          ) },
         ],
       },
 
@@ -80,7 +87,13 @@ const router = createBrowserRouter([
       { path: "workshop/:id", element: <WorkshopDetail /> },
       { path: "mod/:id", element: <ModDetail /> },
       // ชี้หน้าอัปโหลดให้เป็นเส้นทางย่อยของ Workshop
-      { path: "workshop/upload", element: <Workshop /> },
+      { path: "workshop/upload", element: (
+        <RequireAuth>
+          <RequirePerm need="workshop:mod:create">
+            <Workshop />
+          </RequirePerm>
+        </RequireAuth>
+      ) },
       
        { path: "game/:id", element: <GameDetail /> },
 
@@ -108,20 +121,42 @@ const router = createBrowserRouter([
       {
         path: "Admin/Page",
         element: (
-          <AdminPage
-            refunds={refunds}
-            setRefunds={() => { }}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          />
+          <RequireAuth>
+            <RequirePerm need="admin:panel">
+              <AdminPage
+                refunds={refunds}
+                setRefunds={() => { }}
+                addNotification={addNotification}
+                addRefundUpdate={addRefundUpdate}
+              />
+            </RequirePerm>
+          </RequireAuth>
         ),
       },
-      { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+      { path: "Admin/PaymentReviewPage", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <AdminPaymentReviewPage />
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
-      { path: "Admin/RolePage", element: <RoleManagement /> },
+      { path: "Admin/RolePage", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RoleManagement />
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
       // ✅ เพิ่มเส้นทางหน้ารายการที่แก้ไขแล้ว (ตรงกับปุ่ม navigate("/Admin/Resolved"))
-      { path: "Admin/Resolved", element: <ResolvedReportsPage /> },
+      { path: "Admin/Resolved", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <ResolvedReportsPage />
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
       // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
       { path: "orders-status", element: <OrdersStatusPage /> },

@@ -329,6 +329,50 @@ func seedPermissionsAndGrantAdmin(adminID uint) {
 	}
 }
 
+// seedAppPermissions ensures application specific permission keys exist and
+// grants them to the appropriate roles. Admin role will receive every
+// permission (including "*") while the basic User role receives a subset.
+func seedAppPermissions(adminID, userID uint) {
+	guest := []string{
+		"game:view", "promotion:view", "workshop:view", "thread:view",
+	}
+	userExtra := []string{
+		"order:create", "order:read:own", "payment:create",
+		"workshop:mod:create", "workshop:mod:update:own", "workshop:mod:delete:own",
+		"thread:create", "thread:comment", "thread:like",
+		"rating:create", "comment:create",
+		"report:create", "refund:create",
+		"admin:panel", // keep for admin mapping
+	}
+	// combine guest + userExtra for user role (excluding admin:panel)
+	userPerms := append([]string{}, guest...)
+	for _, p := range userExtra {
+		if p != "admin:panel" {
+			userPerms = append(userPerms, p)
+		}
+	}
+	// all perms for ensuring; include wildcard "*"
+	allPerms := append([]string{"*"}, append(guest, userExtra...)...)
+
+	for _, key := range allPerms {
+		perm, err := ensurePermission(key, key, "")
+		if err != nil {
+			log.Println("seed perm error", key, err)
+			continue
+		}
+		if err := ensureRoleHasPermission(adminID, perm.ID); err != nil {
+			log.Println("grant admin perm error", key, err)
+		}
+		for _, uk := range userPerms {
+			if uk == key {
+				if err := ensureRoleHasPermission(userID, perm.ID); err != nil {
+					log.Println("grant user perm error", key, err)
+				}
+			}
+		}
+	}
+}
+
 // ---------- Setup / Seed ----------
 
 // AutoMigrate และ seed ข้อมูลตัวอย่าง (ถ้ายังว่าง) — ไม่ต้องดรอปตาราง
@@ -362,6 +406,7 @@ func SetupDatabase() {
 
 	// Seed permissions & มอบให้ admin
 	seedPermissionsAndGrantAdmin(roleAdmin.ID)
+	seedAppPermissions(roleAdmin.ID, roleUser.ID)
 
 	// เฟส 3: ซ่อม users.role_id ให้ชี้ role ที่มีจริง (กันพังตอนคัดลอกเข้า users__temp ระหว่าง migrate)
 	if tableExists("users") {
@@ -412,8 +457,6 @@ func SetupDatabase() {
 		&entity.ThreadImage{},
 		&entity.Comment{},
 		&entity.ThreadLike{},
-
-
 
 		&entity.Review{},      // ★ ใช้ชื่อดัชนีใหม่แล้ว
 		&entity.Review_Like{}, // ถ้ามี
