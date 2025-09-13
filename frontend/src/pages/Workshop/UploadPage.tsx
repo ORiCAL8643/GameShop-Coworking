@@ -15,7 +15,6 @@ import {
   createMod,
   updateMod,
   listUserGames,
-  // ⬇️ เพิ่ม 2 ตัวนี้ สำหรับโหมดแก้ไข
   replaceModFile,
   replaceModImage,
 } from "../../services/workshop";
@@ -34,8 +33,10 @@ const Ok: React.FC<{ ok: boolean }> = ({ ok }) => (
 const UploadPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const gameIdParam = searchParams.get("gameId");
   const modIdParam = searchParams.get("modId");
+  const fromParam = searchParams.get("from"); // ⬅️ ใช้คืนสู่หน้าที่มาก่อน (เช่น ModDetail)
 
   const [gameId, setGameId] = useState<number | undefined>(
     gameIdParam ? Number(gameIdParam) : undefined
@@ -92,14 +93,13 @@ const UploadPage: React.FC = () => {
       .finally(() => setCheckingOwn(false));
   }, [userId, gameId]);
 
-  // โหลดม็อด (โหมดแก้ไข) + ✅ เซ็ต gameId จากม็อด เพื่อไม่ให้ขึ้น “ไม่มีเกม”
+  // โหลดม็อด (โหมดแก้ไข) + เซ็ต gameId จากม็อด เพื่อไม่ให้ขึ้น “ไม่มีเกม”
   useEffect(() => {
     if (!modId) return;
     getMod(modId)
       .then((m: any) => {
         setModTitle(m?.title ?? "");
         setModDescription(m?.description ?? "");
-        // ✅ ดึง gameId จากม็อด แล้ว set เข้า state
         const gid = m?.game_id ?? m?.GameID ?? m?.gameId;
         if (gid != null) setGameId(Number(gid));
 
@@ -205,12 +205,13 @@ const UploadPage: React.FC = () => {
         fd.append("file", modFile);
         if (modImage) fd.append("image", modImage);
 
-        await createMod(fd, token, userId);
+        const created = await createMod(fd, token, userId);
         message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 0.8 });
 
         setShowSuccess(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         redirectTimer.current = window.setTimeout(() => {
+          // อัปโหลดเสร็จ → กลับหน้า Workshop ของเกม
           navigate(`/workshop/${gameId}`, { replace: true });
         }, 1400);
 
@@ -227,9 +228,9 @@ const UploadPage: React.FC = () => {
         const payload: any = { title: modTitle, description: modDescription, game_id: gameId };
         if (userGameId != null) payload.user_game_id = userGameId;
 
-        await updateMod(modId!, payload, token, userId);
+        const updated = await updateMod(modId!, payload, token, userId);
 
-        // ⬇️ ถ้าแนบไฟล์/รูปมา ให้เปลี่ยนไฟล์/รูป (ออปชัน)
+        // ถ้ามีไฟล์/รูปใหม่ ให้แทนที่ (ออปชัน)
         if (modFile) {
           await replaceModFile(modId!, modFile, token, userId);
         }
@@ -242,7 +243,13 @@ const UploadPage: React.FC = () => {
         setShowSuccess(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         redirectTimer.current = window.setTimeout(() => {
-          navigate(`/workshop/${gameId}`, { replace: true });
+          // ✅ โหมดแก้ไข: กลับไปหน้าที่มาก่อน (มักเป็น ModDetail)
+          if (fromParam) {
+            navigate(decodeURIComponent(fromParam), { replace: true });
+          } else {
+            // fallback: ใช้ history back เพื่อกลับไป ModDetail
+            navigate(-1);
+          }
         }, 1200);
       }
     } catch (err: any) {
@@ -271,7 +278,6 @@ const UploadPage: React.FC = () => {
   const checks = {
     gameId: !!gameId,
     title: !!modTitle.trim(),
-    // โหมดแก้ไขไม่บังคับไฟล์
     fileReady: isEditing ? true : !!modFile,
     owns: ownsThisGame && !checkingOwn,
   };
@@ -360,7 +366,7 @@ const UploadPage: React.FC = () => {
           />
         </Card>
 
-        {/* ⬇️ แสดงได้ทั้งโหมดสร้างใหม่และแก้ไข (โหมดแก้ไข = Replace, optional) */}
+        {/* โหมดแก้ไข = Replace (optional), โหมดสร้าง = เลือกไฟล์ (required) */}
         <Card
           title={
             <span style={{ color: "white" }}>
@@ -493,7 +499,7 @@ const UploadPage: React.FC = () => {
             type="primary"
             size="large"
             loading={uploading}
-            disabled={disableSubmit}
+            disabled={uploading || checkingOwn || !ownsThisGame}
             style={{ background: "#9254de", borderColor: "#9254de" }}
             onClick={handleUpload}
           >
