@@ -196,25 +196,34 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
           message.info("กรุณาเข้าสู่ระบบ");
           return;
         }
-        const created = await ReviewsAPI.createJson(
-          {
-            game_id: gameId,
-            user_id: userId,
-            review_title: values.title,
-            review_text: values.content,
-            rating,
-          },
-          token || undefined
-        );
+        try {
+          const created = await ReviewsAPI.createJson(
+            {
+              game_id: gameId,
+              user_id: userId,
+              review_title: values.title,
+              review_text: values.content,
+              rating,
+            },
+            token || undefined
+          );
 
-        // เติมชื่อทันทีหลังสร้าง (ถ้าคุณมีชื่อใน auth context ใส่แทน created.username ได้)
-        const createdWithName = { ...created } as ReviewItem;
-        if (!createdWithName.username) {
-          createdWithName.username = await fetchUsernameById(userId);
+          // เติมชื่อทันทีหลังสร้าง (ถ้าคุณมีชื่อใน auth context ใส่แทน created.username ได้)
+          const createdWithName = { ...created } as ReviewItem;
+          if (!createdWithName.username) {
+            createdWithName.username = await fetchUsernameById(userId);
+          }
+
+          setItems((prev) => [createdWithName, ...prev]);
+          message.success("สร้างรีวิวแล้ว");
+        } catch (err) {
+          if (axios.isAxiosError(err) && err.response?.status === 403) {
+            message.error("ยังไม่ได้เป็นเจ้าของเกม");
+          } else {
+            message.error("สร้างรีวิวไม่สำเร็จ");
+          }
+          return;
         }
-
-        setItems((prev) => [createdWithName, ...prev]);
-        message.success("สร้างรีวิวแล้ว");
       }
 
       setShowForm(false);
