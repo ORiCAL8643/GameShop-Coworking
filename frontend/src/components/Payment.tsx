@@ -21,11 +21,26 @@ import qrPromptPay from "../assets/ktb-qr.png";
 const formatTHB = (n: number) =>
   `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+// ✅ helper: แปลงไฟล์เป็น base64 สำหรับพรีวิวกรณีที่ยังไม่มี url/thumbUrl
+const getBase64 = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+  });
+
 export default function PaymentPage() {
   const { items, updateQty, removeItem, clearCart } = useCart();
   const [payOpen, setPayOpen] = useState(false);
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // ✅ พรีวิวสลิป
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string>("");
+  const [previewTitle, setPreviewTitle] = useState<string>("");
+
   const navigate = useNavigate();
 
   // ✅ เอาค่าจาก AuthContext
@@ -48,6 +63,43 @@ export default function PaymentPage() {
   const decQuantity = (gameId: number) => {
     const cur = items.find(i => i.id === gameId)?.quantity ?? 1;
     updateQty(gameId, Math.max(1, cur - 1));
+  };
+
+  // ✅ handler: เปิดพรีวิวเมื่อคลิกไฟล์ใน Upload list
+  const handlePreview = async (file: UploadFile) => {
+    // ถ้าเป็น PDF ให้เปิดแท็บใหม่แทน
+    if (file.type?.includes("pdf")) {
+      try {
+        const blobUrl =
+          (file.originFileObj && URL.createObjectURL(file.originFileObj)) ||
+          (typeof file.url === "string" ? file.url : "");
+        if (blobUrl) {
+          window.open(blobUrl, "_blank");
+          return;
+        }
+      } catch (e) {
+        // ถ้าเปิดแท็บไม่ได้ ให้แจ้งเตือนแทน
+      }
+      message.info("ไฟล์ PDF จะเปิดในแท็บใหม่เมื่ออัปโหลดสำเร็จ");
+      return;
+    }
+
+    // รูปภาพ: เตรียม src (url | thumbUrl | base64)
+    if (!file.url && !file.preview && file.originFileObj) {
+      file.preview = await getBase64(file.originFileObj as File);
+    }
+    setPreviewImage((file.url as string) || (file.thumbUrl as string) || (file.preview as string));
+    setPreviewTitle(file.name || "สลิปการชำระเงิน");
+    setPreviewOpen(true);
+  };
+
+  // ✅ handler: ลบไฟล์ปัจจุบัน (ใช้ได้ทั้งจากไอคอนถังขยะของ Upload และปุ่มใน Modal พรีวิว)
+  const handleRemove = () => {
+    setFiles([]);
+    setPreviewOpen(false);
+    setPreviewImage("");
+    setPreviewTitle("");
+    return true;
   };
 
   const handleSubmitSlip = async () => {
@@ -236,6 +288,7 @@ export default function PaymentPage() {
         </Col>
       </Row>
 
+      {/* ===== Modal ชำระเงิน & อัปโหลดสลิป ===== */}
       <Modal
         title={<span style={{ color: THEME_PRIMARY }}>ชำระเงินด้วยคิวอาร์โค้ด</span>}
         open={payOpen}
@@ -260,22 +313,24 @@ export default function PaymentPage() {
             </div>
           </Card>
 
+          {/* ✅ อัปโหลด + พรีวิว + ลบไฟล์ */}
           <div>
             <Typography.Title level={5} style={{ marginBottom: 8, color: TEXT_MAIN }}>
               แนบสลิปการชำระเงิน
             </Typography.Title>
             <Upload.Dragger
-              multiple={false}
-              fileList={files}
-              maxCount={1}
-              accept="image/*,.pdf"
-              beforeUpload={() => false}
-              onChange={({ fileList }) => setFiles(fileList)}
-              onRemove={() => {
-                setFiles([]);
-                return true;
-              }}
-              style={{ borderColor: THEME_PRIMARY, background: BG_DARK }}
+               className="slip-uploader"          // ✅ เพิ่มคลาส
+                multiple={false}
+                fileList={files}
+                maxCount={1}
+                accept="image/*,.pdf"
+                listType="picture"
+                showUploadList={{ showRemoveIcon: true, showPreviewIcon: true }}
+                beforeUpload={() => false}
+                onPreview={handlePreview}
+                onChange={({ fileList }) => setFiles(fileList)}
+                onRemove={handleRemove}
+                style={{ borderColor: THEME_PRIMARY, background: BG_DARK }}
             >
               <p className="ant-upload-drag-icon">📎</p>
               <p className="ant-upload-text" style={{ color: TEXT_MAIN }}>
@@ -293,13 +348,38 @@ export default function PaymentPage() {
               type="primary"
               disabled={!files.length}
               loading={submitting}
-              style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#fff" }}
+              style={{ backgroundColor: THEME_PRIMARY, borderColor: THEME_PRIMARY, color: "#ffffffff" }}
               onClick={handleSubmitSlip}
             >
               ส่งยืนยันการชำระเงิน
             </Button>
           </Space>
         </Space>
+      </Modal>
+
+      {/* ✅ Modal พรีวิวรูปสลิป */}
+      <Modal
+        open={previewOpen}
+        title={<span style={{ color: THEME_PRIMARY }}>{previewTitle || "ตัวอย่างสลิป"}</span>}
+        footer={
+          <Space>
+            <Button danger onClick={handleRemove}>ลบไฟล์นี้</Button>
+            <Button onClick={() => setPreviewOpen(false)}>ปิด</Button>
+          </Space>
+        }
+        onCancel={() => setPreviewOpen(false)}
+        centered
+        styles={{ body: { background: CARD_DARK } }}
+      >
+        {previewImage ? (
+          <img
+            alt="Slip Preview"
+            style={{ width: "100%", borderRadius: 10, boxShadow: `0 0 0 1px ${BORDER}` }}
+            src={previewImage}
+          />
+        ) : (
+          <Typography.Text style={{ color: TEXT_SUB }}>ไม่พบรูปสำหรับพรีวิว</Typography.Text>
+        )}
       </Modal>
     </div>
   );
