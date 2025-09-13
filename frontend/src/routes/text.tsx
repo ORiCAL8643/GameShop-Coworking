@@ -60,12 +60,36 @@ const router = createBrowserRouter([
       { path: "report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
-      { path: "information/Add", element: <Add /> },
-      { path: "information/Edit", element: <Edit /> },
+      { path: "information/Add", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:game">
+              <Add />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
+      { path: "information/Edit", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:game">
+              <Edit />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
       // === request
       { path: "request", element: <Request /> },
-      { path: "requestinfo", element: <Requestinfo /> },
+      { path: "requestinfo", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:request">
+              <Requestinfo />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
       // === category (ใช้ path แบบ relative)
       {
@@ -98,17 +122,65 @@ const router = createBrowserRouter([
        { path: "game/:id", element: <GameDetail /> },
 
       // === promotion
-      { path: "promotion", element: <PromotionManager /> },
-      { path: "promotion/:id", element: <PromotionDetail /> },
+      { path: "promotion", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:promotion">
+              <PromotionManager />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
+      { path: "promotion/:id", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:promotion">
+              <PromotionDetail />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
       // === roles
-      { path: "roles", element: <RoleManagement /> },
-      { path: "roles/:id", element: <RoleEdit /> },
+      { path: "roles", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:role">
+              <RoleManagement />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
+      { path: "roles/:id", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:role">
+              <RoleEdit />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
 
       // === refund
       { path: "refund", element: <RefundPage /> },
       { path: "refund-status", element: <RefundStatusPage refunds={refunds} /> },
-      { path: "/promotion", element: <PromotionManager /> },
-      { path: "/promotion/:id", element: <PromotionDetail /> },
+      { path: "/promotion", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:promotion">
+              <PromotionManager />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
+      { path: "/promotion/:id", element: (
+        <RequireAuth>
+          <RequirePerm need="admin:panel">
+            <RequirePerm need="admin:promotion">
+              <PromotionDetail />
+            </RequirePerm>
+          </RequirePerm>
+        </RequireAuth>
+      ) },
       // Review page for a specific game
       { path: "/reviews/:gameId", element: <Reviewpage /> },
 
@@ -123,12 +195,14 @@ const router = createBrowserRouter([
         element: (
           <RequireAuth>
             <RequirePerm need="admin:panel">
-              <AdminPage
-                refunds={refunds}
-                setRefunds={() => { }}
-                addNotification={addNotification}
-                addRefundUpdate={addRefundUpdate}
-              />
+              <RequirePerm need="admin:page">
+                <AdminPage
+                  refunds={refunds}
+                  setRefunds={() => { }}
+                  addNotification={addNotification}
+                  addRefundUpdate={addRefundUpdate}
+                />
+              </RequirePerm>
             </RequirePerm>
           </RequireAuth>
         ),
@@ -136,7 +210,9 @@ const router = createBrowserRouter([
       { path: "Admin/PaymentReviewPage", element: (
         <RequireAuth>
           <RequirePerm need="admin:panel">
-            <AdminPaymentReviewPage />
+            <RequirePerm need="admin:paymentreview">
+              <AdminPaymentReviewPage />
+            </RequirePerm>
           </RequirePerm>
         </RequireAuth>
       ) },
@@ -144,7 +220,9 @@ const router = createBrowserRouter([
       { path: "Admin/RolePage", element: (
         <RequireAuth>
           <RequirePerm need="admin:panel">
-            <RoleManagement />
+            <RequirePerm need="admin:role">
+              <RoleManagement />
+            </RequirePerm>
           </RequirePerm>
         </RequireAuth>
       ) },
