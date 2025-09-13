@@ -342,7 +342,6 @@ export default function AdminPaymentReviewPage() {
           autoSize={{ minRows: 3, maxRows: 6 }}
           value={rejectText}
           onChange={(e) => setRejectText(e.target.value)}
-          placeholder="เช่น จำนวนเงินไม่ถูกต้อง / สลิปซ้ำ / ไม่พบรายการโอน"
           style={{ background: BG_DARK, color: TEXT_MAIN, borderColor: BORDER }}
         />
       </Modal>
