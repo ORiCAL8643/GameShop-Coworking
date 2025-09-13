@@ -1,21 +1,14 @@
 package entity
 
-import (
-	"time"
-
-	"gorm.io/gorm"
-)
+import "gorm.io/gorm"
 
 type ModRating struct {
 	gorm.Model
 
-	Rating       string    `json:"rating"`
-	Review       string    `json:"review"`
-	PurchaseDate time.Time `json:"purchase_date"`
-
-	UserGameID uint      `json:"user_game_id"`
-	UserGame   *UserGame `gorm:"foreignKey:UserGameID" json:"user_game"`
-
-	ModID uint `json:"mod_id"`
-	Mod   *Mod `gorm:"foreignKey:ModID" json:"mod"`
+	Score   int    `json:"score"`
+	Comment string `json:"comment,omitempty" gorm:"type:text"`
+	UserID  uint   `json:"user_id" gorm:"index"`
+	User    *User  `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	ModID   uint   `json:"mod_id" gorm:"index"`
+	Mod     *Mod   `gorm:"foreignKey:ModID" json:"-"`
 }

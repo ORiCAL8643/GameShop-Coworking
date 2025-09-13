@@ -35,7 +35,11 @@ const normalizePath = (s?: string) => (s ? s.replace(/\\/g, "/") : "");
 const resolveUrl = (src?: string) => {
   const s = normalizePath(src);
   if (!s) return "";
-  if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:"))
+  if (
+    s.startsWith("http://") ||
+    s.startsWith("https://") ||
+    s.startsWith("data:")
+  )
     return s;
   const clean = s.startsWith("/") ? s.slice(1) : s;
   return `${API_BASE}/${clean}`;
@@ -50,11 +54,13 @@ const getModImageUrl = (m: any) =>
       m?.img_src ??
       m?.img ??
       m?.image ??
-      ""
+      "",
   );
 
 const getModFileUrl = (m: any) =>
-  resolveUrl(m?.file_path ?? m?.FilePath ?? m?.fileUrl ?? m?.FileURL ?? m?.file ?? "");
+  resolveUrl(
+    m?.file_path ?? m?.FilePath ?? m?.fileUrl ?? m?.FileURL ?? m?.file ?? "",
+  );
 
 const getGameBannerUrl = (g: any) =>
   resolveUrl(g?.img_src ?? g?.image_path ?? g?.ImagePath ?? g?.cover ?? "");
@@ -76,15 +82,8 @@ type ModRating = {
   id?: number;
   user_id?: number | string;
   mod_id?: number | string;
-  score: number; // 1..5
-  created_at?: string;
-};
-
-type ModComment = {
-  id?: number;
-  user_id?: number | string;
-  mod_id?: number | string;
-  content: string;
+  score: number; // 0..5
+  comment?: string;
   created_at?: string;
   user?: { username?: string; name?: string };
 };
@@ -114,7 +113,7 @@ const ModDetail: React.FC = () => {
   const [submittingRating, setSubmittingRating] = useState(false);
 
   // comments
-  const [comments, setComments] = useState<ModComment[]>([]);
+  const [comments, setComments] = useState<ModRating[]>([]);
   const [comment, setComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
 
@@ -154,7 +153,7 @@ const ModDetail: React.FC = () => {
 
     // 2) ถ้ามี user_game_id → ไปดึง user-games ของผู้ใช้ แล้วเช็คว่า id ตรงกันไหม
     const ownerUserGameId = num(
-      mod?.user_game_id ?? mod?.userGameId ?? mod?.UserGameID
+      mod?.user_game_id ?? mod?.userGameId ?? mod?.UserGameID,
     );
     if (ownerUserGameId == null) {
       setCanEdit(false);
@@ -165,8 +164,7 @@ const ModDetail: React.FC = () => {
       .then((rows: any[]) => {
         const match = (rows ?? []).some((r: any) => {
           const ugid =
-            num(r?.user_game_id ?? r?.UserGameID) ??
-            num(r?.id ?? r?.ID); // รองรับทั้ง 2 key
+            num(r?.user_game_id ?? r?.UserGameID) ?? num(r?.id ?? r?.ID); // รองรับทั้ง 2 key
           return ugid === ownerUserGameId;
         });
         setCanEdit(match);
@@ -178,12 +176,15 @@ const ModDetail: React.FC = () => {
   const modIdNum = useMemo(() => Number(id), [id]);
 
   const recalc = (list: ModRating[]) => {
-    const n = list.length;
-    const sum = list.reduce((acc, r) => acc + Number(r.score || 0), 0);
+    const valid = list.filter((r) => Number(r.score) > 0);
+    const n = valid.length;
+    const sum = valid.reduce((acc, r) => acc + Number(r.score || 0), 0);
     setCount(n);
     setAvg(n ? sum / n : 0);
     const myId = authUserId != null ? Number(authUserId) : undefined;
-    setMyScore(myId ? list.find((r) => Number(r.user_id) === myId)?.score : undefined);
+    setMyScore(
+      myId ? valid.find((r) => Number(r.user_id) === myId)?.score : undefined,
+    );
   };
 
   const fetchRatings = async () => {
@@ -191,8 +192,12 @@ const ModDetail: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE}/modratings?mod_id=${modIdNum}`);
       const data = await res.json();
-      const list: ModRating[] = Array.isArray(data) ? data : data?.data ?? [];
+      const list: ModRating[] = Array.isArray(data) ? data : (data?.data ?? []);
       setRatings(list);
+      const comm = list
+        .filter((r) => r.comment && r.comment.trim() !== "")
+        .sort((a, b) => ts(b.created_at) - ts(a.created_at));
+      setComments(comm);
       recalc(list);
     } catch (e) {
       console.warn("load ratings failed:", e);
@@ -231,23 +236,7 @@ const ModDetail: React.FC = () => {
   };
 
   // -------- comments --------
-  const fetchComments = async () => {
-    if (!modIdNum) return;
-    try {
-      const res = await fetch(`${API_BASE}/comments?mod_id=${modIdNum}`);
-      const data = await res.json();
-      const list: ModComment[] = Array.isArray(data) ? data : data?.data ?? [];
-      // ล่าสุดอยู่บน, invalid date ไปล่าง
-      list.sort((a, b) => ts(b.created_at) - ts(a.created_at));
-      setComments(list);
-    } catch (e) {
-      console.warn("load comments failed:", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchComments();
-  }, [modIdNum]);
+  // comments are part of ratings; no separate fetch
 
   const submitComment = async () => {
     const content = comment.trim();
@@ -261,19 +250,20 @@ const ModDetail: React.FC = () => {
     }
     try {
       setSubmittingComment(true);
-      const res = await fetch(`${API_BASE}/comments`, {
+      const res = await fetch(`${API_BASE}/modratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mod_id: modIdNum,
           user_id: Number(authUserId),
-          content,
+          score: myScore || 0,
+          comment: content,
         }),
       });
       if (!res.ok) throw new Error(await res.text());
       setComment("");
       message.success("เพิ่มคอมเมนต์เรียบร้อย");
-      await fetchComments();
+      await fetchRatings();
     } catch (e: any) {
       message.error(e?.message || "โพสต์คอมเมนต์ไม่สำเร็จ");
     } finally {
@@ -287,11 +277,18 @@ const ModDetail: React.FC = () => {
     return mImg || getGameBannerUrl(game || {});
   }, [mod, game]);
 
-  const downloadUrl = useMemo(() => getModFileUrl(mod || {}), [mod]);
+  const downloadUrl = useMemo(() => {
+    const mid = mod?.id ?? mod?.ID;
+    return mid ? `${API_BASE}/mods/${mid}/download` : "";
+  }, [mod]);
 
   const uploadedText = useMemo(() => {
     const t =
-      mod?.upload_date ?? mod?.UploadDate ?? mod?.created_at ?? mod?.CreatedAt ?? "";
+      mod?.upload_date ??
+      mod?.UploadDate ??
+      mod?.created_at ??
+      mod?.CreatedAt ??
+      "";
     return toDateText(t);
   }, [mod]);
 
@@ -457,7 +454,9 @@ const ModDetail: React.FC = () => {
 
                 {getModImageUrl(mod) && (
                   <>
-                    <Divider style={{ borderColor: "#2b3a42", margin: "12px 0" }} />
+                    <Divider
+                      style={{ borderColor: "#2b3a42", margin: "12px 0" }}
+                    />
                     <Title level={5} style={{ color: "#fff", marginTop: 0 }}>
                       Screenshot
                     </Title>
@@ -473,7 +472,11 @@ const ModDetail: React.FC = () => {
                       <img
                         src={getModImageUrl(mod)}
                         alt="mod"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
                       />
                     </div>
                   </>
@@ -507,8 +510,8 @@ const ModDetail: React.FC = () => {
                 <Divider style={{ borderColor: "#2b3a42" }} />
                 <Text style={{ color: "#9aa4ad" }}>
                   <b>Average Rating:</b>{" "}
-                  <span style={{ color: "#fff" }}>{avg.toFixed(1)} / 5</span>{" "}
-                  ({count} {count === 1 ? "rating" : "ratings"})
+                  <span style={{ color: "#fff" }}>{avg.toFixed(1)} / 5</span> (
+                  {count} {count === 1 ? "rating" : "ratings"})
                 </Text>
               </Card>
 
@@ -530,10 +533,18 @@ const ModDetail: React.FC = () => {
                   onChange={(e) => setComment(e.target.value)}
                   rows={4}
                   placeholder="Write a comment..."
-                  style={{ background: "#1a1a1a", color: "#fff", borderColor: "#2b3a42" }}
+                  style={{
+                    background: "#1a1a1a",
+                    color: "#fff",
+                    borderColor: "#2b3a42",
+                  }}
                 />
                 <div style={{ textAlign: "right", marginTop: 10 }}>
-                  <Button type="primary" onClick={submitComment} loading={submittingComment}>
+                  <Button
+                    type="primary"
+                    onClick={submitComment}
+                    loading={submittingComment}
+                  >
                     Add Comment
                   </Button>
                 </div>
@@ -548,15 +559,25 @@ const ModDetail: React.FC = () => {
                       <List.Item.Meta
                         title={
                           <span style={{ color: "#fff" }}>
-                            {c.user?.username || c.user?.name || `User #${c.user_id}`}
-                            <span style={{ color: "#9aa4ad", marginLeft: 8, fontSize: 12 }}>
+                            {c.user?.username ||
+                              c.user?.name ||
+                              `User #${c.user_id}`}
+                            <span
+                              style={{
+                                color: "#9aa4ad",
+                                marginLeft: 8,
+                                fontSize: 12,
+                              }}
+                            >
                               {toDateText(c.created_at)}
                             </span>
                           </span>
                         }
                         description={
-                          <span style={{ color: "#c9d1d9", whiteSpace: "pre-wrap" }}>
-                            {c.content}
+                          <span
+                            style={{ color: "#c9d1d9", whiteSpace: "pre-wrap" }}
+                          >
+                            {c.comment}
                           </span>
                         }
                       />
@@ -591,9 +612,18 @@ const ModDetail: React.FC = () => {
                     👤 Mod ID: {mod?.ID ?? mod?.id ?? "-"}
                   </div>
                   <div style={{ opacity: 0.9 }}>
-                    <div style={{ marginBottom: 6 }}>📅 Uploaded: {uploadedText}</div>
+                    <div style={{ marginBottom: 6 }}>
+                      📅 Uploaded: {uploadedText}
+                    </div>
                     <div style={{ marginBottom: 6 }}>
                       🧩 Game ID: {mod?.game_id ?? mod?.GameID ?? "-"}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      👁 Views: {mod?.view_count ?? mod?.ViewCount ?? 0}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      ⬇ Downloads:{" "}
+                      {mod?.download_count ?? mod?.DownloadCount ?? 0}
                     </div>
                   </div>
 
@@ -602,7 +632,9 @@ const ModDetail: React.FC = () => {
                   <div style={{ opacity: 0.95, marginBottom: 4 }}>
                     <Text style={{ color: "#fff" }}>{count} Ratings</Text>
                   </div>
-                  <div style={{ color: "rgba(255,255,255,0.9)", marginBottom: 8 }}>
+                  <div
+                    style={{ color: "rgba(255,255,255,0.9)", marginBottom: 8 }}
+                  >
                     Average: {avg.toFixed(1)} / 5
                   </div>
                 </div>
