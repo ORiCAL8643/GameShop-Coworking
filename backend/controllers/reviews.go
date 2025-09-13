@@ -67,6 +67,17 @@ func CreateReview(c *gin.Context) {
 		return
 	}
 
+	// ตรวจสอบว่าเป็นเจ้าของเกมหรือไม่
+	var ug entity.UserGame
+	if err := db.Where("user_id = ? AND game_id = ?", in.UserID, in.GameID).First(&ug).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusForbidden, gin.H{"error": "not_owned"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
 	r := entity.Review{
 		GameID:      in.GameID,
 		UserID:      in.UserID,
