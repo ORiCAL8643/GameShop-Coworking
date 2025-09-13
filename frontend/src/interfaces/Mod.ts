@@ -12,6 +12,8 @@ export interface Mod {
   user_game?: UserGame;
   game_id: number;
   game?: Game;
+  view_count?: number;
+  download_count?: number;
 }
 
 export interface CreateModRequest {

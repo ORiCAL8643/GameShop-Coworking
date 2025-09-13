@@ -1,19 +1,22 @@
 export interface ModRating {
   ID: number;
-  rating: number;
+  score: number;
   user_id: number;
   mod_id: number;
+  comment?: string;
 }
 
 export interface CreateModRatingRequest {
-  rating: number;
+  score: number;
   user_id: number;
   mod_id: number;
+  comment?: string;
 }
 
 export interface UpdateModRatingRequest {
   ID: number;
-  rating?: number;
+  score?: number;
   user_id?: number;
   mod_id?: number;
+  comment?: string;
 }

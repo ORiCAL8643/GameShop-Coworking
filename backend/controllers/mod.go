@@ -12,6 +12,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // GET /mods?game_id=&uploader_id=&q=
@@ -42,10 +43,13 @@ func GetMods(c *gin.Context) {
 func GetModById(c *gin.Context) {
 	id := c.Param("id")
 	var mod entity.Mod
-	if tx := configs.DB().Where("id = ?", id).First(&mod); tx.RowsAffected == 0 {
+	db := configs.DB()
+	if tx := db.Where("id = ?", id).First(&mod); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "mod not found"})
 		return
 	}
+	db.Model(&mod).UpdateColumn("view_count", gorm.Expr("view_count + 1"))
+	mod.ViewCount++
 	c.JSON(http.StatusOK, mod)
 }
 
@@ -423,4 +427,18 @@ func DeleteMod(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successfully"})
+}
+
+// GET /mods/:id/download
+func DownloadMod(c *gin.Context) {
+	id := c.Param("id")
+	var mod entity.Mod
+	db := configs.DB()
+	if tx := db.First(&mod, id); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mod not found"})
+		return
+	}
+	db.Model(&mod).UpdateColumn("download_count", gorm.Expr("download_count + 1"))
+	mod.DownloadCount++
+	c.File(mod.FilePath)
 }

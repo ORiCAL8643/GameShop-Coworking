@@ -156,6 +156,12 @@ func main() {
 		// READ: เปิดสาธารณะเหมือนเดิม
 		router.GET("/mods", controllers.GetMods)
 		router.GET("/mods/:id", controllers.GetModById)
+		router.GET("/mods/:id/download", controllers.DownloadMod)
+
+		// -------- Mod Ratings --------
+		router.GET("/modratings", controllers.GetModRatings)
+		router.GET("/modratings/:id", controllers.GetModRatingById)
+		router.POST("/modratings", controllers.CreateModRating)
 
 		// (WRITE ย้ายไปไว้ใต้ authList ด้านล่าง)
 	}
