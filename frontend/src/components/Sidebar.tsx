@@ -2,11 +2,11 @@
 import { Layout, Menu, Badge } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { DollarOutlined, FlagOutlined, HomeOutlined, PlusOutlined, RetweetOutlined, SendOutlined, TeamOutlined, ToolOutlined, UsergroupAddOutlined } from "@ant-design/icons";
+import { DollarOutlined, FlagOutlined, HomeOutlined, PlusOutlined, RetweetOutlined, SendOutlined, TeamOutlined, ToolOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useReportNewCount } from "../hooks/useReportNewCount";
 import type { ItemType } from "antd/es/menu/interface";
-import { FlagIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 const { Sider, Content } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -17,6 +17,8 @@ const Sidebar = () => {
 
   // ✅ นับเคสใหม่ทุก 8s (หรือปรับตามต้องการ)
   const reportCount = useReportNewCount(8000);
+  const { perms } = useAuth();
+  const has = (p: string) => perms.includes("admin:all") || perms.includes(p);
 
   const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
   const selectedKey = location.pathname;
@@ -46,27 +48,27 @@ const Sidebar = () => {
   );
 
   const items: ItemType[] = [
-    { key: "/home", label: "หน้าแรก", icon: <HomeOutlined/> },
+    { key: "/home", label: "หน้าแรก", icon: <HomeOutlined /> },
     { key: "/request", label: "รีเควสเกม", icon: <SendOutlined /> },
     { key: "/category/Community", label: "ชุมชน", icon: <TeamOutlined /> },
-    { key: "/category/Payment", label: "การชำระเงิน", icon: <DollarOutlined /> }, 
-    { key: "/workshop", label: "Workshop", icon: <ToolOutlined /> },  
-    { key: "/refund", label: "การคืนเงินผู้ใช้", icon: <RetweetOutlined/> },
+    { key: "/category/Payment", label: "การชำระเงิน", icon: <DollarOutlined /> },
+    { key: "/workshop", label: "Workshop", icon: <ToolOutlined /> },
+    { key: "/refund", label: "การคืนเงินผู้ใช้", icon: <RetweetOutlined /> },
     { key: "/report", label: "รายงานปัญหา", icon: <FlagOutlined /> },
-    {
-      key: "/Admin",
-      label: "Admin",
-      children: [
-        { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
-        { key: "/requestinfo", label: "ข้อมูลรีเควส", icon: <PlusOutlined /> },
-        { key: "/promotion", label: "Promotion", icon: <PlusOutlined />  },
-        { key: "/Admin/Page", label: adminPageLabel, icon: <PlusOutlined />,},
-        { key: "/Admin/PaymentReviewPage",label: "PaymentReview", icon: <PlusOutlined />,},
-        { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
-        
-      ],
-    },
   ];
+
+  if (has("admin:panel")) {
+    const children: ItemType[] = [];
+    if (has("admin:game")) children.push({ key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> });
+    if (has("admin:request")) children.push({ key: "/requestinfo", label: "ข้อมูลรีเควส", icon: <PlusOutlined /> });
+    if (has("admin:promotion")) children.push({ key: "/promotion", label: "Promotion", icon: <PlusOutlined /> });
+    if (has("admin:page")) children.push({ key: "/Admin/Page", label: adminPageLabel, icon: <PlusOutlined /> });
+    if (has("admin:paymentreview")) children.push({ key: "/Admin/PaymentReviewPage", label: "PaymentReview", icon: <PlusOutlined /> });
+    if (has("admin:role")) children.push({ key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> });
+    if (children.length > 0) {
+      items.push({ key: "/Admin", label: "Admin", children });
+    }
+  }
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
