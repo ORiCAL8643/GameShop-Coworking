@@ -30,7 +30,7 @@ type Order struct {
 
 	OrderItems []OrderItem `gorm:"foreignKey:OrderID" json:"order_items,omitempty"`
 	Payments   []Payment   `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
-	// ❌ ลบ KeyGame []KeyGame ที่เคยอยู่บน Order ออก (คีย์ผูกกับ OrderItem)
+	
 }
 
 // ใช้ชื่อ field ตามที่ controller อ้างอิง (UnitPrice, LineDiscount, LineTotal, QTY, GameID)
@@ -46,6 +46,6 @@ type Order_Item struct {
 	LineDiscount float64 `json:"line_discount"`
 	LineTotal    float64 `json:"line_total"`
 
-	// ✅ คีย์ที่ “ถูกจัดสรรแล้ว” ให้รายการนี้
+	//  คีย์ที่ “ถูกจัดสรรแล้ว” ให้รายการนี้
 	GameKeys []KeyGame `gorm:"foreignKey:OwnedByOrderItemID" json:"game_keys,omitempty"`
 }

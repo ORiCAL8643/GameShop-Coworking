@@ -21,7 +21,7 @@ export interface CreateOrderRequest {
   total_amount: number;
   order_status: string;
   user_id: number;
-  order_create?: string; // ถ้าไม่ส่ง backend จะใส่ให้
+  order_create?: string; 
 }
 
 export interface UpdateOrderRequest {
