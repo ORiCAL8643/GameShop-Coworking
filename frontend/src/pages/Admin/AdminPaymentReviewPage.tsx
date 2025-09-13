@@ -219,8 +219,8 @@ export default function AdminPaymentReviewPage() {
               dataIndex: "order_no",
               render: (v, r) => (
                 <Space direction="vertical" size={0}>
-                  <Typography.Text style={{ color: TEXT_MAIN, fontWeight: 600 }}>{v}</Typography.Text>
-                  <Typography.Text style={{ color: TEXT_SUB, fontSize: 12 }}>
+                  <Typography.Text style={{ color: "#760ee6ff", fontWeight: 600 }}>{v}</Typography.Text>
+                  <Typography.Text style={{ color: "rgba(0, 0, 0, 0.93)", fontSize: 15 }}>
                     โดย {r.user_name || "-"}
                   </Typography.Text>
                 </Space>
@@ -231,7 +231,7 @@ export default function AdminPaymentReviewPage() {
               dataIndex: "amount",
               align: "right" as const,
               render: (n: number) => (
-                <Typography.Text style={{ color: "#fff", fontWeight: 600 }}>
+                <Typography.Text style={{ color: "#0acb3eff", fontWeight: 600 }}>
                   {formatTHB(n)}
                 </Typography.Text>
               ),
