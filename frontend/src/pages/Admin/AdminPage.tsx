@@ -17,6 +17,7 @@ import {
   resolveReport,
   replyReport,
 } from "../../services/Report";
+import { fetchRefunds, updateRefundStatus } from "../../services/refund";
 import type { ProblemReport } from "../../interfaces/problem_report";
 import type { UploadFile } from "antd/es/upload/interface";
 import { useNavigate } from "react-router-dom";
@@ -27,26 +28,20 @@ const { Title } = Typography;
 const { TextArea } = Input;
 
 interface RefundRequest {
-  id: number;
-  orderId: string;
-  user: string;
-  game: string;
+  ID: number;
+  order_id: number;
+  user_id: number;
   reason: string;
-  status: "Pending" | "Approved" | "Rejected";
+  amount: number;
+  refund_status?: { status_name: string };
 }
 
-interface AdminPageProps {
-  refunds: RefundRequest[];
-  setRefunds: (refunds: RefundRequest[]) => void;
-  addNotification?: (msg: string) => void;
-  addRefundUpdate?: (msg: string) => void;
-}
-
-export default function AdminPage({ refunds, setRefunds }: AdminPageProps) {
+export default function AdminPage() {
   const navigate = useNavigate();
   const { id: adminId } = useAuth(); // ✅ id แอดมินที่ล็อกอิน
 
   const [problems, setProblems] = useState<ProblemReport[]>([]);
+  const [refunds, setRefunds] = useState<RefundRequest[]>([]);
   const [activeTab, setActiveTab] = useState<"refunds" | "problems">("problems");
   const [replies, setReplies] = useState<
     Record<number, { text: string; fileList: UploadFile[] }>
@@ -99,13 +94,38 @@ export default function AdminPage({ refunds, setRefunds }: AdminPageProps) {
     };
   }, []);
 
+  // ✅ โหลดรายการ refund
+  useEffect(() => {
+    const loadRefunds = async () => {
+      try {
+        const items = await fetchRefunds();
+        setRefunds(items);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadRefunds();
+  }, []);
+
   // ✅ อัปเดตสถานะ refund
-  const handleRefundAction = (id: number, action: "Approved" | "Rejected") => {
-    const updated = refunds.map((r) =>
-      r.id === id ? { ...r, status: action } : r
-    );
-    setRefunds(updated);
-    message.success(`Refund #${id} ${action} successfully!`);
+  const handleRefundAction = async (
+    id: number,
+    action: "Approved" | "Rejected"
+  ) => {
+    try {
+      await updateRefundStatus(id, action);
+      setRefunds((prev) =>
+        prev.map((r) =>
+          r.ID === id
+            ? { ...r, refund_status: { status_name: action } }
+            : r
+        )
+      );
+      message.success(`Refund #${id} ${action} successfully!`);
+    } catch (e) {
+      console.error(e);
+      message.error("ไม่สามารถอัปเดตสถานะได้");
+    }
   };
 
   // ✅ ตอบกลับแล้ว -> resolve -> ย้ายการ์ดออก + ยิง noti
@@ -242,6 +262,58 @@ export default function AdminPage({ refunds, setRefunds }: AdminPageProps) {
           );
         })}
       </div>
+      {activeTab === "refunds" && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
+            gap: "25px",
+          }}
+        >
+          {refunds.map((rf) => {
+            const status = rf.refund_status?.status_name || "";
+            const color =
+              status === "Pending"
+                ? "#e39cf1ff"
+                : status === "Approved"
+                ? "#00e14fff"
+                : "#fe082dff";
+            return (
+              <Card key={rf.ID} style={cardStyle}>
+                <p style={textStyle}>Order: {rf.order_id}</p>
+                <p style={textStyle}>User: {rf.user_id}</p>
+                <p style={textStyle}>Reason: {rf.reason}</p>
+                <p style={textStyle}>
+                  Status: <Tag color={color}>{status}</Tag>
+                </p>
+                {status === "Pending" && (
+                  <div style={{ display: "flex", gap: "10px", marginTop: 12 }}>
+                    <Button
+                      onClick={() => handleRefundAction(rf.ID, "Approved")}
+                      style={{
+                        flex: 1,
+                        background: "linear-gradient(90deg, #52c41a, #389e0d)",
+                        color: "white",
+                        fontWeight: "bold",
+                        borderRadius: 12,
+                      }}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      danger
+                      style={{ flex: 1, borderRadius: 12 }}
+                      onClick={() => handleRefundAction(rf.ID, "Rejected")}
+                    >
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Problem Reports: เฉพาะที่ยังไม่ resolved */}
       {activeTab === "problems" && (

@@ -1,34 +1,44 @@
 // pages/Refund/RefundStatus.tsx
 
 import { Table, Tag, Typography, Card } from "antd";
+import { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
+import { fetchRefunds } from "../../services/refund";
 
 const { Title } = Typography;
 
-// 🟣 export interface Refund ให้ไฟล์อื่น import ใช้ได้
 export interface Refund {
-  id: number;
-  orderId: string;
-  user: string;
-  game: string;
+  ID: number;
+  order_id: number;
+  user_id: number;
   reason: string;
-  status: "Pending" | "Approved" | "Rejected";
+  amount: number;
+  refund_status?: { status_name: string };
 }
 
-interface RefundStatusPageProps {
-  refunds: Refund[];
-}
+export default function RefundStatusPage() {
+  const { id } = useAuth();
+  const [refunds, setRefunds] = useState<Refund[]>([]);
 
-export default function RefundStatusPage({ refunds }: RefundStatusPageProps) {
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await fetchRefunds(Number(id));
+        setRefunds(data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    load();
+  }, [id]);
   const columns = [
-    { title: "Order ID", dataIndex: "orderId", key: "orderId" },
-    { title: "User", dataIndex: "user", key: "user" },
-    { title: "Game", dataIndex: "game", key: "game" },
+    { title: "Order ID", dataIndex: "order_id", key: "order_id" },
     { title: "Reason", dataIndex: "reason", key: "reason" },
     {
       title: "Status",
-      dataIndex: "status",
       key: "status",
-      render: (status: string) => {
+      render: (_: any, record: Refund) => {
+        const status = record.refund_status?.status_name || "";
         const color =
           status === "Pending"
             ? "#e39cf1ff"
@@ -51,24 +61,6 @@ export default function RefundStatusPage({ refunds }: RefundStatusPageProps) {
           </Tag>
         );
       },
-    },
-    {
-      title: "Action",
-      key: "action",
-      render: (_: any, record: Refund) =>
-        record.status === "Pending" ? (
-          <span
-            style={{
-              color: "#f472b6",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontSize: 18,
-              textShadow: "0 0 8px #f472b6",
-            }}
-          >
-            $
-          </span>
-        ) : null,
     },
   ];
 

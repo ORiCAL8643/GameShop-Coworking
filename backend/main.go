@@ -20,6 +20,7 @@ func main() {
 	configs.ConnectionDB()
 	configs.SetupDatabase()
 	configs.MigrateReportTables() // ✅ เพิ่มบรรทัดนี้เท่านั้น
+	configs.MigrateRefundTables()
 
 	r := gin.New()
 
@@ -152,6 +153,11 @@ func main() {
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
 
+		// -------- Refunds --------
+		router.POST("/refunds", controllers.CreateRefundRequest)
+		router.GET("/refunds", controllers.FindRefundRequests)
+		router.GET("/refunds/:id", controllers.FindRefundRequestByID)
+
 		// -------- Mods --------
 		// READ: เปิดสาธารณะเหมือนเดิม
 		router.GET("/mods", controllers.GetMods)
@@ -208,6 +214,9 @@ func main() {
 		authList.PATCH("/mods/:id", controllers.UpdateMod)
 		authList.DELETE("/mods/:id", controllers.DeleteMod)
 		authList.GET("/mods/mine", controllers.GetMyMods)
+
+		// -------- Refunds (admin action) --------
+		authList.PATCH("/refunds/:id/status", controllers.UpdateRefundRequestStatus)
 
 	}
 

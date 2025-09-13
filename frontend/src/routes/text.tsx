@@ -25,7 +25,7 @@ import RoleManagement from "../pages/role/RoleManagement";
 import RoleEdit from "../pages/role/RoleEdit";
 
 import RefundPage from "../pages/Refund/RefundPage";
-import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus";
+import RefundStatusPage from "../pages/Refund/RefundStatus";
 
 import AdminPage from "../pages/Admin/AdminPage";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
@@ -34,16 +34,6 @@ import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage"; // ✅ เ�
 import OrdersStatusPage from "../pages/OrdersStatusPage";
 import Reviewpage from "../pages/Review/Reviewpage.tsx";
 import GameDetail from "../pages/Game/GameDetail";
-
-// mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
-const refunds: Refund[] = [
-  { id: 1, orderId: "A001", user: "Alice", game: "Cyberpunk 2077", reason: "Buggy gameplay", status: "Pending" },
-  { id: 2, orderId: "A002", user: "Bob", game: "Elden Ring", reason: "Accidental purchase", status: "Approved" },
-];
-
-// 🟣 Mock ฟังก์ชัน
-const addNotification = (msg: string) => console.log("Notification:", msg);
-const addRefundUpdate = (msg: string) => console.log("Refund update:", msg);
 
 const router = createBrowserRouter([
   {
@@ -93,7 +83,7 @@ const router = createBrowserRouter([
 
       // === refund
       { path: "refund", element: <RefundPage /> },
-      { path: "refund-status", element: <RefundStatusPage refunds={refunds} /> },
+      { path: "refund-status", element: <RefundStatusPage /> },
       { path: "/promotion", element: <PromotionManager /> },
       { path: "/promotion/:id", element: <PromotionDetail /> },
       // Review page for a specific game
@@ -102,20 +92,10 @@ const router = createBrowserRouter([
 
       // 🟣 Refund
       { path: "/refund", element: <RefundPage /> },
-      { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
+      { path: "/refund-status", element: <RefundStatusPage /> },
 
       // === admin
-      {
-        path: "Admin/Page",
-        element: (
-          <AdminPage
-            refunds={refunds}
-            setRefunds={() => { }}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          />
-        ),
-      },
+      { path: "Admin/Page", element: <AdminPage /> },
       { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
 
       { path: "Admin/RolePage", element: <RoleManagement /> },
