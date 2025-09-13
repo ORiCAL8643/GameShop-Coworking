@@ -1,31 +1,30 @@
 // src/components/Navbar.tsx
 import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from "@ant-design/icons";
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Input, Avatar, Space, Button } from "antd";
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "../components/AuthModal";
-
-// ✅ ใช้ชื่อ/พาธให้ตรงกับไฟล์ของคุณ (ถ้าไฟล์ชื่อ NotificationsBell.tsx ให้ import ตามนี้)
 import NotificationBell from "../components/NotificationsBell";
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
   const { token, username, logout, id: userId } = useAuth();
-  console.log("Navbar userId=", userId);
 
-  // ให้แน่ใจว่า userId เปลี่ยนแล้วคอมโพเนนต์จะรีเรนเดอร์ (สำหรับบาง context)
-  useEffect(() => {}, [userId]);
+  // ถ้าอยากใช้เป็น value ที่โชว์ตรง avatar
+  const avatarText = useMemo(() => (username ? username[0]?.toUpperCase() : "U"), [username]);
 
   return (
-    <div
+    <header
+      role="banner"
       style={{
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         padding: "12px 16px",
         background: "#1f1f1f",
+        borderBottom: "1px solid #2a2a2a",
       }}
     >
       {/* Search */}
@@ -38,6 +37,7 @@ const Navbar = () => {
           background: "#2f2f2f",
           color: "white",
         }}
+        allowClear
       />
 
       {/* Icons + Auth */}
@@ -50,7 +50,7 @@ const Navbar = () => {
           <DollarCircleOutlined style={{ color: "#4CAF50", fontSize: 20 }} />
         </Link>
 
-        {/* ตะกร้า */}
+        {/* ตะกร้า (คงสภาพเดิม ไม่ผูกลิงก์เพื่อไม่กระทบของเพื่อน) */}
         <ShoppingCartOutlined style={{ color: "white", fontSize: 18 }} />
 
         {/* โปรไฟล์ / ล็อกอิน */}
@@ -58,7 +58,7 @@ const Navbar = () => {
           <>
             <span style={{ color: "white" }}>{username}</span>
             <Button onClick={logout}>Logout</Button>
-            <Avatar src="https://i.pravatar.cc/300" />
+            <Avatar src="https://i.pravatar.cc/300">{avatarText}</Avatar>
           </>
         ) : (
           <Button type="primary" onClick={() => setOpenAuth(true)}>
@@ -71,13 +71,14 @@ const Navbar = () => {
       <AuthModal
         open={openAuth}
         onClose={() => setOpenAuth(false)}
-        // ถ้าอยากให้รีโหลดกระดิ่งทันทีหลังล็อกอิน:
         onLoginSuccess={() => {
-          // แค่อุดช่องให้ไม่ error; NotificationBell จะเริ่มโหลดเองเมื่อ userId มีค่า
+          // ไม่ต้องทำอะไรพิเศษ: NotificationBell จะโหลดเองเมื่อ userId มีค่า
+          setOpenAuth(false);
         }}
       />
-    </div>
+    </header>
   );
 };
 
 export default Navbar;
+

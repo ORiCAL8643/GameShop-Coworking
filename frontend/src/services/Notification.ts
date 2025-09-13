@@ -1,5 +1,7 @@
 import api from "../lib/api";
-import type { Notification } from "../interfaces/Notification";
+
+// เปลี่ยนชื่อ Notification เป็น AppNotification เพื่อไม่ให้ชนกับ Web Notification API
+import type { Notification as AppNotification } from "../interfaces/Notification";
 import type { User } from "../interfaces/User";
 
 interface RawNotification {
@@ -14,7 +16,7 @@ interface RawNotification {
   user?: User; User?: User;
 }
 
-export async function fetchNotifications(userId: number): Promise<Notification[]> {
+export async function fetchNotifications(userId: number): Promise<AppNotification[]> {
   const { data } = await api.get("/notifications", { params: { user_id: userId } });
   const list = (Array.isArray(data) ? data : data?.items || []) as RawNotification[];
   return list.map((n) => ({
@@ -26,7 +28,7 @@ export async function fetchNotifications(userId: number): Promise<Notification[]
     created_at: (n.created_at ?? n.CreatedAt ?? "")?.toString(),
     is_read: n.is_read ?? n.IsRead ?? false,
     report_id: n.report_id ?? n.ReportID, // ✅ สำคัญ
-  })) as Notification[];
+  })) as AppNotification[];
 }
 
 export async function createNotification(payload: {
@@ -35,10 +37,10 @@ export async function createNotification(payload: {
   type: string;
   user_id: number;
   report_id?: number;
-}): Promise<Notification | null> {
+}): Promise<AppNotification | null> {
   try {
     const res = await api.post("/notifications", payload);
-    return res.data as Notification;
+    return res.data as AppNotification;
   } catch (err) {
     console.error("❌ createNotification error:", err);
     return null;

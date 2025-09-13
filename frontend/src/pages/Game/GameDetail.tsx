@@ -8,29 +8,25 @@ import {
   Card,
   Row,
   Col,
-  Carousel,
   Skeleton,
   Divider,
   Space,
-  Tooltip,
+  Rate,
   message,
 } from "antd";
 import {
-  HeartOutlined,
   ShoppingCartOutlined,
   PictureOutlined,
   StarFilled,
-  TagsOutlined,
   ToolOutlined,
 } from "@ant-design/icons";
-import axios from "axios";
 import { useCart } from "../../context/CartContext";
-import { useAuth } from "../../context/AuthContext";
 import { getGame, listMods } from "../../services/workshop";
 import { findMinimumSpecForGame, type MinimumSpec } from "../../services/minimumspec";
+import ReviewSection from "../../components/ReviewSection";
 import type { Game, Mod } from "../../interfaces";
 
-const { Header, Content, Sider } = Layout;
+const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 const API_BASE = "http://localhost:8088";
@@ -55,11 +51,10 @@ const GameDetail: React.FC = () => {
   const [mods, setMods] = React.useState<Mod[]>([]);
   const [minSpec, setMinSpec] = React.useState<MinimumSpec | null>(null);
   const [msg, ctx] = message.useMessage();
+  const [avgRating, setAvgRating] = React.useState(0);
 
   // contexts
   const { addItem } = useCart();
-  const { id: rawUserId } = useAuth() as { id?: number | string };
-  const userId = React.useMemo(() => (rawUserId != null ? Number(rawUserId) : null), [rawUserId]);
 
   const gid = React.useMemo(() => Number(id), [id]);
 
@@ -111,19 +106,9 @@ const GameDetail: React.FC = () => {
     };
   }, [gid]);
 
-  // รูป/สกรีนช็อต
+  // รูปปก
   const coverRaw = (game as any)?.img_src || (game as any)?.cover || "";
   const cover = resolveImgUrl(coverRaw);
-
-  const screenshots: string[] = (() => {
-    const raw = (game as any)?.screenshots ?? (game as any)?.images ?? [];
-    const arr = Array.isArray(raw)
-      ? raw
-      : typeof raw === "string"
-      ? raw.split(",").map((s) => s.trim()).filter(Boolean)
-      : [];
-    return arr.map((s) => resolveImgUrl(s));
-  })();
 
   // ข้อความ/แท็ก
   const title = (game as any)?.game_name ?? (game as any)?.name ?? "Untitled Game";
@@ -171,42 +156,15 @@ const GameDetail: React.FC = () => {
   }, [mods]);
 
   // === NEW: Purchase handler (เหมือน ProductGrid) ===
-  const handlePurchase = async (e: React.MouseEvent) => {
+  const handlePurchase = () => {
     if (!game) return;
 
     const price = Number((game as any)?.discounted_price ?? (game as any)?.base_price) || 0;
     const gameId = (game as any)?.ID ?? (game as any)?.id;
-    const gameKeyId = (game as any)?.key_id ?? (game as any)?.KeyGameID;
 
-    try {
-      if (userId) {
-        // โฟลว์ backend order
-        const res = await axios.post(`${API_BASE}/orders`, {
-          user_id: Number(userId),
-          total_amount: price,
-          order_status: "PENDING",
-          order_items: [
-            {
-              unit_price: price,
-              qty: 1,
-              game_key_id: gameKeyId, // ใช้ key ของเกมในการสั่งซื้อเหมือน ProductGrid
-            },
-          ],
-        });
-        const orderId = res?.data?.ID ?? res?.data?.id;
-        if (orderId) localStorage.setItem("orderId", String(orderId));
-        msg.success("สร้างออเดอร์เรียบร้อย");
-      } else {
-        // โฟลว์ตะกร้า local
-        addItem({ id: Number(gameId), title, price, quantity: 1 });
-        msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
-      }
-    
+    addItem({ id: Number(gameId), title, price, quantity: 1 });
+    msg.success(`เพิ่ม ${title} ลงตะกร้าแล้ว`);
     navigate("/category/Payment");
-    } catch (err) {
-      console.error("purchase error:", err);
-      msg.error("ไม่สามารถทำรายการได้");
-    }
   };
 
   if (loading && !game) {
@@ -320,15 +278,6 @@ const GameDetail: React.FC = () => {
               {String(desc).length > 280 ? "…" : ""}
             </Paragraph>
 
-            <Space size="middle" wrap>
-              <Button
-                type="primary"
-                icon={<ShoppingCartOutlined />}
-                onClick={handlePurchase} // ← ใช้งานปุ่ม Purchase
-              >
-                Add to Cart
-              </Button>
-            </Space>
           </div>
 
           {/* Price Card */}
@@ -373,91 +322,25 @@ const GameDetail: React.FC = () => {
       {/* ===== Content ===== */}
       <Layout>
         <Content style={{ padding: 24 }}>
-          {/* Screenshots */}
           <Card
-            title="Screenshots"
+            title="System Requirements (Minimum)"
             style={{ marginBottom: 16, background: "#12181f", borderColor: "#23313a" }}
             headStyle={{ color: "#fff" }}
-            bodyStyle={{ padding: 0 }}
           >
-            {screenshots.length > 0 ? (
-              <Carousel autoplay draggable>
-                {screenshots.map((src, i) => (
-                  <div key={i} style={{ height: 380, overflow: "hidden" }}>
-                    <img src={src} alt={`shot-${i}`} style={{ width: "100%", height: 380, objectFit: "cover" }} />
-                  </div>
-                ))}
-              </Carousel>
-            ) : (
-              <div
-                style={{
-                  height: 200,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#7a8a99",
-                }}
-              >
-                <PictureOutlined style={{ fontSize: 28 }} /> &nbsp; No screenshots
-              </div>
-            )}
+            <div style={{ color: "#c7d0d9" }}>
+              <p><b>OS:</b> {os}</p>
+              <p><b>Processor:</b> {cpu}</p>
+              <p><b>Memory:</b> {ram}</p>
+              <p><b>Graphics:</b> {gpu}</p>
+              <p><b>Storage:</b> {storage}</p>
+            </div>
           </Card>
-
-          <Row gutter={[16, 16]}>
-            <Col xs={24} md={16}>
-              <Card title="About this game" style={{ background: "#12181f", borderColor: "#23313a" }} headStyle={{ color: "#fff" }}>
-                <Paragraph style={{ color: "#c7d0d9", whiteSpace: "pre-wrap" }}>{desc}</Paragraph>
-                <Divider />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Developer</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.developer ?? "Unknown"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Publisher</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.publisher ?? "Unknown"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Release date</Text>
-                    <div style={{ color: "#e5eef5" }}>{(game as any)?.release_date ?? "N/A"}</div>
-                  </div>
-                  <div>
-                    <Text style={{ color: "#98a6b3" }}>Genres</Text>
-                    <div>
-                      <Space size={[6, 6]} wrap>
-                        {tags.map((t) => (
-                          <Tag key={t}>{t}</Tag>
-                        ))}
-                        {tags.length === 0 && <Tag>Action</Tag>}
-                      </Space>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </Col>
-
-            <Col xs={24} md={8}>
-              <Card
-                title="System Requirements (Minimum)"
-                style={{ background: "#12181f", borderColor: "#23313a" }}
-                headStyle={{ color: "#fff" }}
-              >
-                <div style={{ color: "#c7d0d9" }}>
-                  <p><b>OS:</b> {os}</p>
-                  <p><b>Processor:</b> {cpu}</p>
-                  <p><b>Memory:</b> {ram}</p>
-                  <p><b>Graphics:</b> {gpu}</p>
-                  <p><b>Storage:</b> {storage}</p>
-                </div>
-              </Card>
-            </Col>
-          </Row>
 
           {/* Workshop items */}
           <Card
             title={<Space><ToolOutlined /> <span>Workshop Items</span></Space>}
             extra={<Button onClick={() => navigate(`/workshop/${gid}`)}>Browse all</Button>}
-            style={{ marginTop: 16, background: "#12181f", borderColor: "#23313a" }}
+            style={{ background: "#12181f", borderColor: "#23313a" }}
             headStyle={{ color: "#fff" }}
           >
             <Row gutter={[16, 16]}>
@@ -501,43 +384,39 @@ const GameDetail: React.FC = () => {
                   </Col>
                 );
               })}
-              {topMods.length === 0 && (
-                <Col span={24} style={{ textAlign: "center", color: "#9aa4ad" }}>
-                  No workshop items for this game yet.
-                </Col>
-              )}
-            </Row>
-          </Card>
-        </Content>
+          {topMods.length === 0 && (
+            <Col span={24} style={{ textAlign: "center", color: "#9aa4ad" }}>
+              No workshop items for this game yet.
+            </Col>
+          )}
+        </Row>
+      </Card>
 
-        {/* Side info */}
-        <Sider width={320} style={{ background: "#0f1419", padding: "24px 16px" }}>
-          <Card
-            size="small"
-            title={<Space><TagsOutlined /> <span>Tags</span></Space>}
-            style={{ background: "#12181f", borderColor: "#23313a", marginBottom: 16 }}
-            headStyle={{ color: "#fff" }}
-          >
-            <Space size={[6, 6]} wrap>
-              {tags.slice(0, 12).map((t) => (
-                <Tag key={t} color="geekblue">
-                  {t}
-                </Tag>
-              ))}
-              {tags.length === 0 && <Tag>Singleplayer</Tag>}
-            </Space>
-          </Card>
+      <Card
+        title={
+          <Space>
+            <StarFilled />
+            <span>User Reviews</span>
+            {avgRating > 0 && (
+              <Space size={4} style={{ color: "#fadb14" }}>
+                <Rate disabled allowHalf value={avgRating} />
+                <span>{avgRating.toFixed(1)}</span>
+              </Space>
+            )}
+          </Space>
+        }
+        style={{ marginTop: 16, background: "#12181f", borderColor: "#23313a" }}
+        headStyle={{ color: "#fff" }}
+      >
+        <ReviewSection
+          gameId={gid}
+          allowCreate
+          className="mt-4"
+          onStatsChange={(s) => setAvgRating(s.average)}
+        />
+      </Card>
+    </Content>
 
-          <Card size="small" title="User Reviews" style={{ background: "#12181f", borderColor: "#23313a" }} headStyle={{ color: "#fff" }}>
-            <div style={{ color: "#d1d5db" }}>
-              Overall: <b>{(game as any)?.review_summary ?? "—"}</b>
-              <br />
-              Recent: <b>{(game as any)?.recent_review_summary ?? "—"}</b>
-              <br />
-              Total reviews: <b>{safeNum((game as any)?.review_count, 0).toLocaleString()}</b>
-            </div>
-          </Card>
-        </Sider>
       </Layout>
     </Layout>
   );

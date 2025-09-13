@@ -101,7 +101,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId = null }) => {
       message.error("ไม่สามารถเพิ่มลงตะกร้าได้");
     }
   };
-
   const approveGames = games.filter((g) => g.status === "approve");
 
   return (
@@ -185,6 +184,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId = null }) => {
         <p>หมวดหมู่: {selected?.categories?.title ?? "-"}</p>
         <p>วันวางขาย: {selected?.release_date ?? "-"}</p>
         <p>อายุขั้นต่ำ: {selected?.age_rating ?? "-"}</p>
+        <p>os: {selected?.minimum_spec?.os}</p>
+        <p>processor: {selected?.minimum_spec?.processor?? "-"}</p>
+        <p>memory: {selected?.minimum_spec?.memory?? "-"}</p>
+        <p>graphics: {selected?.minimum_spec?.graphics?? "-"}</p>
+        <p>Storage: {selected?.minimum_spec?.storage?? "-"}</p>
       </Modal>
     </Row>
   );
