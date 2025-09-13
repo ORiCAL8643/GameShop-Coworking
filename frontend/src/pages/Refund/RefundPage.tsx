@@ -11,6 +11,8 @@ import {
   message,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import { useAuth } from "../../context/AuthContext";
+import { createRefund } from "../../services/refund";
 
 export default function RefundPage() {
   const [form] = Form.useForm();
@@ -18,6 +20,7 @@ export default function RefundPage() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState("");
   const [previewTitle, setPreviewTitle] = useState("");
+  const { id } = useAuth();
 
   // 🎮 ตัวอย่างข้อมูลจากหน้าเกม (mock)
   const mockGameData = {
@@ -33,20 +36,24 @@ export default function RefundPage() {
 
   const handleSubmit = async (values: any) => {
     try {
-      console.log("Refund data (mock):", {
-        ...values,
-        purchaseDate: mockGameData.purchaseDate,
-        orderId: mockGameData.orderId,
-        files: fileList.map((f) => f.name),
+      const orderIdNum = parseInt(
+        String(mockGameData.orderId).replace(/\D/g, ""),
+        10
+      );
+      await createRefund({
+        order_id: orderIdNum || 0,
+        user_id: Number(id) || 0,
+        reason: values.reason,
+        amount: 0,
       });
 
-      await new Promise((r) => setTimeout(r, 600));
-      message.success("ส่งคำขอคืนเงินเรียบร้อย! (จำลอง)");
+      message.success("ส่งคำขอคืนเงินเรียบร้อย!");
       form.resetFields();
       setFileList([]);
     } catch (error) {
       console.error(error);
-      message.error("เกิดข้อผิดพลาดในการส่งคำขอ (จำลอง)");
+      const detail = (error as any)?.response?.data?.error || "เกิดข้อผิดพลาด";
+      message.error(detail);
     }
   };
 
