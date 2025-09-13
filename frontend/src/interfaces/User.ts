@@ -13,7 +13,7 @@ export interface User {
   comments?: Comment[];
   reactions?: Reaction[];
   attachments?: Attachment[];
-  notifications?: Notification[];
+ notifications?: AppNotification[];
   user_games?: UserGame[];
 }
 
@@ -43,5 +43,5 @@ import type { Thread } from "./Thread";
 import type { Comment } from "./Comment";
 import type { Reaction } from "./Reaction";
 import type { Attachment } from "./Attachment";
-import type { Notification } from "./Notification";
+import type { Notification as AppNotification } from "./Notification";
 import type { UserGame } from "./UserGame";

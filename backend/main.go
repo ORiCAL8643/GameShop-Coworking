@@ -1,4 +1,3 @@
-// main.go
 package main
 
 import (
@@ -20,6 +19,7 @@ func main() {
 	// 1) DB connect + migrate/seed
 	configs.ConnectionDB()
 	configs.SetupDatabase()
+	configs.MigrateReportTables() // ✅ เพิ่มบรรทัดนี้เท่านั้น
 
 	r := gin.New()
 
@@ -68,6 +68,7 @@ func main() {
 		// -------- Games --------
 		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
+		router.GET("/games/:id", controllers.FindGameByID)
 		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
 		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
@@ -141,7 +142,11 @@ func main() {
 		router.GET("/reports/:id", controllers.GetReportByID)
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
+		// เปลี่ยน handler ให้รองรับตาราง Reply/ReplyAttachment
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
+		// เพิ่มเส้นทางสำหรับแอดมิน (ตอบกลับ/ปิดงาน)
+		router.POST("/admin/reports/:id/replies", controllers.AdminCreateReply)
+		router.PATCH("/admin/reports/:id/resolve", controllers.AdminResolveReport)
 
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)

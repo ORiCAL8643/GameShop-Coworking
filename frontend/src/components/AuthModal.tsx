@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { Modal, Form, Input, Button, DatePicker } from 'antd';
 import { useAuth } from '../context/AuthContext';
-import type { Notification } from '../interfaces/Notification';
+import type { Notification as AppNotification } from '../interfaces/Notification';
 
 interface AuthModalProps {
   open: boolean;
   onClose: () => void;
-  onLoginSuccess?: (notif: Notification) => void;
+  onLoginSuccess?: (notif: AppNotification) => void;
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) => {
@@ -40,7 +40,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ open, onClose, onLoginSuccess }) 
         message: 'เข้าสู่ระบบสำเร็จ',
         created_at: new Date().toLocaleString(),
         is_read: false,
-      } as Notification;
+      } as AppNotification;
       onLoginSuccess?.(notification);
       onClose();
     } catch (error) {
