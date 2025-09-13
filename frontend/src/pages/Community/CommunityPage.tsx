@@ -151,7 +151,7 @@ export default function CommunityPage() {
             }}
           >
             <div style={{ padding: "14px 24px", display: "flex", gap: 12, alignItems: "center", width: "100%" }}>
-              <Title level={4} style={{ color: "#e6e6e6", margin: 0 }}>GameShop Community</Title>
+              <Title level={4} style={{ color: "#e6e6e6", margin: 0 }}>Community</Title>
               <div style={{ flex: 1 }} />
               <Text style={{ color: "#93a0c2" }}>
                 {(token || authId || DEV_USER_ID) ? "พร้อมใช้งานสำหรับโพสต์/ถูกใจ" : "อ่านได้ แต่ยังโพสต์/ถูกใจไม่ได้ (ไม่มีตัวตน)"}
