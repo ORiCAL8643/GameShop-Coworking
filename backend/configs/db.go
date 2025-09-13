@@ -272,49 +272,34 @@ func fixUserUniqBeforeMigrate() error {
 // ---------- Permissions seeding ----------
 
 func seedPermissionsAndGrantAdmin(adminID uint) {
-	// รายการสิทธิ์
+	// เคลียร์ backup เก่าและ role_permissions เดิม
+	db.Exec("DROP TABLE IF EXISTS permissions_backup")
+	db.Exec("DROP TABLE IF EXISTS role_permissions_backup")
+	if err := db.Exec("DELETE FROM role_permissions").Error; err != nil {
+		log.Println("cleanup role_permissions error:", err)
+	}
+	// reset autoincrement สำหรับ role_permissions ให้เริ่มจาก 1
+	db.Exec("DELETE FROM sqlite_sequence WHERE name='role_permissions'")
+
+	// ลบรายการที่ไม่ใช่ admin:* ทั้งหมด
+	if err := db.Exec("DELETE FROM permissions WHERE key NOT LIKE ?", "admin:%").Error; err != nil {
+		log.Println("cleanup permissions error:", err)
+	}
+
+	// รายการสิทธิ์ใหม่เฉพาะฝั่ง Admin
 	perms := []struct {
 		Key   string
 		Title string
 		Desc  string
 	}{
-		// Requests
-		{"requests.read", "อ่านรายการรีเควส", ""},
-		{"requests.manage", "จัดการรีเควส", ""},
-
-		// Games
-		{"games.read", "อ่านข้อมูลเกม", ""},
-		{"games.manage", "จัดการเกม (เพิ่ม/แก้ไข/ลบ)", ""},
-
-		// Workshop
-		{"workshop.read", "เข้าถึง Workshop", ""},
-		{"workshop.create", "อัปโหลด/สร้างม็อด", ""},
-		{"workshop.moderate", "กลั่นกรอง Workshop", ""},
-
-		// Roles & Users
-		{"roles.read", "ดูบทบาท", ""},
-		{"roles.manage", "จัดการบทบาทและสิทธิ์", ""},
-		{"users.manage", "จัดการผู้ใช้", ""},
-
-		// Payments
-		{"payments.read", "ดูการชำระเงิน", ""},
-		{"payments.manage", "จัดการการชำระเงิน", ""},
-
-		// Community / Reviews
-		{"community.read", "อ่านกระทู้/คอมเมนต์", ""},
-		{"community.moderate", "โมเดอเรตคอมมูนิตี้", ""},
-		{"reviews.read", "ดูรีวิว", ""},
-		{"reviews.moderate", "ตรวจสอบรีวิว", ""},
-
-		// Promotions / Orders / Analytics / Refunds / Reports
-		{"promotions.read", "ดูโปรโมชัน", ""},
-		{"promotions.manage", "จัดการโปรโมชัน", ""},
-		{"orders.manage", "จัดการคำสั่งซื้อ", ""},
-		{"analytics.read", "ดู Analytics", ""},
-		{"refunds.read", "ดูคำร้องคืนเงิน", ""},
-		{"refunds.manage", "จัดการคืนเงิน", ""},
-		{"reports.read", "ดูรายงานปัญหา", ""},
-		{"reports.manage", "จัดการรายงานปัญหา", ""},
+		{"admin:all", "all admin access", ""},
+		{"admin:panel", "access admin panel", ""},
+		{"admin:game", "manage games", ""},
+		{"admin:request", "manage requests", ""},
+		{"admin:promotion", "manage promotions", ""},
+		{"admin:page", "manage pages", ""},
+		{"admin:paymentreview", "review payments", ""},
+		{"admin:role", "manage roles and permissions", ""},
 	}
 
 	for _, it := range perms {
@@ -323,10 +308,14 @@ func seedPermissionsAndGrantAdmin(adminID uint) {
 			log.Println("seed permission error:", it.Key, err)
 			continue
 		}
-		if err := ensureRoleHasPermission(adminID, p.ID); err != nil {
-			log.Println("grant admin perm error:", it.Key, err)
+		// มอบ admin:all และ admin:panel ให้ role แอดมินตั้งแต่แรก
+		if it.Key == "admin:all" || it.Key == "admin:panel" {
+			if err := ensureRoleHasPermission(adminID, p.ID); err != nil {
+				log.Println("grant admin perm error:", it.Key, err)
+			}
 		}
 	}
+
 }
 
 // ---------- Setup / Seed ----------
@@ -412,8 +401,6 @@ func SetupDatabase() {
 		&entity.ThreadImage{},
 		&entity.Comment{},
 		&entity.ThreadLike{},
-
-
 
 		&entity.Review{},      // ★ ใช้ชื่อดัชนีใหม่แล้ว
 		&entity.Review_Like{}, // ถ้ามี
