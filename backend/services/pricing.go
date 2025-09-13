@@ -20,61 +20,27 @@ func GetDiscountedPriceForGame(db *gorm.DB, gameID uint, now time.Time) (float64
 	}
 	base := float64(g.BasePrice)
 
-	// พยายามอ่านโปรโมชันผ่าน raw SQL แบบยืดหยุ่น (รองรับชื่อคอลัมน์ที่ต่างกันได้บ้าง)
+	// อ่านโปรโมชันที่กำลังใช้งานอยู่
 	type promoRow struct {
-		Percent *float64
-		Amount  *float64
-		Price   *float64
+		DiscountType  entity.DiscountType
+		DiscountValue int
 	}
-
-	var r promoRow
-	// attempt #1: promotions + promotion_games (คอลัมน์ชื่อทั่วไป)
-	err := db.Raw(`
-		SELECT
-			CAST(p.discount_percent AS REAL) AS percent,
-			CAST(p.discount_amount  AS REAL) AS amount,
-			CAST(p.special_price    AS REAL) AS price
-		FROM promotions p
-		JOIN promotion_games pg ON pg.promotion_id = p.id
-		WHERE pg.game_id = ?
-		  AND (p.start_at IS NULL OR p.start_at <= ?)
-		  AND (p.end_at   IS NULL OR p.end_at   >= ?)
-		  AND (p.is_active IS NULL OR p.is_active = 1)
-		ORDER BY p.priority DESC, p.id DESC
-		LIMIT 1
-	`, gameID, now, now).Scan(&r).Error
-	if err != nil {
-		// attempt #2: บางโปรเจ็กต์ใช้ชื่อคอลัมน์อีกแบบ
-		_ = db.Raw(`
-			SELECT
-				CAST(p.percent     AS REAL) AS percent,
-				CAST(p.amount      AS REAL) AS amount,
-				CAST(p.sale_price  AS REAL) AS price
-			FROM promotions p
-			JOIN promotion_games pg ON pg.promotion_id = p.id
-			WHERE pg.game_id = ?
-			  AND (p.starts_at IS NULL OR p.starts_at <= ?)
-			  AND (p.ends_at   IS NULL OR p.ends_at   >= ?)
-			  AND (p.active    IS NULL OR p.active = 1)
-			ORDER BY p.id DESC
-			LIMIT 1
-		`, gameID, now, now).Scan(&r).Error
+	var promos []promoRow
+	if err := db.Raw(`
+                SELECT p.discount_type, p.discount_value
+                FROM promotions p
+                JOIN promotion_games pg ON pg.promotion_id = p.id
+                WHERE pg.game_id = ? AND p.status = 1
+                      AND p.start_date <= ? AND p.end_date >= ?
+        `, gameID, now, now).Scan(&promos).Error; err != nil {
+		return 0, err
 	}
 
 	// เลือกวิธีลดที่ให้ "ราคาต่ำสุด" อย่างปลอดภัย
 	price := base
-	if r.Price != nil && *r.Price > 0 && *r.Price < price {
-		price = *r.Price
-	}
-	if r.Percent != nil && *r.Percent > 0 {
-		p := *r.Percent
-		price = base * (100.0 - p) / 100.0
-	}
-	if r.Amount != nil && *r.Amount > 0 {
-		if base-*r.Amount < price {
-			price = base - *r.Amount
-		} else if price-*r.Amount < price {
-			price = price - *r.Amount
+	for _, p := range promos {
+		if discounted := ApplyDiscount(base, p.DiscountType, p.DiscountValue); discounted < price {
+			price = discounted
 		}
 	}
 

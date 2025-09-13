@@ -16,7 +16,7 @@ type Game struct {
 	BasePrice      int         `json:"base_price"`
 	Status         string      `json:"status" gorm:"type:varchar(20);default:'pending';not null;index"`
 	Minimum_specID uint        `json:"minimum_spec_id"`
-	MinimumSpec    MinimumSpec `json:"minimum_spec"`
+	MinimumSpec    MinimumSpec `json:"minimum_spec" gorm:"constraint:OnUpdate:CASCADE,OnDelete:SET NULL;"`
 	AgeRating      int         `json:"age_rating"`
 
 	Requests []Request `gorm:"foreignKey:GameRefer"`

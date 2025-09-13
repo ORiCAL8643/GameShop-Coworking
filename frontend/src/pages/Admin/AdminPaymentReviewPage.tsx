@@ -46,7 +46,7 @@ function normalizeRow(r: any): ReviewablePayment {
     order_id: Number(r.order_id ?? r.OrderID),
     order_no: r.order_no ?? r.OrderNo ?? `ORD-${String(r.order_id ?? r.OrderID ?? "")}`,
     user_name: r.user_name ?? r.UserName ?? "ไม่ระบุ",
-    amount: Number(r.amount ?? r.Amount ?? 0),
+    amount: Number(r.order_total ?? r.OrderTotal ?? r.amount ?? r.Amount ?? 0),
     slip_url: r.slip_url ?? r.SlipURL ?? r.slip_path ?? r.SlipPath ?? "",
     uploaded_at: r.uploaded_at ?? r.UploadedAt ?? r.created_at ?? r.CreatedAt ?? "",
     status: (["PENDING", "APPROVED", "REJECTED"].includes(statusRaw) ? statusRaw : "PENDING") as PaymentStatus,
@@ -83,7 +83,19 @@ export default function AdminPaymentReviewPage() {
       const qs = st === "ALL" ? "" : `?status=${st}`;
       const res = await axios.get(`${BASE_URL}/payments${qs}`, { headers: authHeaders });
       const data = Array.isArray(res.data) ? res.data : [];
-      setRows(data.map(normalizeRow));
+      const mapped = data.map(normalizeRow);
+      const withTotals = await Promise.all(
+        mapped.map(async (r) => {
+          try {
+            const ord = await axios.get(`${BASE_URL}/orders/${r.order_id}`, { headers: authHeaders });
+            const total = Number(ord.data?.total_amount ?? ord.data?.TotalAmount ?? r.amount);
+            return { ...r, amount: total };
+          } catch {
+            return r;
+          }
+        }),
+      );
+      setRows(withTotals);
     } catch (e) {
       console.error(e);
       message.error("โหลดข้อมูลการชำระเงินล้มเหลว");
@@ -207,8 +219,8 @@ export default function AdminPaymentReviewPage() {
               dataIndex: "order_no",
               render: (v, r) => (
                 <Space direction="vertical" size={0}>
-                  <Typography.Text style={{ color: TEXT_MAIN, fontWeight: 600 }}>{v}</Typography.Text>
-                  <Typography.Text style={{ color: TEXT_SUB, fontSize: 12 }}>
+                  <Typography.Text style={{ color: "#760ee6ff", fontWeight: 600 }}>{v}</Typography.Text>
+                  <Typography.Text style={{ color: "rgba(0, 0, 0, 0.93)", fontSize: 15 }}>
                     โดย {r.user_name || "-"}
                   </Typography.Text>
                 </Space>
@@ -219,7 +231,7 @@ export default function AdminPaymentReviewPage() {
               dataIndex: "amount",
               align: "right" as const,
               render: (n: number) => (
-                <Typography.Text style={{ color: "#fff", fontWeight: 600 }}>
+                <Typography.Text style={{ color: "#0acb3eff", fontWeight: 600 }}>
                   {formatTHB(n)}
                 </Typography.Text>
               ),

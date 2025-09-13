@@ -11,6 +11,7 @@ export interface Game {
   age_rating: number;
   status: string;
   minimum_spec_id: number;
+  minimum_spec: {os: string; processor: string; memory: string; graphics: string; storage: string;};
 }
 
 export interface CreateGameRequest {
