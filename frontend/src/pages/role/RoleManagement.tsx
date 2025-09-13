@@ -6,6 +6,7 @@ import {
 import type { ColumnsType } from "antd/es/table";
 import type { MenuProps } from "antd";
 import { UserOutlined, EditOutlined, MoreOutlined, SearchOutlined, PlusOutlined } from "@ant-design/icons";
+import { Can } from "../../components/Can";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 
@@ -198,9 +199,11 @@ const handleAddRole = async () => {
             <Title level={3} style={{ color: "white", margin: 0, flex: 1 }}>
               บทบาท
             </Title>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRole}>
-              สร้างบทบาทใหม่
-            </Button>
+            <Can perm="role.create">
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddRole}>
+                สร้างบทบาทใหม่
+              </Button>
+            </Can>
           </div>
 
           <Card style={{ background: "#1f1f1f", borderColor: "#2b2b2b" }} bodyStyle={{ padding: 16 }}>

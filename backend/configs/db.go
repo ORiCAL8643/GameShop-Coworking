@@ -87,51 +87,21 @@ func getOrCreateRole(title, desc string) (entity.Role, error) {
 	return r, nil
 }
 
-// หา/สร้าง permission ตาม key (slug)
-// หากมีข้อมูลเดิมที่ใช้ title เป็น key จะอัปเดตให้เป็นฟอร์แมตใหม่
-func ensurePermission(key, title, desc string) (entity.Permission, error) {
+// ensurePermission finds or creates a permission by code
+func ensurePermission(code, desc string) (entity.Permission, error) {
 	var p entity.Permission
-
-	// ลองค้นหาจาก key ก่อน (ฟอร์แมตใหม่)
-	if err := db.Where("key = ?", key).First(&p).Error; err != nil {
+	if err := db.Where("code = ?", code).First(&p).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// รองรับฟอร์แมตเก่า: ใช้ title เป็น key
-			if err := db.Where("title = ?", key).First(&p).Error; err != nil {
-				if errors.Is(err, gorm.ErrRecordNotFound) {
-					p = entity.Permission{Key: key, Title: title, Description: desc}
-					if err := db.Create(&p).Error; err != nil {
-						return p, err
-					}
-					return p, nil
-				}
-				return p, err
-			}
-
-			updates := map[string]interface{}{"key": key}
-			if p.Title == key {
-				updates["title"] = title
-			}
-			if p.Description == "" && desc != "" {
-				updates["description"] = desc
-			}
-			if err := db.Model(&p).Updates(updates).Error; err != nil {
+			p = entity.Permission{Code: code, Description: desc}
+			if err := db.Create(&p).Error; err != nil {
 				return p, err
 			}
 			return p, nil
 		}
 		return p, err
 	}
-
-	// อัปเดต title/description หากยังว่าง
-	updates := map[string]interface{}{}
-	if p.Title == "" && title != "" {
-		updates["title"] = title
-	}
 	if p.Description == "" && desc != "" {
-		updates["description"] = desc
-	}
-	if len(updates) > 0 {
-		db.Model(&p).Updates(updates)
+		db.Model(&p).Update("description", desc)
 	}
 	return p, nil
 }
@@ -272,59 +242,30 @@ func fixUserUniqBeforeMigrate() error {
 // ---------- Permissions seeding ----------
 
 func seedPermissionsAndGrantAdmin(adminID uint) {
-	// รายการสิทธิ์
+	// base permissions
 	perms := []struct {
-		Key   string
-		Title string
-		Desc  string
+		Code string
+		Desc string
 	}{
-		// Requests
-		{"requests.read", "อ่านรายการรีเควส", ""},
-		{"requests.manage", "จัดการรีเควส", ""},
-
-		// Games
-		{"games.read", "อ่านข้อมูลเกม", ""},
-		{"games.manage", "จัดการเกม (เพิ่ม/แก้ไข/ลบ)", ""},
-
-		// Workshop
-		{"workshop.read", "เข้าถึง Workshop", ""},
-		{"workshop.create", "อัปโหลด/สร้างม็อด", ""},
-		{"workshop.moderate", "กลั่นกรอง Workshop", ""},
-
-		// Roles & Users
-		{"roles.read", "ดูบทบาท", ""},
-		{"roles.manage", "จัดการบทบาทและสิทธิ์", ""},
-		{"users.manage", "จัดการผู้ใช้", ""},
-
-		// Payments
-		{"payments.read", "ดูการชำระเงิน", ""},
-		{"payments.manage", "จัดการการชำระเงิน", ""},
-
-		// Community / Reviews
-		{"community.read", "อ่านกระทู้/คอมเมนต์", ""},
-		{"community.moderate", "โมเดอเรตคอมมูนิตี้", ""},
-		{"reviews.read", "ดูรีวิว", ""},
-		{"reviews.moderate", "ตรวจสอบรีวิว", ""},
-
-		// Promotions / Orders / Analytics / Refunds / Reports
-		{"promotions.read", "ดูโปรโมชัน", ""},
-		{"promotions.manage", "จัดการโปรโมชัน", ""},
-		{"orders.manage", "จัดการคำสั่งซื้อ", ""},
-		{"analytics.read", "ดู Analytics", ""},
-		{"refunds.read", "ดูคำร้องคืนเงิน", ""},
-		{"refunds.manage", "จัดการคืนเงิน", ""},
-		{"reports.read", "ดูรายงานปัญหา", ""},
-		{"reports.manage", "จัดการรายงานปัญหา", ""},
+		{"role.create", ""},
+		{"role.read", ""},
+		{"role.update", ""},
+		{"role.delete", ""},
+		{"permission.manage", ""},
+		{"workshop.upload", ""},
+		{"mod.moderate", ""},
+		{"game.read", ""},
+		{"promotion.manage", ""},
 	}
 
 	for _, it := range perms {
-		p, err := ensurePermission(it.Key, it.Title, it.Desc)
+		p, err := ensurePermission(it.Code, it.Desc)
 		if err != nil {
-			log.Println("seed permission error:", it.Key, err)
+			log.Println("seed permission error:", it.Code, err)
 			continue
 		}
 		if err := ensureRoleHasPermission(adminID, p.ID); err != nil {
-			log.Println("grant admin perm error:", it.Key, err)
+			log.Println("grant admin perm error:", it.Code, err)
 		}
 	}
 }
@@ -412,8 +353,6 @@ func SetupDatabase() {
 		&entity.ThreadImage{},
 		&entity.Comment{},
 		&entity.ThreadLike{},
-
-
 
 		&entity.Review{},      // ★ ใช้ชื่อดัชนีใหม่แล้ว
 		&entity.Review_Like{}, // ถ้ามี
