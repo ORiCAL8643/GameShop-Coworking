@@ -11,7 +11,7 @@ import PromotionBanner from "../components/PromotionBanner";
 const { Title } = Typography;
 
 const Home = () => {
-  const { id:userId } = useAuth();
+  const { userId } = useAuth();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const navigate = useNavigate();
 
