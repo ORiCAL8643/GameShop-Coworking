@@ -46,32 +46,21 @@ func main() {
 		router.PATCH("/users/:id/role", controllers.UpdateUserRole)
 
 		// -------- Roles --------
-		router.GET("/roles", controllers.GetRoles)
-		router.GET("/roles/:id", controllers.GetRoleById)
-		router.POST("/roles", controllers.CreateRole)
-		router.PATCH("/roles/:id", controllers.UpdateRole)
-		router.DELETE("/roles/:id", controllers.DeleteRole)
+                router.GET("/roles", controllers.GetRoles)
+                router.GET("/roles/:id", controllers.GetRoleById)
 
 		// -------- Permissions --------
-		router.GET("/permissions", controllers.GetPermissions)
-		router.GET("/permissions/:id", controllers.GetPermissionById)
-		router.POST("/permissions", controllers.CreatePermission)
-		router.PATCH("/permissions/:id", controllers.UpdatePermission)
-		router.DELETE("/permissions/:id", controllers.DeletePermission)
+                router.GET("/permissions", controllers.GetPermissions)
+                router.GET("/permissions/:id", controllers.GetPermissionById)
 
 		// -------- RolePermissions --------
-		router.GET("/rolepermissions", controllers.GetRolePermissions)
-		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
-		router.POST("/rolepermissions", controllers.CreateRolePermission)
-		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
-		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
+                router.GET("/rolepermissions", controllers.GetRolePermissions)
+                router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
 
 		// -------- Games --------
-		router.POST("/new-game", controllers.CreateGame)
-		router.GET("/game", controllers.FindGames)
-		router.GET("/games/:id", controllers.FindGameByID)
-		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
+                router.GET("/game", controllers.FindGames)
+                router.GET("/games/:id", controllers.FindGameByID)
+                
 
 		// -------- Threads (READ only = public) --------
 		router.GET("/threads", controllers.FindThreads)                       // ?game_id=&q=
@@ -107,14 +96,10 @@ func main() {
 		router.PUT("/notifications/read-all", controllers.MarkAllNotificationsRead)
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
 
-		// -------- Promotions --------
-		router.POST("/promotions", controllers.CreatePromotion)
-		router.GET("/promotions", controllers.FindPromotions)
-		router.GET("/promotions/:id", controllers.GetPromotionByID)
-		router.PUT("/promotions/:id", controllers.UpdatePromotion)
-		router.DELETE("/promotions/:id", controllers.DeletePromotion)
-		router.POST("/promotions/:id/games", controllers.SetPromotionGames)
-		router.GET("/promotions-active", controllers.FindActivePromotions)
+                // -------- Promotions --------
+                router.GET("/promotions", controllers.FindPromotions)
+                router.GET("/promotions/:id", controllers.GetPromotionByID)
+                router.GET("/promotions-active", controllers.FindActivePromotions)
 
 		// -------- Reviews --------
 		router.POST("/reviews", controllers.CreateReview)
@@ -148,9 +133,8 @@ func main() {
 		router.POST("/admin/reports/:id/replies", controllers.AdminCreateReply)
 		router.PATCH("/admin/reports/:id/resolve", controllers.AdminResolveReport)
 
-		// -------- Requests --------
-		router.POST("/new-request", controllers.CreateRequest)
-		router.GET("/request", controllers.FindRequest)
+                // -------- Requests --------
+                router.POST("/new-request", controllers.CreateRequest)
 
 		// -------- Mods --------
 		// READ: เปิดสาธารณะเหมือนเดิม
@@ -169,49 +153,76 @@ func main() {
 	{
 		authList.GET("/me/permissions", controllers.GetMyPermissions)
 
-		// ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
-		withUserQuery := authList.Group("/", InjectUserIDQuery())
-		{
-			withUserQuery.GET("/orders", middlewares.RequirePerm("order:read:own"), controllers.FindOrders)
-			withUserQuery.GET("/payments", controllers.FindPayments)
-		}
+                // ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
+                withUserQuery := authList.Group("/", InjectUserIDQuery())
+                {
+                        withUserQuery.GET("/orders", middlewares.RequirePerm("order:read:own"), controllers.FindOrders)
+                        withUserQuery.GET("/payments", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:paymentreview"), controllers.FindPayments)
+                }
 
 		// Orders (write)
-		authList.POST("/orders", middlewares.RequirePerm("order:create"), controllers.CreateOrder)
+                authList.POST("/orders", middlewares.RequirePerm("order:create"), controllers.CreateOrder)
+
+                // -------- Games (admin) --------
+                authList.POST("/new-game", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:game"), controllers.CreateGame)
+                authList.PUT("/update-game/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:game"), controllers.UpdateGamebyID)
+                authList.POST("/upload/game", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:game"), controllers.UploadGame)
 
 		// Order Items
-		authList.POST("/order-items", controllers.CreateOrderItem)
-		authList.GET("/order-items", controllers.FindOrderItems)
-		authList.PUT("/order-items/:id/qty", controllers.UpdateOrderItemQty)
-		authList.DELETE("/order-items/:id", controllers.DeleteOrderItem)
+                authList.POST("/order-items", controllers.CreateOrderItem)
+                authList.GET("/order-items", controllers.FindOrderItems)
+                authList.PUT("/order-items/:id/qty", controllers.UpdateOrderItemQty)
+                authList.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
 		// Payments (write/action)
-		authList.POST("/payments", middlewares.RequirePerm("payment:create"), controllers.CreatePayment)
-		authList.PATCH("/payments/:id", middlewares.RequirePerm("payment:create"), controllers.UpdatePayment)
-		authList.POST("/payments/:id/approve", middlewares.RequirePerm("payment:approve"), controllers.ApprovePayment) // ตรวจ role ใน handler
-		authList.POST("/payments/:id/reject", middlewares.RequirePerm("payment:approve"), controllers.RejectPayment)
+                authList.POST("/payments", middlewares.RequirePerm("payment:create"), controllers.CreatePayment)
+                authList.PATCH("/payments/:id", middlewares.RequirePerm("payment:create"), controllers.UpdatePayment)
+                authList.POST("/payments/:id/approve", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:paymentreview"), middlewares.RequirePerm("payment:approve"), controllers.ApprovePayment)
+                authList.POST("/payments/:id/reject", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:paymentreview"), middlewares.RequirePerm("payment:approve"), controllers.RejectPayment)
 
 		// -------- Threads (WRITE only = ต้อง auth) --------
-		authList.POST("/threads", middlewares.RequirePerm("thread:create"), controllers.CreateThread)    // multipart: title, content, game_id, images[]
+                authList.POST("/threads", middlewares.RequirePerm("thread:create"), controllers.CreateThread)    // multipart: title, content, game_id, images[]
 		authList.PUT("/threads/:id", middlewares.RequirePerm("thread:create"), controllers.UpdateThread) // แก้ title/content
 		authList.DELETE("/threads/:id", middlewares.RequirePerm("thread:create"), controllers.DeleteThread)
 		authList.POST("/threads/:id/comments", middlewares.RequirePerm("thread:comment"), controllers.CreateComment)
 		authList.DELETE("/comments/:id", middlewares.RequirePerm("thread:comment"), controllers.DeleteComment)
 		authList.POST("/threads/:id/toggle_like", middlewares.RequirePerm("thread:like"), controllers.ToggleThreadLike)
 
-		authList.POST("/modratings", middlewares.RequirePerm("rating:create"), controllers.CreateModRating)
+                authList.POST("/modratings", middlewares.RequirePerm("rating:create"), controllers.CreateModRating)
 
-		authList.POST("/reports", middlewares.RequirePerm("report:create"), controllers.CreateReport)
+                authList.POST("/reports", middlewares.RequirePerm("report:create"), controllers.CreateReport)
 
-		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
-		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
+                authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
+                authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
 
 		// -------- Mods (WRITE only = ต้อง auth) --------
 		// ✅ เพิ่มเฉพาะส่วนนี้ เพื่อบังคับให้ล็อกอินก่อนสร้าง/แก้ไข/ลบม็อด
-		authList.POST("/mods", middlewares.RequirePerm("workshop:mod:create"), controllers.CreateMod)
-		authList.PATCH("/mods/:id", middlewares.RequirePerm("workshop:mod:update:own"), controllers.UpdateMod)
-		authList.DELETE("/mods/:id", middlewares.RequirePerm("workshop:mod:delete:own"), controllers.DeleteMod)
-		authList.GET("/mods/mine", controllers.GetMyMods)
+                authList.POST("/mods", middlewares.RequirePerm("workshop:mod:create"), controllers.CreateMod)
+                authList.PATCH("/mods/:id", middlewares.RequirePerm("workshop:mod:update:own"), controllers.UpdateMod)
+                authList.DELETE("/mods/:id", middlewares.RequirePerm("workshop:mod:delete:own"), controllers.DeleteMod)
+                authList.GET("/mods/mine", controllers.GetMyMods)
+
+                // -------- Promotions (admin) --------
+                authList.POST("/promotions", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:promotion"), controllers.CreatePromotion)
+                authList.PUT("/promotions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:promotion"), controllers.UpdatePromotion)
+                authList.DELETE("/promotions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:promotion"), controllers.DeletePromotion)
+                authList.POST("/promotions/:id/games", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:promotion"), controllers.SetPromotionGames)
+
+                // -------- Requests (admin) --------
+                authList.GET("/request", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:request"), controllers.FindRequest)
+
+                // -------- RBAC management (admin) --------
+                authList.POST("/roles", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.CreateRole)
+                authList.PATCH("/roles/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.UpdateRole)
+                authList.DELETE("/roles/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.DeleteRole)
+
+                authList.POST("/permissions", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.CreatePermission)
+                authList.PATCH("/permissions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.UpdatePermission)
+                authList.DELETE("/permissions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.DeletePermission)
+
+                authList.POST("/rolepermissions", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.CreateRolePermission)
+                authList.PATCH("/rolepermissions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.UpdateRolePermission)
+                authList.DELETE("/rolepermissions/:id", middlewares.RequirePerm("admin:panel"), middlewares.RequirePerm("admin:role"), controllers.DeleteRolePermission)
 
 	}
 

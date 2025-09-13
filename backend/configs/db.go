@@ -333,26 +333,25 @@ func seedPermissionsAndGrantAdmin(adminID uint) {
 // grants them to the appropriate roles. Admin role will receive every
 // permission (including "*") while the basic User role receives a subset.
 func seedAppPermissions(adminID, userID uint) {
-	guest := []string{
-		"game:view", "promotion:view", "workshop:view", "thread:view",
-	}
-	userExtra := []string{
-		"order:create", "order:read:own", "payment:create",
-		"workshop:mod:create", "workshop:mod:update:own", "workshop:mod:delete:own",
-		"thread:create", "thread:comment", "thread:like",
-		"rating:create", "comment:create",
-		"report:create", "refund:create",
-		"admin:panel", // keep for admin mapping
-	}
-	// combine guest + userExtra for user role (excluding admin:panel)
-	userPerms := append([]string{}, guest...)
-	for _, p := range userExtra {
-		if p != "admin:panel" {
-			userPerms = append(userPerms, p)
-		}
-	}
-	// all perms for ensuring; include wildcard "*"
-	allPerms := append([]string{"*"}, append(guest, userExtra...)...)
+        guest := []string{
+                "game:view", "promotion:view", "workshop:view", "thread:view",
+        }
+        userExtra := []string{
+                "order:create", "order:read:own", "payment:create",
+                "workshop:mod:create", "workshop:mod:update:own", "workshop:mod:delete:own",
+                "thread:create", "thread:comment", "thread:like",
+                "rating:create", "comment:create",
+                "report:create", "refund:create",
+        }
+        adminOnly := []string{
+                "admin:panel", "admin:game", "admin:request", "admin:promotion",
+                "admin:page", "admin:paymentreview", "admin:role",
+        }
+        // combine guest + userExtra for user role
+        userPerms := append([]string{}, guest...)
+        userPerms = append(userPerms, userExtra...)
+        // all perms for ensuring; include wildcard "*" and adminOnly
+        allPerms := append([]string{"*"}, append(append(guest, userExtra...), adminOnly...)...)
 
 	for _, key := range allPerms {
 		perm, err := ensurePermission(key, key, "")
