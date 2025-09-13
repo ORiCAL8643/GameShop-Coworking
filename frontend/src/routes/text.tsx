@@ -2,6 +2,7 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import Sidebar from "../components/Sidebar";
+import AdminRoute from "../components/AdminRoute";
 
 // pages
 import Home from "../pages/Home";
@@ -59,12 +60,12 @@ const router = createBrowserRouter([
       { path: "report/success", element: <ReportSuccessPage /> },
 
       // === กลุ่ม information
-      { path: "information/Add", element: <Add /> },
+      { path: "information/Add", element: <AdminRoute need="admin:game"><Add /></AdminRoute> },
       { path: "information/Edit", element: <Edit /> },
 
       // === request
       { path: "request", element: <Request /> },
-      { path: "requestinfo", element: <Requestinfo /> },
+      { path: "requestinfo", element: <AdminRoute need="admin:request"><Requestinfo /></AdminRoute> },
 
       // === category (ใช้ path แบบ relative)
       {
@@ -85,11 +86,11 @@ const router = createBrowserRouter([
        { path: "game/:id", element: <GameDetail /> },
 
       // === promotion
-      { path: "promotion", element: <PromotionManager /> },
-      { path: "promotion/:id", element: <PromotionDetail /> },
+      { path: "promotion", element: <AdminRoute need="admin:promotion"><PromotionManager /></AdminRoute> },
+      { path: "promotion/:id", element: <AdminRoute need="admin:promotion"><PromotionDetail /></AdminRoute> },
       // === roles
-      { path: "roles", element: <RoleManagement /> },
-      { path: "roles/:id", element: <RoleEdit /> },
+      { path: "roles", element: <AdminRoute need="admin:role"><RoleManagement /></AdminRoute> },
+      { path: "roles/:id", element: <AdminRoute need="admin:role"><RoleEdit /></AdminRoute> },
 
       // === refund
       { path: "refund", element: <RefundPage /> },
@@ -108,20 +109,22 @@ const router = createBrowserRouter([
       {
         path: "Admin/Page",
         element: (
-          <AdminPage
-            refunds={refunds}
-            setRefunds={() => { }}
-            addNotification={addNotification}
-            addRefundUpdate={addRefundUpdate}
-          />
+          <AdminRoute need="admin:page">
+            <AdminPage
+              refunds={refunds}
+              setRefunds={() => { }}
+              addNotification={addNotification}
+              addRefundUpdate={addRefundUpdate}
+            />
+          </AdminRoute>
         ),
       },
-      { path: "Admin/PaymentReviewPage", element: <AdminPaymentReviewPage /> },
+      { path: "Admin/PaymentReviewPage", element: <AdminRoute need="admin:paymentreview"><AdminPaymentReviewPage /></AdminRoute> },
 
-      { path: "Admin/RolePage", element: <RoleManagement /> },
+      { path: "Admin/RolePage", element: <AdminRoute need="admin:role"><RoleManagement /></AdminRoute> },
 
       // ✅ เพิ่มเส้นทางหน้ารายการที่แก้ไขแล้ว (ตรงกับปุ่ม navigate("/Admin/Resolved"))
-      { path: "Admin/Resolved", element: <ResolvedReportsPage /> },
+      { path: "Admin/Resolved", element: <AdminRoute need="admin:page"><ResolvedReportsPage /></AdminRoute> },
 
       // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
       { path: "orders-status", element: <OrdersStatusPage /> },

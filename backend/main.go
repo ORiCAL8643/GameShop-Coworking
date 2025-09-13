@@ -9,6 +9,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/middlewares"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -47,30 +48,18 @@ func main() {
 		// -------- Roles --------
 		router.GET("/roles", controllers.GetRoles)
 		router.GET("/roles/:id", controllers.GetRoleById)
-		router.POST("/roles", controllers.CreateRole)
-		router.PATCH("/roles/:id", controllers.UpdateRole)
-		router.DELETE("/roles/:id", controllers.DeleteRole)
 
 		// -------- Permissions --------
 		router.GET("/permissions", controllers.GetPermissions)
 		router.GET("/permissions/:id", controllers.GetPermissionById)
-		router.POST("/permissions", controllers.CreatePermission)
-		router.PATCH("/permissions/:id", controllers.UpdatePermission)
-		router.DELETE("/permissions/:id", controllers.DeletePermission)
 
 		// -------- RolePermissions --------
 		router.GET("/rolepermissions", controllers.GetRolePermissions)
 		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
-		router.POST("/rolepermissions", controllers.CreateRolePermission)
-		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
-		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
 
 		// -------- Games --------
-		router.POST("/new-game", controllers.CreateGame)
 		router.GET("/game", controllers.FindGames)
 		router.GET("/games/:id", controllers.FindGameByID)
-		router.PUT("/update-game/:id", controllers.UpdateGamebyID)
-		router.POST("/upload/game", controllers.UploadGame) // ลงทะเบียนครั้งเดียว
 
 		// -------- Threads (READ only = public) --------
 		router.GET("/threads", controllers.FindThreads)                       // ?game_id=&q=
@@ -107,12 +96,8 @@ func main() {
 		router.DELETE("/notifications/:id", controllers.DeleteNotificationByID)
 
 		// -------- Promotions --------
-		router.POST("/promotions", controllers.CreatePromotion)
 		router.GET("/promotions", controllers.FindPromotions)
 		router.GET("/promotions/:id", controllers.GetPromotionByID)
-		router.PUT("/promotions/:id", controllers.UpdatePromotion)
-		router.DELETE("/promotions/:id", controllers.DeletePromotion)
-		router.POST("/promotions/:id/games", controllers.SetPromotionGames)
 		router.GET("/promotions-active", controllers.FindActivePromotions)
 
 		// -------- Reviews --------
@@ -128,13 +113,10 @@ func main() {
 		router.GET("/categories", controllers.FindCategories)
 
 		// -------- KeyGames --------
-		router.POST("/keygames", controllers.CreateKeyGame)
-		router.GET("/keygames", controllers.FindKeyGames)
-		router.DELETE("/keygames/:id", controllers.DeleteKeyGame)
+		// (protected routes moved under authList)
 
 		// -------- MinimumSpec --------
-		router.POST("/new-minimumspec", controllers.CreateMinimumSpec)
-		router.GET("/minimumspec", controllers.FindMinimumSpec)
+		// (protected routes moved under authList)
 
 		// -------- Problem Reports --------
 		router.POST("/reports", controllers.CreateReport)
@@ -142,11 +124,7 @@ func main() {
 		router.GET("/reports/:id", controllers.GetReportByID)
 		router.PUT("/reports/:id", controllers.UpdateReport)
 		router.DELETE("/reports/:id", controllers.DeleteReport)
-		// เปลี่ยน handler ให้รองรับตาราง Reply/ReplyAttachment
 		router.POST("/reports/:id/reply", controllers.ReplyReport)
-		// เพิ่มเส้นทางสำหรับแอดมิน (ตอบกลับ/ปิดงาน)
-		router.POST("/admin/reports/:id/replies", controllers.AdminCreateReply)
-		router.PATCH("/admin/reports/:id/resolve", controllers.AdminResolveReport)
 
 		// -------- Requests --------
 		router.POST("/new-request", controllers.CreateRequest)
@@ -169,6 +147,8 @@ func main() {
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
 	authList := r.Group("/", AuthRequired())
 	{
+		authList.GET("/me/permissions", controllers.GetMyPermissions)
+
 		// ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
 		withUserQuery := authList.Group("/", InjectUserIDQuery())
 		{
@@ -188,8 +168,41 @@ func main() {
 		// Payments (write/action)
 		authList.POST("/payments", controllers.CreatePayment)
 		authList.PATCH("/payments/:id", controllers.UpdatePayment)
-		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
-		authList.POST("/payments/:id/reject", controllers.RejectPayment)
+		authList.POST("/payments/:id/approve", middlewares.RequireAdminPerm("admin:paymentreview"), controllers.ApprovePayment)
+		authList.POST("/payments/:id/reject", middlewares.RequireAdminPerm("admin:paymentreview"), controllers.RejectPayment)
+
+		// -------- Roles/Permissions (admin) --------
+		authList.POST("/roles", middlewares.RequireAdminPerm("admin:role"), controllers.CreateRole)
+		authList.PATCH("/roles/:id", middlewares.RequireAdminPerm("admin:role"), controllers.UpdateRole)
+		authList.DELETE("/roles/:id", middlewares.RequireAdminPerm("admin:role"), controllers.DeleteRole)
+
+		authList.POST("/permissions", middlewares.RequireAdminPerm("admin:role"), controllers.CreatePermission)
+		authList.PATCH("/permissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.UpdatePermission)
+		authList.DELETE("/permissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.DeletePermission)
+
+		authList.POST("/rolepermissions", middlewares.RequireAdminPerm("admin:role"), controllers.CreateRolePermission)
+		authList.PATCH("/rolepermissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.UpdateRolePermission)
+		authList.DELETE("/rolepermissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.DeleteRolePermission)
+
+		// -------- Games (admin) --------
+		authList.POST("/new-game", middlewares.RequireAdminPerm("admin:game"), controllers.CreateGame)
+		authList.PUT("/update-game/:id", middlewares.RequireAdminPerm("admin:game"), controllers.UpdateGamebyID)
+		authList.POST("/upload/game", middlewares.RequireAdminPerm("admin:game"), controllers.UploadGame)
+		authList.POST("/keygames", middlewares.RequireAdminPerm("admin:game"), controllers.CreateKeyGame)
+		authList.GET("/keygames", middlewares.RequireAdminPerm("admin:game"), controllers.FindKeyGames)
+		authList.DELETE("/keygames/:id", middlewares.RequireAdminPerm("admin:game"), controllers.DeleteKeyGame)
+		authList.POST("/new-minimumspec", middlewares.RequireAdminPerm("admin:game"), controllers.CreateMinimumSpec)
+		authList.GET("/minimumspec", middlewares.RequireAdminPerm("admin:game"), controllers.FindMinimumSpec)
+
+		// -------- Promotions (admin) --------
+		authList.POST("/promotions", middlewares.RequireAdminPerm("admin:promotion"), controllers.CreatePromotion)
+		authList.PUT("/promotions/:id", middlewares.RequireAdminPerm("admin:promotion"), controllers.UpdatePromotion)
+		authList.DELETE("/promotions/:id", middlewares.RequireAdminPerm("admin:promotion"), controllers.DeletePromotion)
+		authList.POST("/promotions/:id/games", middlewares.RequireAdminPerm("admin:promotion"), controllers.SetPromotionGames)
+
+		// -------- Problem Reports (admin actions) --------
+		authList.POST("/admin/reports/:id/replies", middlewares.RequireAdminPerm("admin:page"), controllers.AdminCreateReply)
+		authList.PATCH("/admin/reports/:id/resolve", middlewares.RequireAdminPerm("admin:page"), controllers.AdminResolveReport)
 
 		// -------- Threads (WRITE only = ต้อง auth) --------
 		authList.POST("/threads", controllers.CreateThread)    // multipart: title, content, game_id, images[]
