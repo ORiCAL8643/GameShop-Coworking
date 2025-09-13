@@ -110,6 +110,7 @@ const ModDetail: React.FC = () => {
   const [avg, setAvg] = useState(0);
   const [count, setCount] = useState(0);
   const [myScore, setMyScore] = useState<number | undefined>(undefined);
+  const [myRating, setMyRating] = useState<ModRating | undefined>(undefined);
   const [submittingRating, setSubmittingRating] = useState(false);
 
   // comments
@@ -182,9 +183,9 @@ const ModDetail: React.FC = () => {
     setCount(n);
     setAvg(n ? sum / n : 0);
     const myId = authUserId != null ? Number(authUserId) : undefined;
-    setMyScore(
-      myId ? valid.find((r) => Number(r.user_id) === myId)?.score : undefined,
-    );
+    const mine = myId ? list.find((r) => Number(r.user_id) === myId) : undefined;
+    setMyRating(mine);
+    setMyScore(mine && Number(mine.score) > 0 ? Number(mine.score) : undefined);
   };
 
   const fetchRatings = async () => {
@@ -192,7 +193,17 @@ const ModDetail: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE}/modratings?mod_id=${modIdNum}`);
       const data = await res.json();
-      const list: ModRating[] = Array.isArray(data) ? data : (data?.data ?? []);
+      const raw: any[] = Array.isArray(data) ? data : data?.data ?? [];
+      const list: ModRating[] = raw.map((r) => ({
+        ...r,
+        id: r.id ?? r.ID,
+        score: Number(r.score ?? r.Score ?? 0),
+        user_id: r.user_id ?? r.UserID,
+        mod_id: r.mod_id ?? r.ModID,
+        comment: r.comment ?? r.Comment,
+        created_at: r.created_at ?? r.CreatedAt,
+        user: r.user ?? r.User,
+      }));
       setRatings(list);
       const comm = list
         .filter((r) => r.comment && r.comment.trim() !== "")
@@ -216,15 +227,24 @@ const ModDetail: React.FC = () => {
     }
     try {
       setSubmittingRating(true);
-      const res = await fetch(`${API_BASE}/modratings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mod_id: modIdNum,
-          user_id: Number(authUserId),
-          score: value, // 1..5
-        }),
-      });
+      let res: Response;
+      if (myRating?.id) {
+        res = await fetch(`${API_BASE}/modratings/${myRating.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ score: value }),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/modratings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mod_id: modIdNum,
+            user_id: Number(authUserId),
+            score: value,
+          }),
+        });
+      }
       if (!res.ok) throw new Error(await res.text());
       message.success("ขอบคุณสำหรับการให้คะแนน!");
       await fetchRatings();
@@ -250,16 +270,25 @@ const ModDetail: React.FC = () => {
     }
     try {
       setSubmittingComment(true);
-      const res = await fetch(`${API_BASE}/modratings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mod_id: modIdNum,
-          user_id: Number(authUserId),
-          score: myScore || 0,
-          comment: content,
-        }),
-      });
+      let res: Response;
+      if (myRating?.id) {
+        res = await fetch(`${API_BASE}/modratings/${myRating.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ comment: content }),
+        });
+      } else {
+        res = await fetch(`${API_BASE}/modratings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mod_id: modIdNum,
+            user_id: Number(authUserId),
+            score: 0,
+            comment: content,
+          }),
+        });
+      }
       if (!res.ok) throw new Error(await res.text());
       setComment("");
       message.success("เพิ่มคอมเมนต์เรียบร้อย");
