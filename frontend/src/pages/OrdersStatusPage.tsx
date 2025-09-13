@@ -340,7 +340,7 @@ export default function OrdersStatusPage() {
               showIcon
               message="ข้อควรระวัง"
               description="เมื่อกด ‘แสดงคีย์’ สำหรับรายการใดแล้ว จะถือว่าคุณได้เปิดดูคีย์เกม และจะไม่สามารถขอคืนเงินได้สำหรับคำสั่งซื้อนี้"
-              style={{ background: "#2b2535", borderColor: BORDER, color: TEXT_MAIN }}
+              style={{ background: "#f9f8f9ff", borderColor: BORDER, color: TEXT_MAIN }}
             />
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={() => setKeysOpenFor(null)}>ปิด</Button>
@@ -348,7 +348,7 @@ export default function OrdersStatusPage() {
           </div>
         }
       >
-        <div style={{ color: TEXT_SUB, marginBottom: 12 }}>
+        <div style={{ color: TEXT_SUB, marginBottom: 16, fontSize: 18, lineHeight: 1.6 }}>
           กด <strong style={{ color: THEME_PRIMARY }}>แสดงคีย์</strong> เพื่อดูคีย์จริง และสามารถ{" "}
           <strong style={{ color: THEME_PRIMARY }}>คัดลอก</strong> ไปใช้งานได้
         </div>
@@ -437,7 +437,7 @@ export default function OrdersStatusPage() {
         </Card>
 
         <Divider style={{ borderColor: BORDER }} />
-        <div style={{ color: TEXT_SUB, fontSize: 12, lineHeight: 1.6 }}>
+        <div style={{ color: TEXT_SUB, fontSize: 17, lineHeight: 1.6 }}>
           <ExclamationCircleOutlined style={{ color: THEME_PRIMARY, marginRight: 6 }} />
           โปรดเก็บรักษาคีย์เกมไว้เป็นความลับ ห้ามเผยแพร่สู่สาธารณะ
         </div>
