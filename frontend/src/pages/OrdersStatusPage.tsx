@@ -26,12 +26,19 @@ type OrderItemRow = {
   line_total?: number; LineTotal?: number;
 };
 
+type PaymentRow = {
+  status?: string; Status?: string;
+  reject_reason?: string; RejectReason?: string;
+};
+
+
 type Order = {
   ID?: number; id?: number;
   OrderStatus?: string; order_status?: string;
   TotalAmount?: number; total_amount?: number;
   OrderCreate?: string; order_create?: string;
   OrderItems?: OrderItemRow[]; order_items?: OrderItemRow[];
+  Payments?: PaymentRow[]; payments?: PaymentRow[];
 };
 
 type RawKeyRow = any;
@@ -101,10 +108,10 @@ export default function OrdersStatusPage() {
   const colorOf = (st: string) => {
     switch ((st || "").toUpperCase()) {
       case "WAITING_PAYMENT": return "default";
-      case "UNDER_REVIEW":   return "processing";
+      case "PAYMENT_FAILED":   return "processing";
       case "PAID":           return "success";
-      case "FULFILLED":      return "success";
-      case "CANCELLED":      return "error";
+      //case "FULFILLED":      return "success";
+      //case "CANCELLED":      return "error";
       default:               return "default";
     }
   };
@@ -258,6 +265,9 @@ export default function OrdersStatusPage() {
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
               const canViewKeys = statusAllowsView(status);
+              const payments = o.Payments ?? o.payments ?? [];
+              const rejectedPay = payments.find(p => (p.status || p.Status || '').toUpperCase() === 'REJECTED');
+              const rejectReason = rejectedPay?.reject_reason ?? rejectedPay?.RejectReason;
 
               return (
                 <Col key={oid} xs={24} sm={12} md={8} lg={6} xl={6}>
@@ -301,6 +311,11 @@ export default function OrdersStatusPage() {
                         </Typography.Text>
                         <Tag color={colorOf(status)}>{status || "UNKNOWN"}</Tag>
                       </Space>
+                       {rejectReason && (
+                        <Typography.Text style={{ color: '#ff4d4f' }}>
+                          เหตุผลการปฏิเสธ: {rejectReason}
+                        </Typography.Text>
+                      )}
 
                       <div>
                         <Typography.Text style={{ color: TEXT_SUB }}>สร้างเมื่อ</Typography.Text>
