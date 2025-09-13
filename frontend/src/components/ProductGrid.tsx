@@ -165,7 +165,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ userId = null }) => {
               </div>
 
               <Button block style={{ marginTop: 10 }} onClick={(e) => handleAddToCart(e, c)}>
-                Add to Cart
+                Purchase
               </Button>
             </Card>
           </Col>
