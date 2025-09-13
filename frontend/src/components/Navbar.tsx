@@ -1,5 +1,5 @@
 // src/components/Navbar.tsx
-import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from "@ant-design/icons";
+import { SearchOutlined, DollarCircleOutlined } from "@ant-design/icons";
 import { useState, useMemo } from "react";
 import { Input, Avatar, Space, Button } from "antd";
 import { Link } from "react-router-dom";
@@ -12,7 +12,7 @@ const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
   const { token, username, logout, id: userId } = useAuth();
 
-  // ถ้าอยากใช้เป็น value ที่โชว์ตรง avatar
+
   const avatarText = useMemo(() => (username ? username[0]?.toUpperCase() : "U"), [username]);
 
   return (
@@ -49,9 +49,6 @@ const Navbar = () => {
         <Link to="/refund-status" aria-label="Refund status">
           <DollarCircleOutlined style={{ color: "#4CAF50", fontSize: 20 }} />
         </Link>
-
-        {/* ตะกร้า (คงสภาพเดิม ไม่ผูกลิงก์เพื่อไม่กระทบของเพื่อน) */}
-        <ShoppingCartOutlined style={{ color: "white", fontSize: 18 }} />
 
         {/* โปรไฟล์ / ล็อกอิน */}
         {token ? (
