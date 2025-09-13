@@ -284,7 +284,7 @@ export default function ThreadList({
 
               <div style={{ marginTop: 10, color: "#8892b0" }}>
                 by <b style={{ color: "#cbd5e1" }}>{t.author || "ไม่ระบุ"}</b>{" "}
-                · {dayjs(t.createdAt).format("D/M/YYYY, h:mm A")} · ถูกใจ{" "}
+                · {dayjs(t.createdAt).format("D/M/YYYY HH:mm")} · ถูกใจ{" "}
                 {t.likeCount} · คอมเมนต์ {t.commentCount}
               </div>
             </Card>

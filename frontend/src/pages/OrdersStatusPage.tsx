@@ -271,7 +271,7 @@ export default function OrdersStatusPage() {
                         style={{ color: THEME_PRIMARY, fontWeight: 600 }}
                         onClick={() => navigate(`/orders/${oid}`)}
                       >
-                        รายละเอียด
+                        ดูข้อมูลเกม
                       </span>,
                       <Tooltip
                         key="viewkeys"

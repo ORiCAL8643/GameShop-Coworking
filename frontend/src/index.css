@@ -29,3 +29,14 @@ body {
 .slip-uploader .ant-upload-list-item-container {
   color: #e8e8f3;
 }
+
+/* ใส่สี placeholder ให้ textarea ที่มีคลาส .gs-textarea */
+.gs-textarea::placeholder {
+  color: var(--ph-color, #a9afc3); /* fallback ถ้าไม่ได้ส่งค่าเข้ามา */
+  opacity: 1; /* บางเบราว์เซอร์ทำ placeholder ให้จางลง */
+}
+
+/* ไม่บังคับ แต่ถ้าอยากให้ตอน focus ยังเป็นสีเดิม */
+.gs-textarea:focus::placeholder {
+  color: var(--ph-color, #a9afc3);
+}
