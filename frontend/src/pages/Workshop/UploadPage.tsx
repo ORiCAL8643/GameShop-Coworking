@@ -9,14 +9,21 @@ import {
   CheckCircleFilled,
 } from "@ant-design/icons";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { getGame, getMod, createMod, updateMod } from "../../services/workshop";
+import {
+  getGame,
+  getMod,
+  createMod,
+  updateMod,
+  listUserGames,
+  replaceModFile,
+  replaceModImage,
+} from "../../services/workshop";
 import type { Game } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Title } = Typography;
 const { Dragger } = Upload;
 
-// helper ไอคอนติ๊ก/กากบาทให้ Checklist
 const Ok: React.FC<{ ok: boolean }> = ({ ok }) => (
   <span style={{ color: ok ? "#52c41a" : "#ff4d4f", fontWeight: 600 }}>
     {ok ? "✅" : "❌"}
@@ -26,9 +33,14 @@ const Ok: React.FC<{ ok: boolean }> = ({ ok }) => (
 const UploadPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+
   const gameIdParam = searchParams.get("gameId");
   const modIdParam = searchParams.get("modId");
-  const gameId = gameIdParam ? Number(gameIdParam) : undefined;
+  const fromParam = searchParams.get("from"); // ⬅️ ใช้คืนสู่หน้าที่มาก่อน (เช่น ModDetail)
+
+  const [gameId, setGameId] = useState<number | undefined>(
+    gameIdParam ? Number(gameIdParam) : undefined
+  );
   const modId = modIdParam ? Number(modIdParam) : undefined;
 
   const { id: userId, token } = useAuth() as { id?: number; token?: string };
@@ -36,31 +48,70 @@ const UploadPage: React.FC = () => {
   const [game, setGame] = useState<Game | null>(null);
   const isEditing = modId !== undefined;
 
+  // เช็คความเป็นเจ้าของเกม
+  const [checkingOwn, setCheckingOwn] = useState(false);
+  const [ownsThisGame, setOwnsThisGame] = useState(false);
+  const [myUserGameId, setMyUserGameId] = useState<number | undefined>(undefined);
+
+  // โหลดข้อมูลเกมเมื่อมี gameId
   useEffect(() => {
-    if (gameId) {
-      getGame(gameId)
-        .then(setGame)
-        .catch((e) => {
-          console.error("[getGame] failed:", e);
-          message.error(e?.message || "โหลดข้อมูลเกมไม่สำเร็จ");
-        });
-    }
+    if (!gameId) return;
+    getGame(gameId)
+      .then(setGame)
+      .catch((e) => {
+        console.error("[getGame] failed:", e);
+        message.error(e?.message || "โหลดข้อมูลเกมไม่สำเร็จ");
+        setGame(null);
+      });
   }, [gameId]);
 
+  // โหลด user-games ของผู้ใช้ ⇒ ยืนยันว่าเป็นเจ้าของเกมนี้ไหม
   useEffect(() => {
-    if (modId) {
-      getMod(modId)
-        .then((m: any) => {
-          setModTitle(m?.title ?? "");
-          setModDescription(m?.description ?? "");
-          const ugid = m?.user_game_id ?? m?.userGameId ?? m?.UserGameID ?? undefined;
-          setUserGameId(typeof ugid === "number" ? ugid : (ugid != null ? Number(ugid) : undefined));
-        })
-        .catch((e) => {
-          console.error("[getMod] failed:", e);
-          message.error(e?.message || "โหลดข้อมูลม็อดไม่สำเร็จ");
-        });
+    if (!userId || !gameId) {
+      setCheckingOwn(false);
+      setOwnsThisGame(false);
+      setMyUserGameId(undefined);
+      return;
     }
+    setCheckingOwn(true);
+    listUserGames(userId)
+      .then((rows: any[]) => {
+        const match = (rows ?? []).find(
+          (r: any) => Number(r.game_id ?? r.gameId ?? r.GameID) === Number(gameId)
+        );
+        setOwnsThisGame(!!match);
+        const ugid = match
+          ? Number(match.user_game_id ?? match.UserGameID ?? match.id ?? match.ID)
+          : undefined;
+        setMyUserGameId(Number.isFinite(ugid!) ? ugid : undefined);
+      })
+      .catch((e) => {
+        console.warn("listUserGames failed:", e);
+        setOwnsThisGame(false);
+        setMyUserGameId(undefined);
+      })
+      .finally(() => setCheckingOwn(false));
+  }, [userId, gameId]);
+
+  // โหลดม็อด (โหมดแก้ไข) + เซ็ต gameId จากม็อด เพื่อไม่ให้ขึ้น “ไม่มีเกม”
+  useEffect(() => {
+    if (!modId) return;
+    getMod(modId)
+      .then((m: any) => {
+        setModTitle(m?.title ?? "");
+        setModDescription(m?.description ?? "");
+        const gid = m?.game_id ?? m?.GameID ?? m?.gameId;
+        if (gid != null) setGameId(Number(gid));
+
+        const ugid = m?.user_game_id ?? m?.userGameId ?? m?.UserGameID ?? undefined;
+        setUserGameId(
+          typeof ugid === "number" ? ugid : ugid != null ? Number(ugid) : undefined
+        );
+      })
+      .catch((e) => {
+        console.error("[getMod] failed:", e);
+        message.error(e?.message || "โหลดข้อมูลม็อดไม่สำเร็จ");
+      });
   }, [modId]);
 
   // Form states
@@ -71,18 +122,18 @@ const UploadPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
 
-  // success banner (ลอยด้านบนจอ)
+  // success banner
   const [showSuccess, setShowSuccess] = useState(false);
   const redirectTimer = useRef<number | undefined>(undefined);
 
-  // (ออปชัน) สำหรับ compatibility เดิม
+  // (compat) สำหรับแก้ไข
   const [userGameId, setUserGameId] = useState<number | undefined>(undefined);
 
   // --- file handlers ---
   const handleModFile = (file: File) => {
     setModFile(file);
     message.success(`${file.name} selected`);
-    return false; // stop auto-upload
+    return false;
   };
   const handleModFileChange: React.ComponentProps<typeof Upload>["onChange"] = (info) => {
     const f = info.file?.originFileObj as File | undefined;
@@ -116,15 +167,28 @@ const UploadPage: React.FC = () => {
         return;
       }
       if (!userId) {
-        message.error("กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด");
+        message.error("กรุณาเข้าสู่ระบบก่อนทำรายการ");
+        return;
+      }
+      if (checkingOwn) {
+        message.loading({ content: "กำลังตรวจสอบสิทธิ์...", duration: 1 });
+        return;
+      }
+      if (!ownsThisGame) {
+        message.error("ต้องเป็นเจ้าของเกมนี้ก่อนจึงจะทำรายการได้");
         return;
       }
       if (!modTitle.trim()) {
         message.error("กรุณาใส่ชื่อม็อด");
         return;
       }
+      if (!token) {
+        message.error("คุณไม่มีสิทธิ์ (token ไม่พบ) — กรุณาเข้าสู่ระบบใหม่");
+        return;
+      }
 
       if (!isEditing) {
+        // ---------- สร้างใหม่ ----------
         if (!modFile) {
           message.error("กรุณาเลือกไฟล์ม็อด");
           return;
@@ -137,40 +201,55 @@ const UploadPage: React.FC = () => {
         fd.append("title", modTitle);
         fd.append("description", modDescription);
         fd.append("game_id", String(gameId));
+        if (myUserGameId != null) fd.append("user_game_id", String(myUserGameId));
         fd.append("file", modFile);
         if (modImage) fd.append("image", modImage);
 
-        await createMod(fd, token); // ควรคืน obj ก็ได้ แต่ไม่จำเป็นสำหรับการรีไดเรกต์ครั้งนี้
+        const created = await createMod(fd, token, userId);
         message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 0.8 });
 
-        // แสดงแบนเนอร์สำเร็จ + รีไดเรกต์กลับ Workshop Detail
         setShowSuccess(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         redirectTimer.current = window.setTimeout(() => {
+          // อัปโหลดเสร็จ → กลับหน้า Workshop ของเกม
           navigate(`/workshop/${gameId}`, { replace: true });
         }, 1400);
 
-        // reset ฟอร์ม
         setModTitle("");
         setModDescription("");
         setModFile(null);
         setModImage(null);
         setImagePreview("");
       } else {
+        // ---------- แก้ไข ----------
         setUploading(true);
         message.open({ key: toastKey, type: "loading", content: "กำลังบันทึก...", duration: 0 });
 
         const payload: any = { title: modTitle, description: modDescription, game_id: gameId };
         if (userGameId != null) payload.user_game_id = userGameId;
 
-        await updateMod(modId!, payload, token);
+        const updated = await updateMod(modId!, payload, token, userId);
+
+        // ถ้ามีไฟล์/รูปใหม่ ให้แทนที่ (ออปชัน)
+        if (modFile) {
+          await replaceModFile(modId!, modFile, token, userId);
+        }
+        if (modImage) {
+          await replaceModImage(modId!, modImage, token, userId);
+        }
 
         message.open({ key: toastKey, type: "success", content: "บันทึกเรียบร้อยแล้ว!", duration: 0.8 });
 
         setShowSuccess(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         redirectTimer.current = window.setTimeout(() => {
-          navigate(`/workshop/${gameId}`, { replace: true });
+          // ✅ โหมดแก้ไข: กลับไปหน้าที่มาก่อน (มักเป็น ModDetail)
+          if (fromParam) {
+            navigate(decodeURIComponent(fromParam), { replace: true });
+          } else {
+            // fallback: ใช้ history back เพื่อกลับไป ModDetail
+            navigate(-1);
+          }
         }, 1200);
       }
     } catch (err: any) {
@@ -186,7 +265,6 @@ const UploadPage: React.FC = () => {
     }
   };
 
-  // cleanup timer เมื่อออกจากหน้า
   useEffect(() => {
     return () => {
       if (redirectTimer.current) {
@@ -195,12 +273,13 @@ const UploadPage: React.FC = () => {
     };
   }, []);
 
-  const disableSubmit = uploading;
+  const disableSubmit = uploading || checkingOwn || !ownsThisGame;
 
   const checks = {
     gameId: !!gameId,
     title: !!modTitle.trim(),
     fileReady: isEditing ? true : !!modFile,
+    owns: ownsThisGame && !checkingOwn,
   };
 
   useEffect(() => {
@@ -209,12 +288,14 @@ const UploadPage: React.FC = () => {
       title: checks.title,
       modFile: !!modFile,
       isEditing,
+      ownsThisGame,
+      checkingOwn,
+      myUserGameId,
     });
-  }, [gameId, modTitle, modFile, isEditing]);
+  }, [gameId, modTitle, modFile, isEditing, ownsThisGame, checkingOwn, myUserGameId]);
 
   return (
     <div style={{ background: "#141414", minHeight: "100vh", flex: 1, position: "relative" }}>
-      {/* === Success Banner (ลอยกึ่งกลางด้านบนจอ) === */}
       {showSuccess && (
         <div
           style={{
@@ -245,10 +326,20 @@ const UploadPage: React.FC = () => {
         <Title level={2} style={{ color: "white" }}>
           {game
             ? `${isEditing ? "Edit" : "Upload"} Mods for ${(game as any)?.game_name ?? (game as any)?.name ?? ""}`
-            : "Upload Game Mods"}
+            : isEditing ? "Edit Game Mod" : "Upload Game Mods"}
         </Title>
 
-        {/* รายละเอียดม็อด */}
+        {!checkingOwn && !ownsThisGame && (
+          <Card
+            style={{ background: "#1f1f1f", borderColor: "#404040", marginBottom: 16 }}
+            headStyle={{ color: "white" }}
+          >
+            <div style={{ color: "#ff7875" }}>
+              คุณต้องเป็นเจ้าของเกมนี้ก่อนจึงจะอัปโหลด/แก้ไขม็อดได้
+            </div>
+          </Card>
+        )}
+
         <Card
           title={
             <span style={{ color: "white" }}>
@@ -275,87 +366,87 @@ const UploadPage: React.FC = () => {
           />
         </Card>
 
-        {!isEditing && (
-          <>
-            {/* เลือกไฟล์ม็อด */}
-            <Card
-              title={
-                <span style={{ color: "white" }}>
-                  <UploadOutlined /> Select your mods file
-                </span>
-              }
-              style={{
-                background: "#1f1f1f",
-                marginBottom: "24px",
-                borderRadius: 8,
-                borderColor: "#404040",
-              }}
-              headStyle={{ color: "white", borderBottomColor: "#404040" }}
-            >
-              <Dragger
-                beforeUpload={handleModFile}
-                onChange={handleModFileChange}
-                onRemove={handleModFileRemove}
-                showUploadList={!!modFile}
-                multiple={false}
-                accept=".zip,.rar,.7z"
-                maxCount={1}
-              >
-                <p className="ant-upload-drag-icon">
-                  <InboxOutlined style={{ color: "#9254de" }} />
-                </p>
-                <p style={{ color: "white" }}>Click or drag mod file to this area</p>
-                <p style={{ color: "#aaa" }}>รองรับ .zip, .rar, .7z</p>
-              </Dragger>
-              {modFile && (
-                <p style={{ color: "white", marginTop: 8 }}>
-                  Selected: {modFile.name}
-                </p>
-              )}
-            </Card>
+        {/* โหมดแก้ไข = Replace (optional), โหมดสร้าง = เลือกไฟล์ (required) */}
+        <Card
+          title={
+            <span style={{ color: "white" }}>
+              <UploadOutlined /> {isEditing ? "Replace your mods file (optional)" : "Select your mods file"}
+            </span>
+          }
+          style={{
+            background: "#1f1f1f",
+            marginBottom: "24px",
+            borderRadius: 8,
+            borderColor: "#404040",
+          }}
+          headStyle={{ color: "white", borderBottomColor: "#404040" }}
+        >
+          <Dragger
+            beforeUpload={handleModFile}
+            onChange={handleModFileChange}
+            onRemove={handleModFileRemove}
+            showUploadList={!!modFile}
+            multiple={false}
+            accept=".zip,.rar,.7z"
+            maxCount={1}
+            disabled={!ownsThisGame || checkingOwn}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined style={{ color: "#9254de" }} />
+            </p>
+            <p style={{ color: "white" }}>
+              {isEditing ? "ลากไฟล์ใหม่มาวางเพื่อแทนที่ไฟล์เดิม หรือคลิกเพื่อเลือก" : "Click or drag mod file to this area"}
+            </p>
+            <p style={{ color: "#aaa" }}>รองรับ .zip, .rar, .7z</p>
+          </Dragger>
+          {modFile && (
+            <p style={{ color: "white", marginTop: 8 }}>
+              Selected: {modFile.name}
+            </p>
+          )}
+        </Card>
 
-            {/* เลือกรูปม็อด (ออปชัน) */}
-            <Card
-              title={
-                <span style={{ color: "white" }}>
-                  <PictureOutlined /> Upload a mod image (optional)
-                </span>
-              }
-              style={{
-                background: "#1f1f1f",
-                marginBottom: "24px",
-                borderRadius: 8,
-                borderColor: "#404040",
-              }}
-              headStyle={{ color: "white", borderBottomColor: "#404040" }}
-            >
-              <Dragger
-                beforeUpload={handleModImage}
-                onChange={handleModImageChange}
-                onRemove={handleModImageRemove}
-                showUploadList={!!modImage}
-                accept="image/*"
-                maxCount={1}
-                multiple={false}
-              >
-                <p className="ant-upload-drag-icon">
-                  <InboxOutlined style={{ color: "#52c41a" }} />
-                </p>
-                <p style={{ color: "white" }}>Click or drag image to this area</p>
-                <p style={{ color: "#aaa" }}>รองรับ .jpg, .png, .gif</p>
-              </Dragger>
-              {imagePreview && (
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  style={{ marginTop: 12, maxHeight: 200, borderRadius: 6 }}
-                />
-              )}
-            </Card>
-          </>
-        )}
+        <Card
+          title={
+            <span style={{ color: "white" }}>
+              <PictureOutlined /> {isEditing ? "Replace mod image (optional)" : "Upload a mod image (optional)"}
+            </span>
+          }
+          style={{
+            background: "#1f1f1f",
+            marginBottom: "24px",
+            borderRadius: 8,
+            borderColor: "#404040",
+          }}
+          headStyle={{ color: "white", borderBottomColor: "#404040" }}
+        >
+          <Dragger
+            beforeUpload={handleModImage}
+            onChange={handleModImageChange}
+            onRemove={handleModImageRemove}
+            showUploadList={!!modImage}
+            accept="image/*"
+            maxCount={1}
+            multiple={false}
+            disabled={!ownsThisGame || checkingOwn}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined style={{ color: "#52c41a" }} />
+            </p>
+            <p style={{ color: "white" }}>
+              {isEditing ? "ลากภาพใหม่มาวางเพื่อแทนที่รูปเดิม หรือคลิกเพื่อเลือก" : "Click or drag image to this area"}
+            </p>
+            <p style={{ color: "#aaa" }}>รองรับ .jpg, .png, .gif</p>
+          </Dragger>
+          {imagePreview && (
+            <img
+              src={imagePreview}
+              alt="Preview"
+              style={{ marginTop: 12, maxHeight: 200, borderRadius: 6 }}
+            />
+          )}
+        </Card>
 
-        {/* คำอธิบาย */}
         <Card
           title={
             <span style={{ color: "white" }}>
@@ -383,7 +474,6 @@ const UploadPage: React.FC = () => {
           />
         </Card>
 
-        {/* Checklist */}
         <Card
           title={<span style={{ color: "white" }}>Checklist</span>}
           style={{
@@ -395,21 +485,21 @@ const UploadPage: React.FC = () => {
           headStyle={{ color: "white", borderBottomColor: "#404040" }}
         >
           <ul style={{ margin: 0, paddingLeft: 18, color: "white", lineHeight: 1.9 }}>
-            <li><Ok ok={!!gameId} /> มีรหัสเกมใน URL (เช่น <code>?gameId=123</code>)</li>
+            <li><Ok ok={!!gameId} /> มีรหัสเกม (อาจมาจาก URL หรือโหลดจากม็อด)</li>
             <li><Ok ok={!!modTitle.trim()} /> กรอกชื่อม็อด</li>
             {!isEditing && (
               <li><Ok ok={!!modFile} /> เลือกไฟล์ม็อด (.zip/.rar/.7z)</li>
             )}
+            <li><Ok ok={!!ownsThisGame && !checkingOwn} /> เป็นเจ้าของเกมนี้</li>
           </ul>
         </Card>
 
-        {/* ปุ่มอัปโหลด/บันทึก */}
         <div style={{ textAlign: "right", position: "relative", zIndex: 1 }}>
           <Button
             type="primary"
             size="large"
             loading={uploading}
-            disabled={uploading}
+            disabled={uploading || checkingOwn || !ownsThisGame}
             style={{ background: "#9254de", borderColor: "#9254de" }}
             onClick={handleUpload}
           >
