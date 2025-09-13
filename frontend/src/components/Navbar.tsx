@@ -1,8 +1,13 @@
 // src/components/Navbar.tsx
-import { SearchOutlined, ShoppingCartOutlined, DollarCircleOutlined } from "@ant-design/icons";
+import {
+  SearchOutlined,
+  ShoppingCartOutlined,
+  DollarCircleOutlined,
+} from "@ant-design/icons";
 import { useState, useMemo } from "react";
-import { Input, Avatar, Space, Button } from "antd";
-import { Link } from "react-router-dom";
+import { Input, Avatar, Space, Button, message } from "antd";
+import { Link, useNavigate } from "react-router-dom";
+import { listGames } from "../services/game";
 
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "../components/AuthModal";
@@ -10,10 +15,31 @@ import NotificationBell from "../components/NotificationsBell";
 
 const Navbar = () => {
   const [openAuth, setOpenAuth] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const navigate = useNavigate();
   const { token, username, logout, id: userId } = useAuth();
 
   // ถ้าอยากใช้เป็น value ที่โชว์ตรง avatar
   const avatarText = useMemo(() => (username ? username[0]?.toUpperCase() : "U"), [username]);
+
+  const handleSearch = async () => {
+    const text = searchText.trim().toLowerCase();
+    if (!text) return;
+    try {
+      const games = await listGames();
+      const matched = games.find((g) =>
+        g.game_name?.toLowerCase().includes(text)
+      );
+      if (matched) {
+        navigate(`/game/${matched.ID}`);
+        setSearchText("");
+      } else {
+        message.error("Game not found");
+      }
+    } catch {
+      message.error("Search failed");
+    }
+  };
 
   return (
     <header
@@ -28,9 +54,12 @@ const Navbar = () => {
       }}
     >
       {/* Search */}
-      <Input
+      <Input.Search
         prefix={<SearchOutlined />}
         placeholder="Search"
+        value={searchText}
+        onChange={(e) => setSearchText(e.target.value)}
+        onSearch={handleSearch}
         style={{
           width: "52%",
           borderRadius: 8,
