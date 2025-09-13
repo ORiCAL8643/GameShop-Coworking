@@ -262,6 +262,12 @@ const GameDetail: React.FC = () => {
             <Title level={2} style={{ color: "#fff", margin: 0 }}>
               {title}
             </Title>
+            <div style={{ margin: "4px 0 12px" }}>
+              <Space size={4}>
+                <Rate disabled allowHalf value={avgRating} />
+                <span style={{ color: "#fadb14" }}>{avgRating.toFixed(1)}</span>
+              </Space>
+            </div>
             <div style={{ margin: "8px 0 12px" }}>
               <Space size={[6, 6]} wrap>
                 {tags.slice(0, 6).map((t) => (
