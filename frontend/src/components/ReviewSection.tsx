@@ -57,6 +57,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   const [editing, setEditing] = useState<ReviewItem | null>(null);
   const [form] = Form.useForm<{ title?: string; content: string; rating: number }>();
   const [owned, setOwned] = useState(false);
+  const hasMyReview = items.some((r) => r.user_id === userId);
 
   const avgRating = useMemo(
     () =>
@@ -153,7 +154,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
   }, [userId, gameId]);
 
   /** ------- actions ------- */
-  const canCreate = allowCreate && !!userId && owned;
+  const canCreate = allowCreate && !!userId && owned && !hasMyReview;
 
   const onCreate = () => {
     setEditing(null);
@@ -298,7 +299,7 @@ const ReviewSection: React.FC<ReviewSectionProps> = ({
       </Space>
     ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [canCreate, items.length]
+    [canCreate, items, hasMyReview]
   );
 
   return (
