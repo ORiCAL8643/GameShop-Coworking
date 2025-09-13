@@ -275,9 +275,19 @@ func seedPermissionsAndGrantAdmin(adminID uint) {
 	// สำรองข้อมูลเดิมของ permissions (ทำครั้งแรกเท่านั้น)
 	db.Exec("CREATE TABLE IF NOT EXISTS permissions_backup AS SELECT * FROM permissions")
 
-	// ลบรายการที่ไม่ใช่ admin:* ทั้งหมด
-	if err := db.Exec("DELETE FROM permissions WHERE key NOT LIKE ?", "admin:%").Error; err != nil {
+	// ลบรายการที่ไม่ใช่ admin:* หรือ key ว่าง/NULL ทั้งหมด
+	if err := db.Exec(
+		"DELETE FROM permissions WHERE key IS NULL OR key = '' OR key NOT LIKE ?",
+		"admin:%",
+	).Error; err != nil {
 		log.Println("cleanup permissions error:", err)
+	}
+
+	// ลบ role_permissions ที่ชี้ไปยัง permission ที่ถูกลบแล้ว
+	if err := db.Exec(
+		"DELETE FROM role_permissions WHERE permission_id NOT IN (SELECT id FROM permissions)",
+	).Error; err != nil {
+		log.Println("cleanup role_permissions error:", err)
 	}
 
 	// รายการสิทธิ์ใหม่เฉพาะฝั่ง Admin
