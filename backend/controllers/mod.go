@@ -79,6 +79,7 @@ func GetMyMods(c *gin.Context) {
 // POST /mods
 // อนุญาตให้อัปโหลดได้โดยไม่ต้องมี user_game_id แต่จะบันทึก user_id ของผู้ที่อัปโหลด (ถ้า route อยู่ใต้ AuthRequired)
 // แนะนำให้ย้าย endpoint นี้ไปอยู่ในกลุ่ม AuthRequired() เพื่อให้มี userID เสมอ
+// POST /mods
 func CreateMod(c *gin.Context) {
 	title := c.PostForm("title")
 	if title == "" {
@@ -87,7 +88,7 @@ func CreateMod(c *gin.Context) {
 	}
 	description := c.PostForm("description")
 
-	// ✅ บังคับเฉพาะ game_id
+	// ✅ ต้องมี game_id
 	gameIDStr := c.PostForm("game_id")
 	if gameIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id is required"})
@@ -109,17 +110,52 @@ func CreateMod(c *gin.Context) {
 		}
 	}
 
-	// ✅ ต้องมีไฟล์ม็อดเสมอ
+	// ✅ ต้องล็อกอิน (อยู่ใต้ AuthRequired แล้ว แต่กันเผื่อ)
+	uidAny, ok := c.Get("userID")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "please login first"})
+		return
+	}
+	uploaderID, _ := uidAny.(uint)
+	if uploaderID == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "please login first"})
+		return
+	}
+
+	// ✅ เช็ค “เป็นเจ้าของเกม” ก่อน (มี user_games ของเกมนี้จริง)
+	// ถ้า client ส่ง user_game_id มา → ตรวจว่ามีแถวนี้และเป็นของ user เดียวกัน และ game ตรงกัน
+	db := configs.DB()
+
+	if userGameID != nil {
+		var ug entity.UserGame
+		if tx := db.Where("id = ? AND user_id = ? AND game_id = ?", *userGameID, uploaderID, gameID).First(&ug); tx.Error != nil || tx.RowsAffected == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "you must own this game (invalid user_game_id)"})
+			return
+		}
+	} else {
+		var cnt int64
+		if err := db.Model(&entity.UserGame{}).
+			Where("user_id = ? AND game_id = ?", uploaderID, gameID).
+			Count(&cnt).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if cnt == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "you must own this game to upload mods"})
+			return
+		}
+	}
+
+	// ✅ ต้องมีไฟล์ม็อด
 	modFile, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "mod file is required"})
 		return
 	}
-
-	// 🟡 OPTIONAL: รูปตัวอย่างม็อด
+	// (ออปชัน) รูปพรีวิว
 	imageFile, _ := c.FormFile("image")
 
-	// ---------- บันทึกไฟล์ม็อด (disk path) ----------
+	// ---------- บันทึกไฟล์ม็อด ----------
 	modFilename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), modFile.Filename)
 	modDirFS := filepath.Join("uploads", "mods")
 	if err := os.MkdirAll(modDirFS, os.ModePerm); err != nil {
@@ -131,7 +167,6 @@ func CreateMod(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save mod file"})
 		return
 	}
-	// ✅ web path (forward slash)
 	modPathWeb := path.Join("uploads", "mods", modFilename)
 
 	// ---------- บันทึกรูป (ถ้ามี) ----------
@@ -151,32 +186,22 @@ func CreateMod(c *gin.Context) {
 		imagePathWeb = path.Join("uploads", "mod_images", imgFilename)
 	}
 
-	// ✅ คนอัปโหลด (ต้องใช้ร่วมกับ AuthRequired() เพื่อให้มี userID เสมอ)
-	var uploaderID uint
-	if uidAny, ok := c.Get("userID"); ok {
-		if u, okC := uidAny.(uint); okC && u > 0 {
-			uploaderID = u
-		}
-	}
-	// ถ้าคุณต้อง “บังคับล็อกอิน” ให้ย้าย endpoint นี้ไว้ใต้ AuthRequired() และทำเช็คด้านล่าง:
-	// if uploaderID == 0 { c.JSON(http.StatusUnauthorized, gin.H{"error":"please login first"}); return }
-
-	// เตรียม record (เก็บ web path ลง DB)
+	// ✅ สร้าง record
 	mod := entity.Mod{
 		Title:       title,
 		Description: description,
-		UploadDate:  time.Now(), // ถ้ามี gorm.Model.CreatedAt แล้ว สามารถตัดออกได้
+		UploadDate:  time.Now(),
 		FilePath:    modPathWeb,
 		ImagePath:   imagePathWeb,
 		Status:      "pending",
 		GameID:      gameID,
-		UserID:      uploaderID, // ✅ บันทึกคนอัปโหลด
+		UserID:      uploaderID,
 	}
 	if userGameID != nil {
 		mod.UserGameID = userGameID
 	}
 
-	if err := configs.DB().Create(&mod).Error; err != nil {
+	if err := db.Create(&mod).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -193,41 +218,61 @@ func UpdateMod(c *gin.Context) {
 		return
 	}
 
-	// ✅ รองรับ JSON (แก้เฉพาะข้อมูลตัวหนังสือ)
+	// ✅ อนุญาตเฉพาะเจ้าของ (หรือ admin ถ้าต้องการ)
+	if uidAny, ok := c.Get("userID"); ok {
+		uid := uidAny.(uint)
+		// ถ้าต้องการให้แอดมินแก้ได้ ให้เอา roleID มาด้วย
+		isOwner := uid == mod.UserID
+		if !isOwner {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var input entity.Mod
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 🟡 ถ้าไม่อยากให้แก้ path/สถานะ ให้ล้างค่านี้ก่อนอัพเดต
-	// input.FilePath = ""
-	// input.ImagePath = ""
-	// input.Status = ""
-
 	if err := configs.DB().Model(&mod).Updates(input).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	if err := configs.DB().Where("id = ?", id).First(&mod).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, mod)
 }
 
-// DELETE /mods/:id
 func DeleteMod(c *gin.Context) {
 	id := c.Param("id")
 
-	// 🟡 OPTIONAL: ตรวจสิทธิ์ลบ (เจ้าของหรือแอดมินเท่านั้น)
-	// uidAny, _ := c.Get("userID")
-	// if !canDelete(uidAny, id) { c.JSON(http.StatusForbidden, gin.H{"error":"forbidden"}); return }
-
-	if tx := configs.DB().Exec("DELETE FROM mods WHERE id = ?", id); tx.RowsAffected == 0 {
+	var mod entity.Mod
+	if tx := configs.DB().Where("id = ?", id).First(&mod); tx.RowsAffected == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "mod not found"})
+		return
+	}
+
+	// ✅ อนุญาตเฉพาะเจ้าของ (หรือ admin ถ้าต้องการ)
+	if uidAny, ok := c.Get("userID"); ok {
+		uid := uidAny.(uint)
+		isOwner := uid == mod.UserID
+		if !isOwner {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if err := configs.DB().Delete(&entity.Mod{}, "id = ?", id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted successfully"})

@@ -10,6 +10,8 @@ import {
 } from '@ant-design/icons';
 const { Title } = Typography;
 import { useState,useEffect } from 'react';
+//import { useAuth } from "../../context/AuthContext";
+
 import axios from 'axios';
 import { message } from "antd";
 import type { UploadProps } from "antd";
@@ -31,8 +33,8 @@ const Add = () => {
     const [memory, setMemory] = useState("");
     const [graphics, setGraphics] = useState("");
     const [storage, setStorage] = useState("");
-    const { id } = useAuth(); //คนใช้งานระบบ
-    const [useron, Setuseron] = useState<useronline | null>(null)
+    //const { id } = useAuth(); //คนใช้งานระบบ
+    //const [useron, Setuseron] = useState<useronline | null>(null)
 
     async function uploadGameImage(file: File): Promise<string> {
         const fd = new FormData();

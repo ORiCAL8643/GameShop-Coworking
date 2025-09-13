@@ -9,14 +9,13 @@ import {
   CheckCircleFilled,
 } from "@ant-design/icons";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { getGame, getMod, createMod, updateMod } from "../../services/workshop";
+import { getGame, getMod, createMod, updateMod, listUserGames } from "../../services/workshop";
 import type { Game } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
 const { Title } = Typography;
 const { Dragger } = Upload;
 
-// helper ไอคอนติ๊ก/กากบาทให้ Checklist
 const Ok: React.FC<{ ok: boolean }> = ({ ok }) => (
   <span style={{ color: ok ? "#52c41a" : "#ff4d4f", fontWeight: 600 }}>
     {ok ? "✅" : "❌"}
@@ -36,6 +35,11 @@ const UploadPage: React.FC = () => {
   const [game, setGame] = useState<Game | null>(null);
   const isEditing = modId !== undefined;
 
+  // เช็คความเป็นเจ้าของเกม
+  const [checkingOwn, setCheckingOwn] = useState(false);
+  const [ownsThisGame, setOwnsThisGame] = useState(false);
+  const [myUserGameId, setMyUserGameId] = useState<number | undefined>(undefined);
+
   useEffect(() => {
     if (gameId) {
       getGame(gameId)
@@ -46,6 +50,34 @@ const UploadPage: React.FC = () => {
         });
     }
   }, [gameId]);
+
+  // โหลด user-games ของผู้ใช้ ⇒ ใช้ยืนยันว่าเป็นเจ้าของเกมนี้ไหม
+  useEffect(() => {
+    if (!userId || !gameId) {
+      setCheckingOwn(false);
+      setOwnsThisGame(false);
+      setMyUserGameId(undefined);
+      return;
+    }
+    setCheckingOwn(true);
+    listUserGames(userId)
+      .then((rows: any[]) => {
+        const match = (rows ?? []).find(
+          (r: any) => Number(r.game_id ?? r.gameId ?? r.GameID) === Number(gameId)
+        );
+        setOwnsThisGame(!!match);
+        const ugid = match
+          ? Number(match.user_game_id ?? match.UserGameID ?? match.id ?? match.ID)
+          : undefined;
+        setMyUserGameId(Number.isFinite(ugid!) ? ugid : undefined);
+      })
+      .catch((e) => {
+        console.warn("listUserGames failed:", e);
+        setOwnsThisGame(false);
+        setMyUserGameId(undefined);
+      })
+      .finally(() => setCheckingOwn(false));
+  }, [userId, gameId]);
 
   useEffect(() => {
     if (modId) {
@@ -71,18 +103,18 @@ const UploadPage: React.FC = () => {
   const [imagePreview, setImagePreview] = useState<string>("");
   const [uploading, setUploading] = useState(false);
 
-  // success banner (ลอยด้านบนจอ)
+  // success banner
   const [showSuccess, setShowSuccess] = useState(false);
   const redirectTimer = useRef<number | undefined>(undefined);
 
-  // (ออปชัน) สำหรับ compatibility เดิม
+  // (compat) สำหรับแก้ไข
   const [userGameId, setUserGameId] = useState<number | undefined>(undefined);
 
   // --- file handlers ---
   const handleModFile = (file: File) => {
     setModFile(file);
     message.success(`${file.name} selected`);
-    return false; // stop auto-upload
+    return false;
   };
   const handleModFileChange: React.ComponentProps<typeof Upload>["onChange"] = (info) => {
     const f = info.file?.originFileObj as File | undefined;
@@ -119,8 +151,20 @@ const UploadPage: React.FC = () => {
         message.error("กรุณาเข้าสู่ระบบก่อนอัปโหลดม็อด");
         return;
       }
+      if (checkingOwn) {
+        message.loading({ content: "กำลังตรวจสอบสิทธิ์...", duration: 1 });
+        return;
+      }
+      if (!ownsThisGame) {
+        message.error("ต้องเป็นเจ้าของเกมนี้ก่อนจึงจะอัปโหลดม็อดได้");
+        return;
+      }
       if (!modTitle.trim()) {
         message.error("กรุณาใส่ชื่อม็อด");
+        return;
+      }
+      if (!token) {
+        message.error("คุณไม่มีสิทธิ์อัปโหลด (token ไม่พบ) — กรุณาเข้าสู่ระบบใหม่");
         return;
       }
 
@@ -137,20 +181,19 @@ const UploadPage: React.FC = () => {
         fd.append("title", modTitle);
         fd.append("description", modDescription);
         fd.append("game_id", String(gameId));
+        if (myUserGameId != null) fd.append("user_game_id", String(myUserGameId));
         fd.append("file", modFile);
         if (modImage) fd.append("image", modImage);
 
-        await createMod(fd, token); // ควรคืน obj ก็ได้ แต่ไม่จำเป็นสำหรับการรีไดเรกต์ครั้งนี้
+        await createMod(fd, token, userId);
         message.open({ key: toastKey, type: "success", content: "อัปโหลดเรียบร้อยแล้ว!", duration: 0.8 });
 
-        // แสดงแบนเนอร์สำเร็จ + รีไดเรกต์กลับ Workshop Detail
         setShowSuccess(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
         redirectTimer.current = window.setTimeout(() => {
           navigate(`/workshop/${gameId}`, { replace: true });
         }, 1400);
 
-        // reset ฟอร์ม
         setModTitle("");
         setModDescription("");
         setModFile(null);
@@ -163,7 +206,7 @@ const UploadPage: React.FC = () => {
         const payload: any = { title: modTitle, description: modDescription, game_id: gameId };
         if (userGameId != null) payload.user_game_id = userGameId;
 
-        await updateMod(modId!, payload, token);
+        await updateMod(modId!, payload, token, userId);
 
         message.open({ key: toastKey, type: "success", content: "บันทึกเรียบร้อยแล้ว!", duration: 0.8 });
 
@@ -186,7 +229,6 @@ const UploadPage: React.FC = () => {
     }
   };
 
-  // cleanup timer เมื่อออกจากหน้า
   useEffect(() => {
     return () => {
       if (redirectTimer.current) {
@@ -195,12 +237,13 @@ const UploadPage: React.FC = () => {
     };
   }, []);
 
-  const disableSubmit = uploading;
+  const disableSubmit = uploading || checkingOwn || !ownsThisGame;
 
   const checks = {
     gameId: !!gameId,
     title: !!modTitle.trim(),
     fileReady: isEditing ? true : !!modFile,
+    owns: ownsThisGame && !checkingOwn,
   };
 
   useEffect(() => {
@@ -209,12 +252,14 @@ const UploadPage: React.FC = () => {
       title: checks.title,
       modFile: !!modFile,
       isEditing,
+      ownsThisGame,
+      checkingOwn,
+      myUserGameId,
     });
-  }, [gameId, modTitle, modFile, isEditing]);
+  }, [gameId, modTitle, modFile, isEditing, ownsThisGame, checkingOwn, myUserGameId]);
 
   return (
     <div style={{ background: "#141414", minHeight: "100vh", flex: 1, position: "relative" }}>
-      {/* === Success Banner (ลอยกึ่งกลางด้านบนจอ) === */}
       {showSuccess && (
         <div
           style={{
@@ -248,7 +293,17 @@ const UploadPage: React.FC = () => {
             : "Upload Game Mods"}
         </Title>
 
-        {/* รายละเอียดม็อด */}
+        {!checkingOwn && !ownsThisGame && (
+          <Card
+            style={{ background: "#1f1f1f", borderColor: "#404040", marginBottom: 16 }}
+            headStyle={{ color: "white" }}
+          >
+            <div style={{ color: "#ff7875" }}>
+              คุณต้องเป็นเจ้าของเกมนี้ก่อนจึงจะอัปโหลดม็อดได้
+            </div>
+          </Card>
+        )}
+
         <Card
           title={
             <span style={{ color: "white" }}>
@@ -277,7 +332,6 @@ const UploadPage: React.FC = () => {
 
         {!isEditing && (
           <>
-            {/* เลือกไฟล์ม็อด */}
             <Card
               title={
                 <span style={{ color: "white" }}>
@@ -300,6 +354,7 @@ const UploadPage: React.FC = () => {
                 multiple={false}
                 accept=".zip,.rar,.7z"
                 maxCount={1}
+                disabled={!ownsThisGame || checkingOwn}
               >
                 <p className="ant-upload-drag-icon">
                   <InboxOutlined style={{ color: "#9254de" }} />
@@ -314,7 +369,6 @@ const UploadPage: React.FC = () => {
               )}
             </Card>
 
-            {/* เลือกรูปม็อด (ออปชัน) */}
             <Card
               title={
                 <span style={{ color: "white" }}>
@@ -337,6 +391,7 @@ const UploadPage: React.FC = () => {
                 accept="image/*"
                 maxCount={1}
                 multiple={false}
+                disabled={!ownsThisGame || checkingOwn}
               >
                 <p className="ant-upload-drag-icon">
                   <InboxOutlined style={{ color: "#52c41a" }} />
@@ -355,7 +410,6 @@ const UploadPage: React.FC = () => {
           </>
         )}
 
-        {/* คำอธิบาย */}
         <Card
           title={
             <span style={{ color: "white" }}>
@@ -383,7 +437,6 @@ const UploadPage: React.FC = () => {
           />
         </Card>
 
-        {/* Checklist */}
         <Card
           title={<span style={{ color: "white" }}>Checklist</span>}
           style={{
@@ -400,16 +453,16 @@ const UploadPage: React.FC = () => {
             {!isEditing && (
               <li><Ok ok={!!modFile} /> เลือกไฟล์ม็อด (.zip/.rar/.7z)</li>
             )}
+            <li><Ok ok={!!ownsThisGame && !checkingOwn} /> เป็นเจ้าของเกมนี้</li>
           </ul>
         </Card>
 
-        {/* ปุ่มอัปโหลด/บันทึก */}
         <div style={{ textAlign: "right", position: "relative", zIndex: 1 }}>
           <Button
             type="primary"
             size="large"
             loading={uploading}
-            disabled={uploading}
+            disabled={uploading || checkingOwn || !ownsThisGame}
             style={{ background: "#9254de", borderColor: "#9254de" }}
             onClick={handleUpload}
           >

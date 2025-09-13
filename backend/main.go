@@ -148,18 +148,11 @@ func main() {
 		router.GET("/request", controllers.FindRequest)
 
 		// -------- Mods --------
+		// READ: เปิดสาธารณะเหมือนเดิม
 		router.GET("/mods", controllers.GetMods)
 		router.GET("/mods/:id", controllers.GetModById)
-		router.POST("/mods", controllers.CreateMod)
-		router.PATCH("/mods/:id", controllers.UpdateMod)
-		router.DELETE("/mods/:id", controllers.DeleteMod)
 
-		// -------- Mod Ratings --------
-		router.GET("/modratings", controllers.GetModRatings)
-		router.GET("/modratings/:id", controllers.GetModRatingById)
-		router.POST("/modratings", controllers.CreateModRating)
-		router.PATCH("/modratings/:id", controllers.UpdateModRating)
-		router.DELETE("/modratings/:id", controllers.DeleteModRating)
+		// (WRITE ย้ายไปไว้ใต้ authList ด้านล่าง)
 	}
 
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
@@ -197,6 +190,14 @@ func main() {
 
 		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
 		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
+
+		// -------- Mods (WRITE only = ต้อง auth) --------
+		// ✅ เพิ่มเฉพาะส่วนนี้ เพื่อบังคับให้ล็อกอินก่อนสร้าง/แก้ไข/ลบม็อด
+		authList.POST("/mods", controllers.CreateMod)
+		authList.PATCH("/mods/:id", controllers.UpdateMod)
+		authList.DELETE("/mods/:id", controllers.DeleteMod)
+		authList.GET("/mods/mine", controllers.GetMyMods)
+
 	}
 
 	// 6) Run server
