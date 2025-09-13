@@ -6,6 +6,7 @@ export interface Payment {
   payment_date: string; // ISO datetime
   status: string;       // e.g., "pending", "verifying", "approved", "rejected"
   amount: number;
+  reject_reason?: string;
 
   order_id: number;
   order?: Order;

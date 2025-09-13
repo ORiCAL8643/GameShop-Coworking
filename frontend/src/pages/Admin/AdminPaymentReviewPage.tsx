@@ -199,7 +199,6 @@ export default function AdminPaymentReviewPage() {
           <Input
             allowClear
             prefix={<SearchOutlined />}
-            placeholder="ค้นหาเลขออเดอร์หรือชื่อผู้ใช้"
             onChange={(e) => setKeyword(e.target.value)}
             style={{ width: 280, background: BG_DARK, color: TEXT_MAIN, borderColor: BORDER }}
           />
