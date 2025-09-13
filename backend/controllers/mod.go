@@ -24,7 +24,7 @@ func GetMods(c *gin.Context) {
 		q = q.Where("game_id = ?", gid)
 	}
 	if uid := c.Query("uploader_id"); uid != "" {
-		q = q.Where("user_id = ?", uid) // ✅ ฟิลเตอร์ตามผู้อัปโหลด
+		q = q.Where("user_id = ?", uid) // ฟิลเตอร์ตามผู้อัปโหลด
 	}
 	if s := c.Query("q"); s != "" {
 		like := "%" + s + "%"
@@ -77,9 +77,7 @@ func GetMyMods(c *gin.Context) {
 }
 
 // POST /mods
-// อนุญาตให้อัปโหลดได้โดยไม่ต้องมี user_game_id แต่จะบันทึก user_id ของผู้ที่อัปโหลด (ถ้า route อยู่ใต้ AuthRequired)
-// แนะนำให้ย้าย endpoint นี้ไปอยู่ในกลุ่ม AuthRequired() เพื่อให้มี userID เสมอ
-// POST /mods
+// อัปโหลดม็อด: ต้องล็อกอิน + ต้องเป็นเจ้าของเกม
 func CreateMod(c *gin.Context) {
 	title := c.PostForm("title")
 	if title == "" {
@@ -88,7 +86,7 @@ func CreateMod(c *gin.Context) {
 	}
 	description := c.PostForm("description")
 
-	// ✅ ต้องมี game_id
+	// ต้องมี game_id
 	gameIDStr := c.PostForm("game_id")
 	if gameIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "game_id is required"})
@@ -101,7 +99,7 @@ func CreateMod(c *gin.Context) {
 	}
 	gameID := uint(gameID64)
 
-	// 🟡 OPTIONAL: user_game_id (ไม่บังคับ)
+	// OPTIONAL: user_game_id
 	var userGameID *uint = nil
 	if userGameIDStr := c.PostForm("user_game_id"); userGameIDStr != "" {
 		if ugid64, err := strconv.ParseUint(userGameIDStr, 10, 64); err == nil {
@@ -110,7 +108,7 @@ func CreateMod(c *gin.Context) {
 		}
 	}
 
-	// ✅ ต้องล็อกอิน (อยู่ใต้ AuthRequired แล้ว แต่กันเผื่อ)
+	// ต้องล็อกอิน
 	uidAny, ok := c.Get("userID")
 	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "please login first"})
@@ -122,10 +120,8 @@ func CreateMod(c *gin.Context) {
 		return
 	}
 
-	// ✅ เช็ค “เป็นเจ้าของเกม” ก่อน (มี user_games ของเกมนี้จริง)
-	// ถ้า client ส่ง user_game_id มา → ตรวจว่ามีแถวนี้และเป็นของ user เดียวกัน และ game ตรงกัน
+	// ต้องเป็นเจ้าของเกม
 	db := configs.DB()
-
 	if userGameID != nil {
 		var ug entity.UserGame
 		if tx := db.Where("id = ? AND user_id = ? AND game_id = ?", *userGameID, uploaderID, gameID).First(&ug); tx.Error != nil || tx.RowsAffected == 0 {
@@ -146,13 +142,13 @@ func CreateMod(c *gin.Context) {
 		}
 	}
 
-	// ✅ ต้องมีไฟล์ม็อด
+	// ต้องมีไฟล์ม็อด
 	modFile, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "mod file is required"})
 		return
 	}
-	// (ออปชัน) รูปพรีวิว
+	// รูปพรีวิว (ออปชัน)
 	imageFile, _ := c.FormFile("image")
 
 	// ---------- บันทึกไฟล์ม็อด ----------
@@ -209,6 +205,7 @@ func CreateMod(c *gin.Context) {
 }
 
 // PATCH /mods/:id
+// อัปเดตเฉพาะฟิลด์ที่อนุญาต + ถ้าเปลี่ยนเกมต้องเป็นเจ้าของเกม
 func UpdateMod(c *gin.Context) {
 	id := c.Param("id")
 
@@ -218,12 +215,10 @@ func UpdateMod(c *gin.Context) {
 		return
 	}
 
-	// ✅ อนุญาตเฉพาะเจ้าของ (หรือ admin ถ้าต้องการ)
+	// (ถ้า main.go มี EnsureModOwner แล้ว ส่วนนี้เป็น safety ซ้ำชั้น)
 	if uidAny, ok := c.Get("userID"); ok {
 		uid := uidAny.(uint)
-		// ถ้าต้องการให้แอดมินแก้ได้ ให้เอา roleID มาด้วย
-		isOwner := uid == mod.UserID
-		if !isOwner {
+		if uid != mod.UserID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}
@@ -232,13 +227,56 @@ func UpdateMod(c *gin.Context) {
 		return
 	}
 
-	var input entity.Mod
+	// whitelist ฟิลด์ที่อัปเดตได้
+	type updateInput struct {
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+		GameID      *uint   `json:"game_id"`
+		UserGameID  *uint   `json:"user_game_id"`
+	}
+	var input updateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := configs.DB().Model(&mod).Updates(input).Error; err != nil {
+	// ถ้าจะเปลี่ยนเกม → ต้องเป็นเจ้าของเกมใหม่
+	if input.GameID != nil {
+		uid := c.GetUint("userID")
+		var cnt int64
+		if err := configs.DB().
+			Model(&entity.UserGame{}).
+			Where("user_id = ? AND game_id = ?", uid, *input.GameID).
+			Count(&cnt).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		if cnt == 0 {
+			c.JSON(http.StatusForbidden, gin.H{"error": "you must own the target game"})
+			return
+		}
+	}
+
+	updates := map[string]interface{}{}
+	if input.Title != nil {
+		updates["title"] = *input.Title
+	}
+	if input.Description != nil {
+		updates["description"] = *input.Description
+	}
+	if input.GameID != nil {
+		updates["game_id"] = *input.GameID
+	}
+	if input.UserGameID != nil {
+		updates["user_game_id"] = *input.UserGameID
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusOK, mod) // ไม่มีอะไรจะอัปเดต
+		return
+	}
+
+	if err := configs.DB().Model(&mod).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -249,6 +287,116 @@ func UpdateMod(c *gin.Context) {
 	c.JSON(http.StatusOK, mod)
 }
 
+// PUT /mods/:id/file
+// form-data: file=<binary>
+func ReplaceModFile(c *gin.Context) {
+	id := c.Param("id")
+
+	var mod entity.Mod
+	if tx := configs.DB().Where("id = ?", id).First(&mod); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mod not found"})
+		return
+	}
+
+	// (ถ้า main.go มี EnsureModOwner แล้ว ส่วนนี้เป็น safety ซ้ำชั้น)
+	if uidAny, ok := c.Get("userID"); ok {
+		uid := uidAny.(uint)
+		if uid != mod.UserID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	file, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
+		return
+	}
+
+	// บันทึกไฟล์ใหม่
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), file.Filename)
+	dirFS := filepath.Join("uploads", "mods")
+	if err := os.MkdirAll(dirFS, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+		return
+	}
+	pathFS := filepath.Join(dirFS, filename)
+	if err := c.SaveUploadedFile(file, pathFS); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		return
+	}
+	pathWeb := path.Join("uploads", "mods", filename)
+
+	// อัปเดต DB
+	if err := configs.DB().Model(&mod).Update("file_path", pathWeb).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	// อ่านกลับ
+	if err := configs.DB().Where("id = ?", id).First(&mod).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, mod)
+}
+
+// PUT /mods/:id/image
+// form-data: image=<binary>
+func ReplaceModImage(c *gin.Context) {
+	id := c.Param("id")
+
+	var mod entity.Mod
+	if tx := configs.DB().Where("id = ?", id).First(&mod); tx.RowsAffected == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mod not found"})
+		return
+	}
+
+	// (ถ้า main.go มี EnsureModOwner แล้ว ส่วนนี้เป็น safety ซ้ำชั้น)
+	if uidAny, ok := c.Get("userID"); ok {
+		uid := uidAny.(uint)
+		if uid != mod.UserID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
+	} else {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	img, err := c.FormFile("image")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing image"})
+		return
+	}
+
+	filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), img.Filename)
+	dirFS := filepath.Join("uploads", "mod_images")
+	if err := os.MkdirAll(dirFS, os.ModePerm); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create directory"})
+		return
+	}
+	pathFS := filepath.Join(dirFS, filename)
+	if err := c.SaveUploadedFile(img, pathFS); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save image"})
+		return
+	}
+	pathWeb := path.Join("uploads", "mod_images", filename)
+
+	if err := configs.DB().Model(&mod).Update("image_path", pathWeb).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if err := configs.DB().Where("id = ?", id).First(&mod).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, mod)
+}
+
+// DELETE /mods/:id
 func DeleteMod(c *gin.Context) {
 	id := c.Param("id")
 
@@ -258,11 +406,10 @@ func DeleteMod(c *gin.Context) {
 		return
 	}
 
-	// ✅ อนุญาตเฉพาะเจ้าของ (หรือ admin ถ้าต้องการ)
+	// (ถ้า main.go มี EnsureModOwner แล้ว ส่วนนี้เป็น safety ซ้ำชั้น)
 	if uidAny, ok := c.Get("userID"); ok {
 		uid := uidAny.(uint)
-		isOwner := uid == mod.UserID
-		if !isOwner {
+		if uid != mod.UserID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 			return
 		}

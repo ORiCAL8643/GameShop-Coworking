@@ -12,6 +12,7 @@ import {
   Divider,
   Rate,
   Input,
+  List,
 } from "antd";
 import {
   DownloadOutlined,
@@ -19,7 +20,7 @@ import {
   PictureOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
-import { getMod, getGame } from "../../services/workshop";
+import { getMod, getGame, listUserGames } from "../../services/workshop"; // ⬅️ เพิ่ม listUserGames
 import type { Game } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
@@ -29,7 +30,7 @@ const { Title, Text, Paragraph } = Typography;
 const API_BASE =
   (import.meta as any)?.env?.VITE_API_BASE ?? "http://localhost:8088";
 
-// ------ URL helpers (แก้รูปไม่ขึ้น + รองรับ path แบบ Windows) ------
+// ------ URL helpers ------
 const normalizePath = (s?: string) => (s ? s.replace(/\\/g, "/") : "");
 const resolveUrl = (src?: string) => {
   const s = normalizePath(src);
@@ -64,13 +65,33 @@ const toDateText = (d?: string) => {
   return isNaN(dt.getTime()) ? d : dt.toLocaleString();
 };
 
-// ------ types ratings ------
+// ให้ timestamp เสมอ: ถ้าวันที่พัง → -Infinity
+const ts = (s?: string) => {
+  const t = Date.parse(s ?? "");
+  return Number.isFinite(t) ? t : -Infinity;
+};
+
+// ------ types ------
 type ModRating = {
   id?: number;
   user_id?: number | string;
   mod_id?: number | string;
   score: number; // 1..5
   created_at?: string;
+};
+
+type ModComment = {
+  id?: number;
+  user_id?: number | string;
+  mod_id?: number | string;
+  content: string;
+  created_at?: string;
+  user?: { username?: string; name?: string };
+};
+
+const num = (v: any) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 };
 
 const ModDetail: React.FC = () => {
@@ -82,15 +103,20 @@ const ModDetail: React.FC = () => {
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // สิทธิ์แก้ไข
+  const [canEdit, setCanEdit] = useState(false);
+
   // ratings
   const [ratings, setRatings] = useState<ModRating[]>([]);
   const [avg, setAvg] = useState(0);
   const [count, setCount] = useState(0);
   const [myScore, setMyScore] = useState<number | undefined>(undefined);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
 
-  // comments (placeholder ให้หน้าตาเหมือนเดิม)
+  // comments
+  const [comments, setComments] = useState<ModComment[]>([]);
   const [comment, setComment] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   // -------- load mod + game --------
   useEffect(() => {
@@ -110,6 +136,43 @@ const ModDetail: React.FC = () => {
       .catch((e) => message.error(e?.message || "ไม่พบข้อมูลม็อด"))
       .finally(() => setLoading(false));
   }, [id]);
+
+  // -------- ตรวจว่าเป็น 'เจ้าของม็อด' หรือไม่ --------
+  useEffect(() => {
+    const myId = num(authUserId);
+    if (!myId || !mod) {
+      setCanEdit(false);
+      return;
+    }
+
+    // 1) ถ้ามี user_id ในม็อด เทียบตรง ๆ เลย
+    const ownerUserId = num(mod?.user_id ?? mod?.UserID ?? mod?.userId);
+    if (ownerUserId != null) {
+      setCanEdit(ownerUserId === myId);
+      return;
+    }
+
+    // 2) ถ้ามี user_game_id → ไปดึง user-games ของผู้ใช้ แล้วเช็คว่า id ตรงกันไหม
+    const ownerUserGameId = num(
+      mod?.user_game_id ?? mod?.userGameId ?? mod?.UserGameID
+    );
+    if (ownerUserGameId == null) {
+      setCanEdit(false);
+      return;
+    }
+
+    listUserGames(myId)
+      .then((rows: any[]) => {
+        const match = (rows ?? []).some((r: any) => {
+          const ugid =
+            num(r?.user_game_id ?? r?.UserGameID) ??
+            num(r?.id ?? r?.ID); // รองรับทั้ง 2 key
+          return ugid === ownerUserGameId;
+        });
+        setCanEdit(match);
+      })
+      .catch(() => setCanEdit(false));
+  }, [authUserId, mod]);
 
   // -------- ratings --------
   const modIdNum = useMemo(() => Number(id), [id]);
@@ -132,7 +195,6 @@ const ModDetail: React.FC = () => {
       setRatings(list);
       recalc(list);
     } catch (e) {
-      // ไม่ต้องเด้ง error ใหญ่ ให้หน้าใช้งานต่อได้
       console.warn("load ratings failed:", e);
     }
   };
@@ -148,14 +210,14 @@ const ModDetail: React.FC = () => {
       return;
     }
     try {
-      setSubmitting(true);
+      setSubmittingRating(true);
       const res = await fetch(`${API_BASE}/modratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mod_id: modIdNum,
           user_id: Number(authUserId),
-          score: value,
+          score: value, // 1..5
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -164,7 +226,58 @@ const ModDetail: React.FC = () => {
     } catch (e: any) {
       message.error(e?.message || "ให้คะแนนไม่สำเร็จ");
     } finally {
-      setSubmitting(false);
+      setSubmittingRating(false);
+    }
+  };
+
+  // -------- comments --------
+  const fetchComments = async () => {
+    if (!modIdNum) return;
+    try {
+      const res = await fetch(`${API_BASE}/comments?mod_id=${modIdNum}`);
+      const data = await res.json();
+      const list: ModComment[] = Array.isArray(data) ? data : data?.data ?? [];
+      // ล่าสุดอยู่บน, invalid date ไปล่าง
+      list.sort((a, b) => ts(b.created_at) - ts(a.created_at));
+      setComments(list);
+    } catch (e) {
+      console.warn("load comments failed:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [modIdNum]);
+
+  const submitComment = async () => {
+    const content = comment.trim();
+    if (!authUserId) {
+      message.error("กรุณาเข้าสู่ระบบก่อนแสดงความคิดเห็น");
+      return;
+    }
+    if (!content) {
+      message.warning("พิมพ์ข้อความก่อนโพสต์");
+      return;
+    }
+    try {
+      setSubmittingComment(true);
+      const res = await fetch(`${API_BASE}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mod_id: modIdNum,
+          user_id: Number(authUserId),
+          content,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setComment("");
+      message.success("เพิ่มคอมเมนต์เรียบร้อย");
+      await fetchComments();
+    } catch (e: any) {
+      message.error(e?.message || "โพสต์คอมเมนต์ไม่สำเร็จ");
+    } finally {
+      setSubmittingComment(false);
     }
   };
 
@@ -184,7 +297,7 @@ const ModDetail: React.FC = () => {
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
-      {/* ===== Hero Banner (พื้นหลังรูปม็อดแบบเบลอ) — อยู่ในพื้นที่ของหน้าเท่านั้น ไม่ล้นไป Sidebar ===== */}
+      {/* ===== Hero Banner ===== */}
       <Header
         style={{
           background: "#0f1419",
@@ -195,7 +308,6 @@ const ModDetail: React.FC = () => {
           borderBottom: "1px solid #1f2933",
         }}
       >
-        {/* เบลอเฉพาะใน Header */}
         <div
           aria-hidden
           style={{
@@ -219,7 +331,6 @@ const ModDetail: React.FC = () => {
           }}
         />
 
-        {/* เนื้อหาใน header */}
         <div
           style={{
             position: "relative",
@@ -257,7 +368,6 @@ const ModDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* ปกรูปคมชัด */}
           <div
             style={{
               justifySelf: "end",
@@ -299,10 +409,9 @@ const ModDetail: React.FC = () => {
       </Header>
 
       <Layout>
-        {/* ใส่พื้นหลังเข้มให้เนื้อหา เพื่อไม่ดูขาว และเข้าชุดกับ Workshop */}
         <Content style={{ padding: 20, background: "#0f1419" }}>
           <Row gutter={[16, 16]}>
-            {/* ซ้าย: เนื้อหา + ให้คะแนน (สไตล์เดิม) */}
+            {/* ซ้าย */}
             <Col xs={24} lg={16}>
               <Card
                 loading={loading}
@@ -328,9 +437,13 @@ const ModDetail: React.FC = () => {
                       </Button>
                     </a>
                   )}
-                  <Link to={`/workshop/upload?modId=${mod?.ID ?? mod?.id}`}>
-                    <Button icon={<EditOutlined />}>Edit</Button>
-                  </Link>
+
+                  {/* ✅ ปุ่ม Edit เฉพาะเจ้าของม็อดเท่านั้น */}
+                  {canEdit && (
+                    <Link to={`/workshop/upload?modId=${mod?.ID ?? mod?.id}`}>
+                      <Button icon={<EditOutlined />}>Edit</Button>
+                    </Link>
+                  )}
                 </div>
 
                 <Divider style={{ borderColor: "#2b3a42", margin: "12px 0" }} />
@@ -367,7 +480,7 @@ const ModDetail: React.FC = () => {
                 )}
               </Card>
 
-              {/* ====== Rate this Mod (เหมือนเดิม) ====== */}
+              {/* ====== Rate this Mod ====== */}
               <Card
                 style={{
                   background: "#111315",
@@ -383,7 +496,9 @@ const ModDetail: React.FC = () => {
                   <Rate
                     value={myScore}
                     onChange={submitRating}
-                    disabled={submitting}
+                    disabled={submittingRating}
+                    allowHalf={false}
+                    count={5}
                   />
                   <Text style={{ color: "#c9d1d9" }}>
                     {myScore ? `Your rating: ${myScore}/5` : "No rating yet"}
@@ -397,7 +512,7 @@ const ModDetail: React.FC = () => {
                 </Text>
               </Card>
 
-              {/* Comments (วางสไตล์เดิม) */}
+              {/* ====== Comments ====== */}
               <Card
                 style={{
                   background: "#111315",
@@ -409,6 +524,7 @@ const ModDetail: React.FC = () => {
                 <Title level={4} style={{ color: "#fff", marginTop: 0 }}>
                   Comments
                 </Title>
+
                 <Input.TextArea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
@@ -417,14 +533,40 @@ const ModDetail: React.FC = () => {
                   style={{ background: "#1a1a1a", color: "#fff", borderColor: "#2b3a42" }}
                 />
                 <div style={{ textAlign: "right", marginTop: 10 }}>
-                  <Button type="primary" disabled>
+                  <Button type="primary" onClick={submitComment} loading={submittingComment}>
                     Add Comment
                   </Button>
                 </div>
+
+                <Divider style={{ borderColor: "#2b3a42" }} />
+
+                <List
+                  dataSource={comments}
+                  locale={{ emptyText: "ยังไม่มีคอมเมนต์" }}
+                  renderItem={(c) => (
+                    <List.Item style={{ borderColor: "#1f2933" }}>
+                      <List.Item.Meta
+                        title={
+                          <span style={{ color: "#fff" }}>
+                            {c.user?.username || c.user?.name || `User #${c.user_id}`}
+                            <span style={{ color: "#9aa4ad", marginLeft: 8, fontSize: 12 }}>
+                              {toDateText(c.created_at)}
+                            </span>
+                          </span>
+                        }
+                        description={
+                          <span style={{ color: "#c9d1d9", whiteSpace: "pre-wrap" }}>
+                            {c.content}
+                          </span>
+                        }
+                      />
+                    </List.Item>
+                  )}
+                />
               </Card>
             </Col>
 
-            {/* ขวา: แผงข้อมูล (สรุปเรตติ้งแบบเดิม) */}
+            {/* ขวา */}
             <Col xs={24} lg={8}>
               <Sider
                 width="100%"
