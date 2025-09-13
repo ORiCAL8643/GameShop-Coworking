@@ -6,6 +6,7 @@ import (
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -108,7 +109,7 @@ func FindGames(c *gin.Context) {
 	for _, g := range games {
 		discounted := float64(g.BasePrice)
 		for _, p := range g.Promotions {
-			if price := applyDiscount(float64(g.BasePrice), p.DiscountType, p.DiscountValue); price < discounted {
+			if price := services.ApplyDiscount(float64(g.BasePrice), p.DiscountType, p.DiscountValue); price < discounted {
 				discounted = price
 			}
 		}
