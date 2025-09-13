@@ -108,10 +108,7 @@ const Sidebar = () => {
       {/* ✅ โซนเนื้อหาหลักต้องอยู่ใน Content */}
       <Layout style={{ background: "#0f0f0f" }}>
         <Content style={{ margin: 0, padding: 0, minHeight: "100vh" }}>
-          {/* padding รวมของทุกหน้า (ถ้าบางหน้าต้องเต็มขอบ ก็ย้าย paddingไปรอบในหน้านั้นได้) */}
-          <div style={{ padding: "16px 24px" }}>
             <Outlet />
-          </div>
         </Content>
       </Layout>
     </Layout>
