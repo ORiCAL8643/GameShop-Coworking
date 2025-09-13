@@ -54,7 +54,7 @@ const formatTHB = (n: number | undefined) =>
   `฿${((n ?? 0)).toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const maskCode = (s?: string | null) => {
-  // หน้ากากคีย์เกมแบบอ่านง่าย “••••-••••-••••-••••”
+  
   const base = "••••-••••-••••-••••";
   if (!s) return base;
   // ถ้าโค้ดยาวกว่า 4*4 ให้ดูความยาวแล้วสร้างจุดเท่าจำนวนกลุ่ม

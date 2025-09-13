@@ -1,5 +1,5 @@
 import type { Order } from "./Order";
-import type { PaymentSlip } from "./PaymentSlip";
+//import type { PaymentSlip } from "./PaymentSlip";
 
 export interface Payment {
   ID: number;
@@ -11,7 +11,7 @@ export interface Payment {
   order_id: number;
   order?: Order;
 
-  payment_slips?: PaymentSlip[];
+  //payment_slips?: PaymentSlip[];
 }
 
 export interface CreatePaymentRequest {
