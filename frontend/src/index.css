@@ -1,3 +1,42 @@
 body {
   background-color: #141414;
 }
+
+/* อ่านชื่อไฟล์ได้ชัดเจนบนพื้นหลังมืด */
+.slip-uploader .ant-upload-list-item-name,
+.slip-uploader .ant-upload-list-item-name > a {
+  color: #e8e8f3 !important;   /* เท่ากับ TEXT_MAIN */
+}
+
+/* Hover ให้สว่างขึ้นนิดหน่อย */
+.slip-uploader .ant-upload-list-item:hover .ant-upload-list-item-name,
+.slip-uploader .ant-upload-list-item:hover .ant-upload-list-item-name > a {
+  color: #ffffff !important;
+}
+
+/* ทำให้ไอคอน Preview/Delete มองเห็นชัด */
+.slip-uploader .ant-upload-list-item-actions .anticon {
+  color: #9b59b6 !important;   /* THEME_PRIMARY */
+}
+
+/* ข้อความเล็ก ๆ ใน list ให้เป็นสีอ่อนอ่านง่าย */
+.slip-uploader .ant-upload-list-item {
+  color: #e8e8f3;
+}
+
+/* กรณี listType=picture ให้ caption ใต้รูปอ่านชัด */
+.slip-uploader .ant-upload-list-item-thumbnail,
+.slip-uploader .ant-upload-list-item-container {
+  color: #e8e8f3;
+}
+
+/* ใส่สี placeholder ให้ textarea ที่มีคลาส .gs-textarea */
+.gs-textarea::placeholder {
+  color: var(--ph-color, #a9afc3); /* fallback ถ้าไม่ได้ส่งค่าเข้ามา */
+  opacity: 1; /* บางเบราว์เซอร์ทำ placeholder ให้จางลง */
+}
+
+/* ไม่บังคับ แต่ถ้าอยากให้ตอน focus ยังเป็นสีเดิม */
+.gs-textarea:focus::placeholder {
+  color: var(--ph-color, #a9afc3);
+}

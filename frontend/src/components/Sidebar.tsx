@@ -2,10 +2,11 @@
 import { Layout, Menu, Badge } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { PlusOutlined } from "@ant-design/icons";
+import { DollarOutlined, FlagOutlined, HomeOutlined, PlusOutlined, RetweetOutlined, SendOutlined, TeamOutlined, ToolOutlined, UsergroupAddOutlined } from "@ant-design/icons";
 import { useEffect, useMemo, useState } from "react";
 import { useReportNewCount } from "../hooks/useReportNewCount";
 import type { ItemType } from "antd/es/menu/interface";
+import { FlagIcon } from "lucide-react";
 
 const { Sider, Content } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -45,45 +46,24 @@ const Sidebar = () => {
   );
 
   const items: ItemType[] = [
-    { key: "/home", label: "หน้าแรก" },
-    { key: "/request", label: "รีเควสเกม" },
-    { key: "/requestinfo", label: "ข้อมูลรีเควส" },
-    {
-      key: "/information",
-      label: "จัดการข้อมูลเกม",
-      children: [
-        { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
-        { key: "/information/Edit", label: "แก้ไขข้อมูลเกม", icon: <PlusOutlined /> },
-      ],
-    },
-    {
-      key: "/category",
-      label: "หมวดหมู่",
-      children: [
-        { key: "/category/Community", label: "ชุมชน", icon: <PlusOutlined /> },
-        { key: "/category/Payment", label: "การชำระเงิน", icon: <PlusOutlined /> },
-      ],
-    },
-    { key: "/workshop", label: "Workshop" },
-    { key: "/promotion", label: "Promotion" },
-    { key: "/refund", label: "การคืนเงินผู้ใช้" },
-    { key: "/report", label: "รายงานปัญหา" },
+    { key: "/home", label: "หน้าแรก", icon: <HomeOutlined/> },
+    { key: "/request", label: "รีเควสเกม", icon: <SendOutlined /> },
+    { key: "/category/Community", label: "ชุมชน", icon: <TeamOutlined /> },
+    { key: "/category/Payment", label: "การชำระเงิน", icon: <DollarOutlined /> }, 
+    { key: "/workshop", label: "Workshop", icon: <ToolOutlined /> },  
+    { key: "/refund", label: "การคืนเงินผู้ใช้", icon: <RetweetOutlined/> },
+    { key: "/report", label: "รายงานปัญหา", icon: <FlagOutlined /> },
     {
       key: "/Admin",
       label: "Admin",
       children: [
-        {
-          key: "/Admin/Page",
-          icon: <PlusOutlined />,
-          label: adminPageLabel, // ✅ Page + Badge
-        },
-        {
-          key: "/Admin/PaymentReviewPage",
-          label: "PaymentReview",
-          icon: <PlusOutlined />,
-        },
+        { key: "/information/Add", label: "เพิ่มเกม", icon: <PlusOutlined /> },
+        { key: "/requestinfo", label: "ข้อมูลรีเควส", icon: <PlusOutlined /> },
+        { key: "/promotion", label: "Promotion", icon: <PlusOutlined />  },
+        { key: "/Admin/Page", label: adminPageLabel, icon: <PlusOutlined />,},
+        { key: "/Admin/PaymentReviewPage",label: "PaymentReview", icon: <PlusOutlined />,},
         { key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> },
-        // ❌ ไม่ใส่ Resolved Reports อีกแล้ว
+        
       ],
     },
   ];
@@ -108,10 +88,7 @@ const Sidebar = () => {
       {/* ✅ โซนเนื้อหาหลักต้องอยู่ใน Content */}
       <Layout style={{ background: "#0f0f0f" }}>
         <Content style={{ margin: 0, padding: 0, minHeight: "100vh" }}>
-          {/* padding รวมของทุกหน้า (ถ้าบางหน้าต้องเต็มขอบ ก็ย้าย paddingไปรอบในหน้านั้นได้) */}
-          <div style={{ padding: "16px 24px" }}>
             <Outlet />
-          </div>
         </Content>
       </Layout>
     </Layout>

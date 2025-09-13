@@ -2,82 +2,82 @@
 package controllers
 
 import (
-        "fmt"
-        "mime/multipart"
-        "net/http"
-        "os"
-        "path/filepath"
-        "strings"
-        "time"
+	"fmt"
+	"mime/multipart"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-        "example.com/sa-gameshop/configs"
-        "example.com/sa-gameshop/entity"
-        "github.com/gin-gonic/gin"
-        "github.com/golang-jwt/jwt/v5"
-        "gorm.io/gorm"
+	"example.com/sa-gameshop/configs"
+	"example.com/sa-gameshop/entity"
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+	"gorm.io/gorm"
 )
 
 // ==== Promotion Controllers ====
 
 // helper: ensure end after start
 func validatePromoWindow(start, end time.Time) bool {
-        return !start.IsZero() && !end.IsZero() && end.After(start)
+	return !start.IsZero() && !end.IsZero() && end.After(start)
 }
 
 func getUserID(c *gin.Context) (uint, error) {
-        header := c.GetHeader("Authorization")
-        if header == "" {
-                return 0, fmt.Errorf("authorization header missing")
-        }
-        tokenString := strings.TrimPrefix(header, "Bearer ")
-        secret := os.Getenv("JWT_SECRET")
-        if secret == "" {
-                secret = "secret"
-        }
-        token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-                if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-                        return nil, fmt.Errorf("unexpected signing method")
-                }
-                return []byte(secret), nil
-        })
-        if err != nil || !token.Valid {
-                return 0, fmt.Errorf("invalid token")
-        }
-        claims, ok := token.Claims.(jwt.MapClaims)
-        if !ok {
-                return 0, fmt.Errorf("invalid claims")
-        }
-        sub, ok := claims["sub"].(float64)
-        if !ok {
-                return 0, fmt.Errorf("invalid subject")
-        }
-        return uint(sub), nil
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		return 0, fmt.Errorf("authorization header missing")
+	}
+	tokenString := strings.TrimPrefix(header, "Bearer ")
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "secret"
+	}
+	token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid {
+		return 0, fmt.Errorf("invalid token")
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return 0, fmt.Errorf("invalid claims")
+	}
+	sub, ok := claims["sub"].(float64)
+	if !ok {
+		return 0, fmt.Errorf("invalid subject")
+	}
+	return uint(sub), nil
 }
 
 type createPromotionRequest struct {
-        Title         string                `form:"title"          binding:"required"`
-        Description   string                `form:"description"`
-        DiscountType  entity.DiscountType   `form:"discount_type"   binding:"required"`
-        DiscountValue int                   `form:"discount_value"  binding:"required,min=0"`
-        StartDate     time.Time             `form:"start_date"      binding:"required"`
-        EndDate       time.Time             `form:"end_date"        binding:"required"`
-        PromoImage    *multipart.FileHeader `form:"promo_image"`
-        Status        *bool                 `form:"status"`
-        GameIDs       []uint                `form:"game_ids"` // optional: set links to games
+	Title         string                `form:"title"          binding:"required"`
+	Description   string                `form:"description"`
+	DiscountType  entity.DiscountType   `form:"discount_type"   binding:"required"`
+	DiscountValue int                   `form:"discount_value"  binding:"required,min=0"`
+	StartDate     time.Time             `form:"start_date"      binding:"required"`
+	EndDate       time.Time             `form:"end_date"        binding:"required"`
+	PromoImage    *multipart.FileHeader `form:"promo_image"`
+	Status        *bool                 `form:"status"`
+	GameIDs       []uint                `form:"game_ids"` // optional: set links to games
 }
 
 // POST /promotions
 func CreatePromotion(c *gin.Context) {
-        uid, err := getUserID(c)
-        if err != nil {
-                c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-                return
-        }
-        var req createPromotionRequest
-        if err := c.ShouldBind(&req); err != nil {
-                c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
-                return
-        }
+	uid, err := getUserID(c)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		return
+	}
+	var req createPromotionRequest
+	if err := c.ShouldBind(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: " + err.Error()})
+		return
+	}
 	if !validatePromoWindow(req.StartDate, req.EndDate) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "end_date must be after start_date"})
 		return
@@ -99,17 +99,17 @@ func CreatePromotion(c *gin.Context) {
 		promoImagePath = path
 	}
 
-        promo := entity.Promotion{
-                Title:         req.Title,
-                Description:   req.Description,
-                DiscountType:  req.DiscountType,
-                DiscountValue: req.DiscountValue,
-                StartDate:     req.StartDate,
-                EndDate:       req.EndDate,
-                PromoImage:    promoImagePath,
-                Status:        true,
-                UserID:        uid,
-        }
+	promo := entity.Promotion{
+		Title:         req.Title,
+		Description:   req.Description,
+		DiscountType:  req.DiscountType,
+		DiscountValue: req.DiscountValue,
+		StartDate:     req.StartDate,
+		EndDate:       req.EndDate,
+		PromoImage:    promoImagePath,
+		Status:        true,
+		UserID:        uid,
+	}
 	if req.Status != nil {
 		promo.Status = *req.Status
 	}
@@ -186,15 +186,15 @@ func GetPromotionByID(c *gin.Context) {
 }
 
 type updatePromotionRequest struct {
-        Title         *string               `form:"title"`
-        Description   *string               `form:"description"`
-        DiscountType  *entity.DiscountType  `form:"discount_type"`
-        DiscountValue *int                  `form:"discount_value"  binding:"omitempty,min=0"`
-        StartDate     *time.Time            `form:"start_date"`
-        EndDate       *time.Time            `form:"end_date"`
-        PromoImage    *multipart.FileHeader `form:"promo_image"`
-        Status        *bool                 `form:"status"`
-        GameIDs       *[]uint               `form:"game_ids"` // if present, replace mapping
+	Title         *string               `form:"title"`
+	Description   *string               `form:"description"`
+	DiscountType  *entity.DiscountType  `form:"discount_type"`
+	DiscountValue *int                  `form:"discount_value"  binding:"omitempty,min=0"`
+	StartDate     *time.Time            `form:"start_date"`
+	EndDate       *time.Time            `form:"end_date"`
+	PromoImage    *multipart.FileHeader `form:"promo_image"`
+	Status        *bool                 `form:"status"`
+	GameIDs       *[]uint               `form:"game_ids"` // if present, replace mapping
 }
 
 // PUT /promotions/:id
@@ -366,22 +366,4 @@ func FindActivePromotions(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, rows)
-}
-
-// util: apply discount to a price (for clients, optional)
-func applyDiscount(price float64, t entity.DiscountType, v int) float64 {
-	if v <= 0 {
-		return price
-	}
-	switch t {
-	case entity.DiscountPercent:
-		return price * (1.0 - float64(v)/100.0)
-	case entity.DiscountAmount:
-		if price < float64(v) {
-			return 0
-		}
-		return price - float64(v)
-	default:
-		return price
-	}
 }

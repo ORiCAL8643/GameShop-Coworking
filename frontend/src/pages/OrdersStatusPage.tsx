@@ -20,11 +20,25 @@ const BORDER = "#2b2f3a";
 const TEXT_MAIN = "#e8e8f3";
 const TEXT_SUB = "#a9afc3";
 
+type OrderItemRow = {
+  unit_price?: number; UnitPrice?: number;
+  qty?: number; QTY?: number;
+  line_total?: number; LineTotal?: number;
+};
+
+type PaymentRow = {
+  status?: string; Status?: string;
+  reject_reason?: string; RejectReason?: string;
+};
+
+
 type Order = {
   ID?: number; id?: number;
   OrderStatus?: string; order_status?: string;
   TotalAmount?: number; total_amount?: number;
   OrderCreate?: string; order_create?: string;
+  OrderItems?: OrderItemRow[]; order_items?: OrderItemRow[];
+  Payments?: PaymentRow[]; payments?: PaymentRow[];
 };
 
 type RawKeyRow = any;
@@ -94,10 +108,10 @@ export default function OrdersStatusPage() {
   const colorOf = (st: string) => {
     switch ((st || "").toUpperCase()) {
       case "WAITING_PAYMENT": return "default";
-      case "UNDER_REVIEW":   return "processing";
+      case "PAYMENT_FAILED":   return "processing";
       case "PAID":           return "success";
-      case "FULFILLED":      return "success";
-      case "CANCELLED":      return "error";
+      //case "FULFILLED":      return "success";
+      //case "CANCELLED":      return "error";
       default:               return "default";
     }
   };
@@ -235,10 +249,25 @@ export default function OrdersStatusPage() {
             {rows.map((o) => {
               const oid = o.ID ?? o.id!;
               const status = (o.OrderStatus ?? o.order_status ?? "").toUpperCase();
-              const total = o.TotalAmount ?? o.total_amount ?? 0;
+              const items = (o.OrderItems ?? o.order_items ?? []) as any[];
+              const total =
+                o.TotalAmount ??
+                o.total_amount ??
+                items.reduce(
+                  (sum, it) =>
+                    sum +
+                    (it.LineTotal ??
+                      it.line_total ??
+                      (it.UnitPrice ?? it.unit_price ?? 0) * (it.QTY ?? it.qty ?? 1)),
+                  0,
+                );
+
               const createdRaw = o.OrderCreate ?? o.order_create ?? "";
               const created = createdRaw ? new Date(createdRaw).toLocaleString("th-TH") : "-";
               const canViewKeys = statusAllowsView(status);
+              const payments = o.Payments ?? o.payments ?? [];
+              const rejectedPay = payments.find(p => (p.status || p.Status || '').toUpperCase() === 'REJECTED');
+              const rejectReason = rejectedPay?.reject_reason ?? rejectedPay?.RejectReason;
 
               return (
                 <Col key={oid} xs={24} sm={12} md={8} lg={6} xl={6}>
@@ -252,7 +281,7 @@ export default function OrdersStatusPage() {
                         style={{ color: THEME_PRIMARY, fontWeight: 600 }}
                         onClick={() => navigate(`/orders/${oid}`)}
                       >
-                        รายละเอียด
+                        ดูข้อมูลเกม
                       </span>,
                       <Tooltip
                         key="viewkeys"
@@ -282,6 +311,11 @@ export default function OrdersStatusPage() {
                         </Typography.Text>
                         <Tag color={colorOf(status)}>{status || "UNKNOWN"}</Tag>
                       </Space>
+                       {rejectReason && (
+                        <Typography.Text style={{ color: '#ff4d4f' }}>
+                          เหตุผลการปฏิเสธ: {rejectReason}
+                        </Typography.Text>
+                      )}
 
                       <div>
                         <Typography.Text style={{ color: TEXT_SUB }}>สร้างเมื่อ</Typography.Text>
@@ -321,7 +355,7 @@ export default function OrdersStatusPage() {
               showIcon
               message="ข้อควรระวัง"
               description="เมื่อกด ‘แสดงคีย์’ สำหรับรายการใดแล้ว จะถือว่าคุณได้เปิดดูคีย์เกม และจะไม่สามารถขอคืนเงินได้สำหรับคำสั่งซื้อนี้"
-              style={{ background: "#2b2535", borderColor: BORDER, color: TEXT_MAIN }}
+              style={{ background: "#f9f8f9ff", borderColor: BORDER, color: TEXT_MAIN }}
             />
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <Button onClick={() => setKeysOpenFor(null)}>ปิด</Button>
@@ -329,7 +363,7 @@ export default function OrdersStatusPage() {
           </div>
         }
       >
-        <div style={{ color: TEXT_SUB, marginBottom: 12 }}>
+        <div style={{ color: TEXT_SUB, marginBottom: 16, fontSize: 18, lineHeight: 1.6 }}>
           กด <strong style={{ color: THEME_PRIMARY }}>แสดงคีย์</strong> เพื่อดูคีย์จริง และสามารถ{" "}
           <strong style={{ color: THEME_PRIMARY }}>คัดลอก</strong> ไปใช้งานได้
         </div>
@@ -418,7 +452,7 @@ export default function OrdersStatusPage() {
         </Card>
 
         <Divider style={{ borderColor: BORDER }} />
-        <div style={{ color: TEXT_SUB, fontSize: 12, lineHeight: 1.6 }}>
+        <div style={{ color: TEXT_SUB, fontSize: 17, lineHeight: 1.6 }}>
           <ExclamationCircleOutlined style={{ color: THEME_PRIMARY, marginRight: 6 }} />
           โปรดเก็บรักษาคีย์เกมไว้เป็นความลับ ห้ามเผยแพร่สู่สาธารณะ
         </div>

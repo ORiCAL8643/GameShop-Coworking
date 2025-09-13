@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import ProductGrid from "../components/ProductGrid";
 import { useAuth } from "../context/AuthContext";
-import { Button, Space, Typography } from "antd";
+import { Typography } from "antd";
 import type { Promotion } from "../interfaces/Promotion";
 import { listPromotions } from "../services/promotions";
 import PromotionBanner from "../components/PromotionBanner";
@@ -36,14 +36,7 @@ const Home = () => {
           onClick={(id) => navigate(`/promotion/${id}`)}
         />
         <Title level={3} style={{ color: 'white' }}>Product</Title>
-        <Space style={{ marginBottom: 16 }}>
-          <Button type="primary" shape="round">
-            Top
-          </Button>
-          <Button shape="round">Popular</Button>
-          <Button shape="round">Recommended</Button>
-          <Button shape="round">Filter</Button>
-        </Space>
+        
         <ProductGrid userId={userId} />
       </div>
     </div>

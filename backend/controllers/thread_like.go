@@ -36,7 +36,7 @@ func ToggleThreadLike(c *gin.Context) {
 	switch {
 	case err == nil:
 		// ยกเลิกไลก์
-		if err := db.Delete(&like).Error; err != nil {
+		if err := db.Unscoped().Delete(&like).Error; err != nil {
 			db.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

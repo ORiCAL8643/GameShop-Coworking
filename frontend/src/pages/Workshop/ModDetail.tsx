@@ -12,6 +12,7 @@ import {
   Divider,
   Rate,
   Input,
+  List,
 } from "antd";
 import {
   DownloadOutlined,
@@ -19,7 +20,7 @@ import {
   PictureOutlined,
   ArrowLeftOutlined,
 } from "@ant-design/icons";
-import { getMod, getGame } from "../../services/workshop";
+import { getMod, getGame, listUserGames } from "../../services/workshop"; // ⬅️ เพิ่ม listUserGames
 import type { Game } from "../../interfaces";
 import { useAuth } from "../../context/AuthContext";
 
@@ -29,12 +30,16 @@ const { Title, Text, Paragraph } = Typography;
 const API_BASE =
   (import.meta as any)?.env?.VITE_API_BASE ?? "http://localhost:8088";
 
-// ------ URL helpers (แก้รูปไม่ขึ้น + รองรับ path แบบ Windows) ------
+// ------ URL helpers ------
 const normalizePath = (s?: string) => (s ? s.replace(/\\/g, "/") : "");
 const resolveUrl = (src?: string) => {
   const s = normalizePath(src);
   if (!s) return "";
-  if (s.startsWith("http://") || s.startsWith("https://") || s.startsWith("data:"))
+  if (
+    s.startsWith("http://") ||
+    s.startsWith("https://") ||
+    s.startsWith("data:")
+  )
     return s;
   const clean = s.startsWith("/") ? s.slice(1) : s;
   return `${API_BASE}/${clean}`;
@@ -49,11 +54,13 @@ const getModImageUrl = (m: any) =>
       m?.img_src ??
       m?.img ??
       m?.image ??
-      ""
+      "",
   );
 
 const getModFileUrl = (m: any) =>
-  resolveUrl(m?.file_path ?? m?.FilePath ?? m?.fileUrl ?? m?.FileURL ?? m?.file ?? "");
+  resolveUrl(
+    m?.file_path ?? m?.FilePath ?? m?.fileUrl ?? m?.FileURL ?? m?.file ?? "",
+  );
 
 const getGameBannerUrl = (g: any) =>
   resolveUrl(g?.img_src ?? g?.image_path ?? g?.ImagePath ?? g?.cover ?? "");
@@ -64,13 +71,26 @@ const toDateText = (d?: string) => {
   return isNaN(dt.getTime()) ? d : dt.toLocaleString();
 };
 
-// ------ types ratings ------
+// ให้ timestamp เสมอ: ถ้าวันที่พัง → -Infinity
+const ts = (s?: string) => {
+  const t = Date.parse(s ?? "");
+  return Number.isFinite(t) ? t : -Infinity;
+};
+
+// ------ types ------
 type ModRating = {
   id?: number;
   user_id?: number | string;
   mod_id?: number | string;
-  score: number; // 1..5
+  score: number; // 0..5
+  comment?: string;
   created_at?: string;
+  user?: { username?: string; name?: string };
+};
+
+const num = (v: any) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 };
 
 const ModDetail: React.FC = () => {
@@ -82,15 +102,20 @@ const ModDetail: React.FC = () => {
   const [game, setGame] = useState<Game | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // สิทธิ์แก้ไข
+  const [canEdit, setCanEdit] = useState(false);
+
   // ratings
   const [ratings, setRatings] = useState<ModRating[]>([]);
   const [avg, setAvg] = useState(0);
   const [count, setCount] = useState(0);
   const [myScore, setMyScore] = useState<number | undefined>(undefined);
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
 
-  // comments (placeholder ให้หน้าตาเหมือนเดิม)
+  // comments
+  const [comments, setComments] = useState<ModRating[]>([]);
   const [comment, setComment] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
 
   // -------- load mod + game --------
   useEffect(() => {
@@ -111,16 +136,55 @@ const ModDetail: React.FC = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // -------- ตรวจว่าเป็น 'เจ้าของม็อด' หรือไม่ --------
+  useEffect(() => {
+    const myId = num(authUserId);
+    if (!myId || !mod) {
+      setCanEdit(false);
+      return;
+    }
+
+    // 1) ถ้ามี user_id ในม็อด เทียบตรง ๆ เลย
+    const ownerUserId = num(mod?.user_id ?? mod?.UserID ?? mod?.userId);
+    if (ownerUserId != null) {
+      setCanEdit(ownerUserId === myId);
+      return;
+    }
+
+    // 2) ถ้ามี user_game_id → ไปดึง user-games ของผู้ใช้ แล้วเช็คว่า id ตรงกันไหม
+    const ownerUserGameId = num(
+      mod?.user_game_id ?? mod?.userGameId ?? mod?.UserGameID,
+    );
+    if (ownerUserGameId == null) {
+      setCanEdit(false);
+      return;
+    }
+
+    listUserGames(myId)
+      .then((rows: any[]) => {
+        const match = (rows ?? []).some((r: any) => {
+          const ugid =
+            num(r?.user_game_id ?? r?.UserGameID) ?? num(r?.id ?? r?.ID); // รองรับทั้ง 2 key
+          return ugid === ownerUserGameId;
+        });
+        setCanEdit(match);
+      })
+      .catch(() => setCanEdit(false));
+  }, [authUserId, mod]);
+
   // -------- ratings --------
   const modIdNum = useMemo(() => Number(id), [id]);
 
   const recalc = (list: ModRating[]) => {
-    const n = list.length;
-    const sum = list.reduce((acc, r) => acc + Number(r.score || 0), 0);
+    const valid = list.filter((r) => Number(r.score) > 0);
+    const n = valid.length;
+    const sum = valid.reduce((acc, r) => acc + Number(r.score || 0), 0);
     setCount(n);
     setAvg(n ? sum / n : 0);
     const myId = authUserId != null ? Number(authUserId) : undefined;
-    setMyScore(myId ? list.find((r) => Number(r.user_id) === myId)?.score : undefined);
+    setMyScore(
+      myId ? valid.find((r) => Number(r.user_id) === myId)?.score : undefined,
+    );
   };
 
   const fetchRatings = async () => {
@@ -128,11 +192,14 @@ const ModDetail: React.FC = () => {
     try {
       const res = await fetch(`${API_BASE}/modratings?mod_id=${modIdNum}`);
       const data = await res.json();
-      const list: ModRating[] = Array.isArray(data) ? data : data?.data ?? [];
+      const list: ModRating[] = Array.isArray(data) ? data : (data?.data ?? []);
       setRatings(list);
+      const comm = list
+        .filter((r) => r.comment && r.comment.trim() !== "")
+        .sort((a, b) => ts(b.created_at) - ts(a.created_at));
+      setComments(comm);
       recalc(list);
     } catch (e) {
-      // ไม่ต้องเด้ง error ใหญ่ ให้หน้าใช้งานต่อได้
       console.warn("load ratings failed:", e);
     }
   };
@@ -148,14 +215,14 @@ const ModDetail: React.FC = () => {
       return;
     }
     try {
-      setSubmitting(true);
+      setSubmittingRating(true);
       const res = await fetch(`${API_BASE}/modratings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mod_id: modIdNum,
           user_id: Number(authUserId),
-          score: value,
+          score: value, // 1..5
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -164,7 +231,43 @@ const ModDetail: React.FC = () => {
     } catch (e: any) {
       message.error(e?.message || "ให้คะแนนไม่สำเร็จ");
     } finally {
-      setSubmitting(false);
+      setSubmittingRating(false);
+    }
+  };
+
+  // -------- comments --------
+  // comments are part of ratings; no separate fetch
+
+  const submitComment = async () => {
+    const content = comment.trim();
+    if (!authUserId) {
+      message.error("กรุณาเข้าสู่ระบบก่อนแสดงความคิดเห็น");
+      return;
+    }
+    if (!content) {
+      message.warning("พิมพ์ข้อความก่อนโพสต์");
+      return;
+    }
+    try {
+      setSubmittingComment(true);
+      const res = await fetch(`${API_BASE}/modratings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mod_id: modIdNum,
+          user_id: Number(authUserId),
+          score: myScore || 0,
+          comment: content,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setComment("");
+      message.success("เพิ่มคอมเมนต์เรียบร้อย");
+      await fetchRatings();
+    } catch (e: any) {
+      message.error(e?.message || "โพสต์คอมเมนต์ไม่สำเร็จ");
+    } finally {
+      setSubmittingComment(false);
     }
   };
 
@@ -174,17 +277,24 @@ const ModDetail: React.FC = () => {
     return mImg || getGameBannerUrl(game || {});
   }, [mod, game]);
 
-  const downloadUrl = useMemo(() => getModFileUrl(mod || {}), [mod]);
+  const downloadUrl = useMemo(() => {
+    const mid = mod?.id ?? mod?.ID;
+    return mid ? `${API_BASE}/mods/${mid}/download` : "";
+  }, [mod]);
 
   const uploadedText = useMemo(() => {
     const t =
-      mod?.upload_date ?? mod?.UploadDate ?? mod?.created_at ?? mod?.CreatedAt ?? "";
+      mod?.upload_date ??
+      mod?.UploadDate ??
+      mod?.created_at ??
+      mod?.CreatedAt ??
+      "";
     return toDateText(t);
   }, [mod]);
 
   return (
     <Layout style={{ background: "#0f1419", minHeight: "100vh" }}>
-      {/* ===== Hero Banner (พื้นหลังรูปม็อดแบบเบลอ) — อยู่ในพื้นที่ของหน้าเท่านั้น ไม่ล้นไป Sidebar ===== */}
+      {/* ===== Hero Banner ===== */}
       <Header
         style={{
           background: "#0f1419",
@@ -195,7 +305,6 @@ const ModDetail: React.FC = () => {
           borderBottom: "1px solid #1f2933",
         }}
       >
-        {/* เบลอเฉพาะใน Header */}
         <div
           aria-hidden
           style={{
@@ -219,7 +328,6 @@ const ModDetail: React.FC = () => {
           }}
         />
 
-        {/* เนื้อหาใน header */}
         <div
           style={{
             position: "relative",
@@ -257,7 +365,6 @@ const ModDetail: React.FC = () => {
             </div>
           </div>
 
-          {/* ปกรูปคมชัด */}
           <div
             style={{
               justifySelf: "end",
@@ -299,10 +406,9 @@ const ModDetail: React.FC = () => {
       </Header>
 
       <Layout>
-        {/* ใส่พื้นหลังเข้มให้เนื้อหา เพื่อไม่ดูขาว และเข้าชุดกับ Workshop */}
         <Content style={{ padding: 20, background: "#0f1419" }}>
           <Row gutter={[16, 16]}>
-            {/* ซ้าย: เนื้อหา + ให้คะแนน (สไตล์เดิม) */}
+            {/* ซ้าย */}
             <Col xs={24} lg={16}>
               <Card
                 loading={loading}
@@ -328,9 +434,13 @@ const ModDetail: React.FC = () => {
                       </Button>
                     </a>
                   )}
-                  <Link to={`/workshop/upload?modId=${mod?.ID ?? mod?.id}`}>
-                    <Button icon={<EditOutlined />}>Edit</Button>
-                  </Link>
+
+                  {/* ✅ ปุ่ม Edit เฉพาะเจ้าของม็อดเท่านั้น */}
+                  {canEdit && (
+                    <Link to={`/workshop/upload?modId=${mod?.ID ?? mod?.id}`}>
+                      <Button icon={<EditOutlined />}>Edit</Button>
+                    </Link>
+                  )}
                 </div>
 
                 <Divider style={{ borderColor: "#2b3a42", margin: "12px 0" }} />
@@ -344,7 +454,9 @@ const ModDetail: React.FC = () => {
 
                 {getModImageUrl(mod) && (
                   <>
-                    <Divider style={{ borderColor: "#2b3a42", margin: "12px 0" }} />
+                    <Divider
+                      style={{ borderColor: "#2b3a42", margin: "12px 0" }}
+                    />
                     <Title level={5} style={{ color: "#fff", marginTop: 0 }}>
                       Screenshot
                     </Title>
@@ -360,14 +472,18 @@ const ModDetail: React.FC = () => {
                       <img
                         src={getModImageUrl(mod)}
                         alt="mod"
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
                       />
                     </div>
                   </>
                 )}
               </Card>
 
-              {/* ====== Rate this Mod (เหมือนเดิม) ====== */}
+              {/* ====== Rate this Mod ====== */}
               <Card
                 style={{
                   background: "#111315",
@@ -383,7 +499,9 @@ const ModDetail: React.FC = () => {
                   <Rate
                     value={myScore}
                     onChange={submitRating}
-                    disabled={submitting}
+                    disabled={submittingRating}
+                    allowHalf={false}
+                    count={5}
                   />
                   <Text style={{ color: "#c9d1d9" }}>
                     {myScore ? `Your rating: ${myScore}/5` : "No rating yet"}
@@ -392,12 +510,12 @@ const ModDetail: React.FC = () => {
                 <Divider style={{ borderColor: "#2b3a42" }} />
                 <Text style={{ color: "#9aa4ad" }}>
                   <b>Average Rating:</b>{" "}
-                  <span style={{ color: "#fff" }}>{avg.toFixed(1)} / 5</span>{" "}
-                  ({count} {count === 1 ? "rating" : "ratings"})
+                  <span style={{ color: "#fff" }}>{avg.toFixed(1)} / 5</span> (
+                  {count} {count === 1 ? "rating" : "ratings"})
                 </Text>
               </Card>
 
-              {/* Comments (วางสไตล์เดิม) */}
+              {/* ====== Comments ====== */}
               <Card
                 style={{
                   background: "#111315",
@@ -409,22 +527,67 @@ const ModDetail: React.FC = () => {
                 <Title level={4} style={{ color: "#fff", marginTop: 0 }}>
                   Comments
                 </Title>
+
                 <Input.TextArea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   rows={4}
                   placeholder="Write a comment..."
-                  style={{ background: "#1a1a1a", color: "#fff", borderColor: "#2b3a42" }}
+                  style={{
+                    background: "#1a1a1a",
+                    color: "#fff",
+                    borderColor: "#2b3a42",
+                  }}
                 />
                 <div style={{ textAlign: "right", marginTop: 10 }}>
-                  <Button type="primary" disabled>
+                  <Button
+                    type="primary"
+                    onClick={submitComment}
+                    loading={submittingComment}
+                  >
                     Add Comment
                   </Button>
                 </div>
+
+                <Divider style={{ borderColor: "#2b3a42" }} />
+
+                <List
+                  dataSource={comments}
+                  locale={{ emptyText: "ยังไม่มีคอมเมนต์" }}
+                  renderItem={(c) => (
+                    <List.Item style={{ borderColor: "#1f2933" }}>
+                      <List.Item.Meta
+                        title={
+                          <span style={{ color: "#fff" }}>
+                            {c.user?.username ||
+                              c.user?.name ||
+                              `User #${c.user_id}`}
+                            <span
+                              style={{
+                                color: "#9aa4ad",
+                                marginLeft: 8,
+                                fontSize: 12,
+                              }}
+                            >
+                              {toDateText(c.created_at)}
+                            </span>
+                          </span>
+                        }
+                        description={
+                          <span
+                            style={{ color: "#c9d1d9", whiteSpace: "pre-wrap" }}
+                          >
+                            {c.comment}
+                          </span>
+                        }
+                      />
+                    </List.Item>
+                  )}
+                />
               </Card>
             </Col>
 
-            {/* ขวา: แผงข้อมูล (สรุปเรตติ้งแบบเดิม) */}
+            {/* ขวา */}
             <Col xs={24} lg={8}>
               <Sider
                 width="100%"
@@ -449,9 +612,18 @@ const ModDetail: React.FC = () => {
                     👤 Mod ID: {mod?.ID ?? mod?.id ?? "-"}
                   </div>
                   <div style={{ opacity: 0.9 }}>
-                    <div style={{ marginBottom: 6 }}>📅 Uploaded: {uploadedText}</div>
+                    <div style={{ marginBottom: 6 }}>
+                      📅 Uploaded: {uploadedText}
+                    </div>
                     <div style={{ marginBottom: 6 }}>
                       🧩 Game ID: {mod?.game_id ?? mod?.GameID ?? "-"}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      👁 Views: {mod?.view_count ?? mod?.ViewCount ?? 0}
+                    </div>
+                    <div style={{ marginBottom: 6 }}>
+                      ⬇ Downloads:{" "}
+                      {mod?.download_count ?? mod?.DownloadCount ?? 0}
                     </div>
                   </div>
 
@@ -460,7 +632,9 @@ const ModDetail: React.FC = () => {
                   <div style={{ opacity: 0.95, marginBottom: 4 }}>
                     <Text style={{ color: "#fff" }}>{count} Ratings</Text>
                   </div>
-                  <div style={{ color: "rgba(255,255,255,0.9)", marginBottom: 8 }}>
+                  <div
+                    style={{ color: "rgba(255,255,255,0.9)", marginBottom: 8 }}
+                  >
                     Average: {avg.toFixed(1)} / 5
                   </div>
                 </div>

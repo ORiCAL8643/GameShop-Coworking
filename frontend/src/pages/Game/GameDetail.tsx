@@ -142,12 +142,11 @@ const GameDetail: React.FC = () => {
   }
 
   // Minimum Spec
-  const ms = minSpec ?? {};
-  const os      = (ms as any).os ?? (ms as any).OS ?? "N/A";
-  const cpu     = (ms as any).cpu ?? (ms as any).CPU ?? "N/A";
-  const ram     = (ms as any).ram ?? (ms as any).RAM ?? "N/A";
-  const gpu     = (ms as any).gpu ?? (ms as any).GPU ?? "N/A";
-  const storage = (ms as any).storage ?? (ms as any).Storage ?? "N/A";
+  const os      = game?.minimum_spec?.os ?? "N/A";
+  const cpu     = game?.minimum_spec?.processor  ??  "N/A";
+  const ram     = game?.minimum_spec?.memory ?? "N/A";
+  const gpu     = game?.minimum_spec?.graphics ?? "N/A";
+  const storage = game?.minimum_spec?.storage  ?? "N/A";
 
   // Top workshop items
   const topMods = React.useMemo(() => {
