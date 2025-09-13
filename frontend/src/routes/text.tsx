@@ -1,5 +1,7 @@
 // src/routes/text.tsx
 import { createBrowserRouter, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import Forbidden from "../pages/Forbidden";
 
 import Sidebar from "../components/Sidebar";
 
@@ -34,6 +36,11 @@ import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage"; // ✅ เ�
 import OrdersStatusPage from "../pages/OrdersStatusPage";
 import Reviewpage from "../pages/Review/Reviewpage.tsx";
 import GameDetail from "../pages/Game/GameDetail";
+
+const GuardedRoute: React.FC<{ needed: string; element: JSX.Element }> = ({ needed, element }) => {
+  const { hasPerm } = useAuth();
+  return hasPerm(needed) ? element : <Navigate to="/403" replace />;
+};
 
 // mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
 const refunds: Refund[] = [
@@ -88,8 +95,8 @@ const router = createBrowserRouter([
       { path: "promotion", element: <PromotionManager /> },
       { path: "promotion/:id", element: <PromotionDetail /> },
       // === roles
-      { path: "roles", element: <RoleManagement /> },
-      { path: "roles/:id", element: <RoleEdit /> },
+      { path: "roles", element: <GuardedRoute needed="role.read" element={<RoleManagement />} /> },
+      { path: "roles/:id", element: <GuardedRoute needed="role.update" element={<RoleEdit />} /> },
 
       // === refund
       { path: "refund", element: <RefundPage /> },
@@ -127,6 +134,7 @@ const router = createBrowserRouter([
       { path: "orders-status", element: <OrdersStatusPage /> },
 
       // === fallback
+      { path: "403", element: <Forbidden /> },
       { path: "*", element: <Navigate to="/home" replace /> },
     ],
   },

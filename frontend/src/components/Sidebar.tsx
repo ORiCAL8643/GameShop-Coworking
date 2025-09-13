@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useReportNewCount } from "../hooks/useReportNewCount";
 import type { ItemType } from "antd/es/menu/interface";
 import { FlagIcon } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 const { Sider, Content } = Layout;
 type GroupItem = Required<MenuProps>["items"][number];
@@ -33,6 +34,8 @@ const Sidebar = () => {
   };
 
   // ✅ Label Page + Badge (โชว์แม้เป็น 0)
+  const { refresh } = useAuth();
+
   const adminPageLabel = (
     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <span>Page</span>
@@ -53,6 +56,7 @@ const Sidebar = () => {
     { key: "/workshop", label: "Workshop", icon: <ToolOutlined /> },  
     { key: "/refund", label: "การคืนเงินผู้ใช้", icon: <RetweetOutlined/> },
     { key: "/report", label: "รายงานปัญหา", icon: <FlagOutlined /> },
+    { key: "refresh-perms", label: "Refresh Permissions", icon: <RetweetOutlined /> },
     {
       key: "/Admin",
       label: "Admin",
@@ -81,7 +85,13 @@ const Sidebar = () => {
           selectedKeys={[selectedKey]}
           openKeys={openKeys}
           onOpenChange={(keys) => setOpenKeys(keys as string[])}
-          onClick={({ key }) => navigate(String(key))}
+          onClick={({ key }) => {
+            if (key === "refresh-perms") {
+              refresh();
+            } else {
+              navigate(String(key));
+            }
+          }}
         />
       </Sider>
 

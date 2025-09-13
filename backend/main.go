@@ -5,10 +5,13 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/middlewares"
+	"example.com/sa-gameshop/services"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -21,6 +24,8 @@ func main() {
 	configs.SetupDatabase()
 	configs.MigrateReportTables() // ✅ เพิ่มบรรทัดนี้เท่านั้น
 
+	permService := services.NewPermService(configs.DB(), 60*time.Second)
+
 	r := gin.New()
 
 	// 2) Static & CORS
@@ -29,6 +34,7 @@ func main() {
 
 	// 3) health check
 	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
+	r.GET("/me", middlewares.AuthRequired(), controllers.Me(permService))
 
 	// 4) กลุ่มเส้นทางสาธารณะ (ไม่ต้อง auth)
 	router := r.Group("/")
@@ -43,27 +49,6 @@ func main() {
 		router.PUT("/users/:id", controllers.UpdateUser)
 		router.DELETE("/users/:id", controllers.DeleteUserByID)
 		router.PATCH("/users/:id/role", controllers.UpdateUserRole)
-
-		// -------- Roles --------
-		router.GET("/roles", controllers.GetRoles)
-		router.GET("/roles/:id", controllers.GetRoleById)
-		router.POST("/roles", controllers.CreateRole)
-		router.PATCH("/roles/:id", controllers.UpdateRole)
-		router.DELETE("/roles/:id", controllers.DeleteRole)
-
-		// -------- Permissions --------
-		router.GET("/permissions", controllers.GetPermissions)
-		router.GET("/permissions/:id", controllers.GetPermissionById)
-		router.POST("/permissions", controllers.CreatePermission)
-		router.PATCH("/permissions/:id", controllers.UpdatePermission)
-		router.DELETE("/permissions/:id", controllers.DeletePermission)
-
-		// -------- RolePermissions --------
-		router.GET("/rolepermissions", controllers.GetRolePermissions)
-		router.GET("/rolepermissions/:id", controllers.GetRolePermissionById)
-		router.POST("/rolepermissions", controllers.CreateRolePermission)
-		router.PATCH("/rolepermissions/:id", controllers.UpdateRolePermission)
-		router.DELETE("/rolepermissions/:id", controllers.DeleteRolePermission)
 
 		// -------- Games --------
 		router.POST("/new-game", controllers.CreateGame)
@@ -209,6 +194,19 @@ func main() {
 		authList.DELETE("/mods/:id", controllers.DeleteMod)
 		authList.GET("/mods/mine", controllers.GetMyMods)
 
+	}
+
+	admin := r.Group("/admin", middlewares.AuthRequired(), middlewares.RequirePerm(permService, middlewares.RequireAny, "permission.manage"))
+	{
+		admin.GET("/permissions", controllers.ListPermissions)
+		admin.POST("/permissions", controllers.CreatePermission)
+		admin.DELETE("/permissions/:id", controllers.DeletePermission)
+		admin.POST("/roles/:roleId/grant", controllers.GrantPermToRole(permService))
+		admin.POST("/roles/:roleId/revoke", controllers.RevokePermFromRole(permService))
+		admin.GET("/roles", middlewares.RequirePerm(permService, middlewares.RequireAny, "role.read"), controllers.GetRoles)
+		admin.POST("/roles", middlewares.RequirePerm(permService, middlewares.RequireAny, "role.create"), controllers.CreateRole)
+		admin.PATCH("/roles/:id", middlewares.RequirePerm(permService, middlewares.RequireAny, "role.update"), controllers.UpdateRole)
+		admin.DELETE("/roles/:id", middlewares.RequirePerm(permService, middlewares.RequireAny, "role.delete"), controllers.DeleteRole)
 	}
 
 	// 6) Run server
