@@ -4,7 +4,7 @@ import {
   ShoppingCartOutlined,
   DollarCircleOutlined,
 } from "@ant-design/icons";
-import { useState, useMemo } from "react";
+import { useState, useMemo, type JSX } from "react";
 import { AutoComplete, Input, Avatar, Space, Button, message } from "antd";
 import { Link, useNavigate } from "react-router-dom";
 import { listGames } from "../services/game";
