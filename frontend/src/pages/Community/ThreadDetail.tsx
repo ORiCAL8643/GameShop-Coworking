@@ -209,7 +209,7 @@ export default function ThreadDetail({ threadId, onBack }: Props) {
                         <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
                           <span style={{ color: "#e6e6e6", fontWeight: 500 }}>{c.userName || "ไม่ระบุ"}</span>
                           <span style={{ color: "#93a0c2", fontSize: 12 }}>
-                            {c.createdAt ? dayjs(thread.createdAt).format("D/M/YYYY HH:mm") : ""}
+                            {c.createdAt ? dayjs(c.createdAt).format("D/M/YYYY HH:mm") : ""}
                           </span>
                         </div>
                         <div style={{ color: "#cfd7ef", marginTop: 6 }}>{c.content}</div>
