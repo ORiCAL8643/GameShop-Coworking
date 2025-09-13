@@ -28,7 +28,7 @@ const Add = () => {
     const [age, setAge] = useState<number | null>(null);
     const [imgurl, setImageurl] = useState("https://static.vecteezy.com/system/resources/thumbnails/004/141/669/small_2x/no-photo-or-blank-image-icon-loading-images-or-missing-image-mark-image-not-available-or-image-coming-soon-sign-simple-nature-silhouette-in-frame-isolated-illustration-vector.jpg");
     const [os, setOs] = useState("");
-    const [m_id,setM_id]=useState<number>(1);
+   // const [m_id,setM_id]=useState<number>(1);
     const [processor, setProcessor] = useState("");
     const [memory, setMemory] = useState("");
     const [graphics, setGraphics] = useState("");
@@ -112,16 +112,22 @@ const Add = () => {
             base_price: price,
             age_rating: age,
             img_src: imgurl,
-            minimum_spec_id: m_id,
             categories_id: categoryId,
+            minimum_spec: {
+                os: os,
+                processor: processor,
+                memory: memory,
+                graphics:graphics,
+                storage:storage,
+            }
         });
             console.log("เพิ่มเกมสำเร็จ:", response.data)
-            setM_id(m_id+1)
+            //setM_id(m_id+1)
         } catch(err) {
             console.log("add game error",err)
         }  
 } 
-    async function AddMinimumSpec() {
+   /* async function AddMinimumSpec() {
         try {
             const response = await axios.post(`${base_url}/new-minimumspec`, {
             os: os,
@@ -134,7 +140,7 @@ const Add = () => {
         } catch(err) {
             console.log("add spec error",err)
         }  
-}
+} */
     return(
         <Layout>
             <Layout style={{ background: '#141414', flex: 1 , minHeight: '100vh'}}>
@@ -226,7 +232,7 @@ const Add = () => {
                     </Row>
                     <Row style={{marginTop: 12}}>
                         <Col offset={23}><Button type="primary" onClick={() => {
-                            AddMinimumSpec();
+                            //AddMinimumSpec();
                             AddGame(); 
                         }}>ยืนยัน</Button></Col>
                     </Row>

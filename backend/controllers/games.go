@@ -7,6 +7,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/entity"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 /*
@@ -127,12 +128,13 @@ func FindGameByID(c *gin.Context) {
 }
 func CreateGame(c *gin.Context) {
 	var input struct {
-		GameName        string `json:"game_name" binding:"required"`
-		BasePrice       int    `json:"base_price" binding:"required"`
-		AgeRating       int    `json:"age_rating"`
-		ImgSrc          string `json:"img_src"`
-		Minimum_spec_id int    `json:"minimum_spec_id" binding:"required"`
-		CategoriesID    int    `json:"categories_id" binding:"required"`
+		GameName  string `json:"game_name" binding:"required"`
+		BasePrice int    `json:"base_price" binding:"required"`
+		AgeRating int    `json:"age_rating"`
+		ImgSrc    string `json:"img_src"`
+		//Minimum_spec_id int                `json:"minimum_spec_id"`
+		MinimumSpec  entity.MinimumSpec `json:"minimum_spec" binding:"required"`
+		CategoriesID int                `json:"categories_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -140,14 +142,15 @@ func CreateGame(c *gin.Context) {
 	}
 
 	games := entity.Game{
-		GameName:       input.GameName,
-		BasePrice:      input.BasePrice,
-		AgeRating:      input.AgeRating,
-		ImgSrc:         input.ImgSrc,
-		Minimum_specID: uint(input.Minimum_spec_id),
-		CategoriesID:   input.CategoriesID,
+		GameName:  input.GameName,
+		BasePrice: input.BasePrice,
+		AgeRating: input.AgeRating,
+		ImgSrc:    input.ImgSrc,
+		//Minimum_specID: uint(input.Minimum_spec_id),
+		MinimumSpec:  input.MinimumSpec,
+		CategoriesID: input.CategoriesID,
 	}
-	if err := configs.DB().Create(&games).Error; err != nil {
+	if err := configs.DB().Session(&gorm.Session{FullSaveAssociations: true}).Create(&games).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
