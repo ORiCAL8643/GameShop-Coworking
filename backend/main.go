@@ -9,6 +9,7 @@ import (
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
 	"example.com/sa-gameshop/entity"
+	"example.com/sa-gameshop/middlewares"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -137,7 +138,6 @@ func main() {
 		router.GET("/minimumspec", controllers.FindMinimumSpec)
 
 		// -------- Problem Reports --------
-		router.POST("/reports", controllers.CreateReport)
 		router.GET("/reports", controllers.FindReports)
 		router.GET("/reports/:id", controllers.GetReportByID)
 		router.PUT("/reports/:id", controllers.UpdateReport)
@@ -161,23 +161,23 @@ func main() {
 		// -------- Mod Ratings --------
 		router.GET("/modratings", controllers.GetModRatings)
 		router.GET("/modratings/:id", controllers.GetModRatingById)
-		router.POST("/modratings", controllers.CreateModRating)
-
 		// (WRITE ย้ายไปไว้ใต้ authList ด้านล่าง)
 	}
 
 	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
 	authList := r.Group("/", AuthRequired())
 	{
+		authList.GET("/me/permissions", controllers.GetMyPermissions)
+
 		// ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
 		withUserQuery := authList.Group("/", InjectUserIDQuery())
 		{
-			withUserQuery.GET("/orders", controllers.FindOrders)
+			withUserQuery.GET("/orders", middlewares.RequirePerm("order:read:own"), controllers.FindOrders)
 			withUserQuery.GET("/payments", controllers.FindPayments)
 		}
 
 		// Orders (write)
-		authList.POST("/orders", controllers.CreateOrder)
+		authList.POST("/orders", middlewares.RequirePerm("order:create"), controllers.CreateOrder)
 
 		// Order Items
 		authList.POST("/order-items", controllers.CreateOrderItem)
@@ -186,27 +186,31 @@ func main() {
 		authList.DELETE("/order-items/:id", controllers.DeleteOrderItem)
 
 		// Payments (write/action)
-		authList.POST("/payments", controllers.CreatePayment)
-		authList.PATCH("/payments/:id", controllers.UpdatePayment)
-		authList.POST("/payments/:id/approve", controllers.ApprovePayment) // ตรวจ role ใน handler
-		authList.POST("/payments/:id/reject", controllers.RejectPayment)
+		authList.POST("/payments", middlewares.RequirePerm("payment:create"), controllers.CreatePayment)
+		authList.PATCH("/payments/:id", middlewares.RequirePerm("payment:create"), controllers.UpdatePayment)
+		authList.POST("/payments/:id/approve", middlewares.RequirePerm("payment:approve"), controllers.ApprovePayment) // ตรวจ role ใน handler
+		authList.POST("/payments/:id/reject", middlewares.RequirePerm("payment:approve"), controllers.RejectPayment)
 
 		// -------- Threads (WRITE only = ต้อง auth) --------
-		authList.POST("/threads", controllers.CreateThread)    // multipart: title, content, game_id, images[]
-		authList.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
-		authList.DELETE("/threads/:id", controllers.DeleteThread)
-		authList.POST("/threads/:id/comments", controllers.CreateComment)
-		authList.DELETE("/comments/:id", controllers.DeleteComment)
-		authList.POST("/threads/:id/toggle_like", controllers.ToggleThreadLike)
+		authList.POST("/threads", middlewares.RequirePerm("thread:create"), controllers.CreateThread)    // multipart: title, content, game_id, images[]
+		authList.PUT("/threads/:id", middlewares.RequirePerm("thread:create"), controllers.UpdateThread) // แก้ title/content
+		authList.DELETE("/threads/:id", middlewares.RequirePerm("thread:create"), controllers.DeleteThread)
+		authList.POST("/threads/:id/comments", middlewares.RequirePerm("thread:comment"), controllers.CreateComment)
+		authList.DELETE("/comments/:id", middlewares.RequirePerm("thread:comment"), controllers.DeleteComment)
+		authList.POST("/threads/:id/toggle_like", middlewares.RequirePerm("thread:like"), controllers.ToggleThreadLike)
+
+		authList.POST("/modratings", middlewares.RequirePerm("rating:create"), controllers.CreateModRating)
+
+		authList.POST("/reports", middlewares.RequirePerm("report:create"), controllers.CreateReport)
 
 		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
 		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
 
 		// -------- Mods (WRITE only = ต้อง auth) --------
 		// ✅ เพิ่มเฉพาะส่วนนี้ เพื่อบังคับให้ล็อกอินก่อนสร้าง/แก้ไข/ลบม็อด
-		authList.POST("/mods", controllers.CreateMod)
-		authList.PATCH("/mods/:id", controllers.UpdateMod)
-		authList.DELETE("/mods/:id", controllers.DeleteMod)
+		authList.POST("/mods", middlewares.RequirePerm("workshop:mod:create"), controllers.CreateMod)
+		authList.PATCH("/mods/:id", middlewares.RequirePerm("workshop:mod:update:own"), controllers.UpdateMod)
+		authList.DELETE("/mods/:id", middlewares.RequirePerm("workshop:mod:delete:own"), controllers.DeleteMod)
 		authList.GET("/mods/mine", controllers.GetMyMods)
 
 	}
