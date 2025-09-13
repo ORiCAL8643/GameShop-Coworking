@@ -15,6 +15,7 @@ import (
 type createCommentBody struct {
 	Content string `json:"content" binding:"required"`
 }
+
 func CreateComment(c *gin.Context) {
 	uid := c.GetUint("userID")
 	if uid == 0 {

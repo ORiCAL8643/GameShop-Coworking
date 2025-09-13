@@ -18,12 +18,12 @@ type Mod struct {
 	Status      string    `json:"status"`
 
 	// ✅ เกมที่ม็อดนี้สังกัด
-	GameID uint   `json:"game_id" gorm:"index"`
-	Game   *Game  `gorm:"foreignKey:GameID" json:"game,omitempty"`
+	GameID uint  `json:"game_id" gorm:"index"`
+	Game   *Game `gorm:"foreignKey:GameID" json:"game,omitempty"`
 
 	// ✅ ผู้ใช้งานที่อัปโหลดม็อด (สำคัญมากสำหรับการเช็คว่าเป็นของใคร)
-	UserID uint   `json:"user_id" gorm:"index"`
-	User   *User  `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL" json:"uploader,omitempty"`
+	UserID uint  `json:"user_id" gorm:"index"`
+	User   *User `gorm:"foreignKey:UserID;constraint:OnDelete:SET NULL" json:"uploader,omitempty"`
 
 	// 🟡 ความเป็นเจ้าของ ‘เกม’ ในคลังของผู้ใช้ (ออปชัน)
 	// เดิมเป็น uint ไม่ nullable; ถ้าจะให้ไม่บังคับ -> ใช้ *uint
@@ -31,4 +31,7 @@ type Mod struct {
 	UserGame   *UserGame `gorm:"foreignKey:UserGameID" json:"user_game,omitempty"`
 
 	//ModTags []ModTags `gorm:"foreignKey:ModID" json:"mod_tags"`
+
+	ViewCount     int64 `json:"view_count" gorm:"default:0"`
+	DownloadCount int64 `json:"download_count" gorm:"default:0"`
 }
