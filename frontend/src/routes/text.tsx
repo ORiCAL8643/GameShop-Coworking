@@ -30,19 +30,18 @@ import RefundStatusPage, { type Refund } from "../pages/Refund/RefundStatus";
 
 import AdminPage from "../pages/Admin/AdminPage";
 import AdminPaymentReviewPage from "../pages/Admin/AdminPaymentReviewPage";
-import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage"; // ✅ เพิ่ม import นี้
+import ResolvedReportsPage from "../pages/Admin/ResolvedReportPage";
 
 import OrdersStatusPage from "../pages/OrdersStatusPage";
 import Reviewpage from "../pages/Review/Reviewpage.tsx";
 import GameDetail from "../pages/Game/GameDetail";
 
-// mock data (ถ้ามีอยู่แล้วที่อื่นจะลบส่วนนี้ออกได้)
+// mock data (ถ้ามี data จริงอยู่ที่อื่นจะย้ายออกได้)
 const refunds: Refund[] = [
   { id: 1, orderId: "A001", user: "Alice", game: "Cyberpunk 2077", reason: "Buggy gameplay", status: "Pending" },
   { id: 2, orderId: "A002", user: "Bob", game: "Elden Ring", reason: "Accidental purchase", status: "Approved" },
 ];
 
-// 🟣 Mock ฟังก์ชัน
 const addNotification = (msg: string) => console.log("Notification:", msg);
 const addRefundUpdate = (msg: string) => console.log("Refund update:", msg);
 
@@ -55,19 +54,19 @@ const router = createBrowserRouter([
       { index: true, element: <Home /> },
       { path: "home", element: <Home /> },
 
-      // ✅ Report
+      // === รายงานปัญหา (public)
       { path: "report", element: <ReportPage /> },
       { path: "report/success", element: <ReportSuccessPage /> },
 
-      // === กลุ่ม information
+      // === information (admin)
       { path: "information/Add", element: <AdminRoute need="admin:game"><Add /></AdminRoute> },
-      { path: "information/Edit", element: <Edit /> },
+      { path: "information/Edit", element: <AdminRoute need="admin:game"><Edit /></AdminRoute> },
 
       // === request
       { path: "request", element: <Request /> },
       { path: "requestinfo", element: <AdminRoute need="admin:request"><Requestinfo /></AdminRoute> },
 
-      // === category (ใช้ path แบบ relative)
+      // === category
       {
         path: "category",
         children: [
@@ -80,30 +79,25 @@ const router = createBrowserRouter([
       { path: "workshop", element: <WorkshopMain /> },
       { path: "workshop/:id", element: <WorkshopDetail /> },
       { path: "mod/:id", element: <ModDetail /> },
-      // ชี้หน้าอัปโหลดให้เป็นเส้นทางย่อยของ Workshop
       { path: "workshop/upload", element: <Workshop /> },
-      
-       { path: "game/:id", element: <GameDetail /> },
 
-      // === promotion
+      // === เกม
+      { path: "game/:id", element: <GameDetail /> },
+
+      // === promotion (admin)
       { path: "promotion", element: <AdminRoute need="admin:promotion"><PromotionManager /></AdminRoute> },
       { path: "promotion/:id", element: <AdminRoute need="admin:promotion"><PromotionDetail /></AdminRoute> },
-      // === roles
+
+      // === roles (admin)
       { path: "roles", element: <AdminRoute need="admin:role"><RoleManagement /></AdminRoute> },
       { path: "roles/:id", element: <AdminRoute need="admin:role"><RoleEdit /></AdminRoute> },
 
-      // === refund
+      // === review
+      { path: "reviews/:gameId", element: <Reviewpage /> },
+
+      // === refund (ผู้ใช้ทั่วไปก็เข้ามาดู/ยื่นได้ ถ้าต้องล็อกอินค่อยครอบเอง)
       { path: "refund", element: <RefundPage /> },
       { path: "refund-status", element: <RefundStatusPage refunds={refunds} /> },
-      { path: "/promotion", element: <PromotionManager /> },
-      { path: "/promotion/:id", element: <PromotionDetail /> },
-      // Review page for a specific game
-      { path: "/reviews/:gameId", element: <Reviewpage /> },
-
-
-      // 🟣 Refund
-      { path: "/refund", element: <RefundPage /> },
-      { path: "/refund-status", element: <RefundStatusPage refunds={refunds} /> },
 
       // === admin
       {
@@ -112,7 +106,7 @@ const router = createBrowserRouter([
           <AdminRoute need="admin:page">
             <AdminPage
               refunds={refunds}
-              setRefunds={() => { }}
+              setRefunds={() => {}}
               addNotification={addNotification}
               addRefundUpdate={addRefundUpdate}
             />
@@ -120,16 +114,13 @@ const router = createBrowserRouter([
         ),
       },
       { path: "Admin/PaymentReviewPage", element: <AdminRoute need="admin:paymentreview"><AdminPaymentReviewPage /></AdminRoute> },
-
       { path: "Admin/RolePage", element: <AdminRoute need="admin:role"><RoleManagement /></AdminRoute> },
-
-      // ✅ เพิ่มเส้นทางหน้ารายการที่แก้ไขแล้ว (ตรงกับปุ่ม navigate("/Admin/Resolved"))
       { path: "Admin/Resolved", element: <AdminRoute need="admin:page"><ResolvedReportsPage /></AdminRoute> },
 
-      // === ✅ สถานะคำสั่งซื้อ (เส้นทางที่ต้องการ)
+      // === สถานะคำสั่งซื้อ
       { path: "orders-status", element: <OrdersStatusPage /> },
 
-      // === fallback
+      // fallback
       { path: "*", element: <Navigate to="/home" replace /> },
     ],
   },

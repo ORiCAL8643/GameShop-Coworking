@@ -2,16 +2,11 @@ package main
 
 import (
 	"net/http"
-	"os"
-	"strconv"
-	"strings"
 
 	"example.com/sa-gameshop/configs"
 	"example.com/sa-gameshop/controllers"
-	"example.com/sa-gameshop/entity"
 	"example.com/sa-gameshop/middlewares"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 const PORT = "8088"
@@ -20,7 +15,7 @@ func main() {
 	// 1) DB connect + migrate/seed
 	configs.ConnectionDB()
 	configs.SetupDatabase()
-	configs.MigrateReportTables() // ✅ เพิ่มบรรทัดนี้เท่านั้น
+	configs.MigrateReportTables()
 
 	r := gin.New()
 
@@ -31,7 +26,7 @@ func main() {
 	// 3) health check
 	r.GET("/ping", func(c *gin.Context) { c.String(http.StatusOK, "pong") })
 
-	// 4) กลุ่มเส้นทางสาธารณะ (ไม่ต้อง auth)
+	// 4) Public routes (ไม่ต้อง auth)
 	router := r.Group("/")
 	{
 		// -------- Auth --------
@@ -112,12 +107,6 @@ func main() {
 		// -------- Categories --------
 		router.GET("/categories", controllers.FindCategories)
 
-		// -------- KeyGames --------
-		// (protected routes moved under authList)
-
-		// -------- MinimumSpec --------
-		// (protected routes moved under authList)
-
 		// -------- Problem Reports --------
 		router.POST("/reports", controllers.CreateReport)
 		router.GET("/reports", controllers.FindReports)
@@ -130,8 +119,7 @@ func main() {
 		router.POST("/new-request", controllers.CreateRequest)
 		router.GET("/request", controllers.FindRequest)
 
-		// -------- Mods --------
-		// READ: เปิดสาธารณะเหมือนเดิม
+		// -------- Mods (public read) --------
 		router.GET("/mods", controllers.GetMods)
 		router.GET("/mods/:id", controllers.GetModById)
 		router.GET("/mods/:id/download", controllers.DownloadMod)
@@ -140,16 +128,14 @@ func main() {
 		router.GET("/modratings", controllers.GetModRatings)
 		router.GET("/modratings/:id", controllers.GetModRatingById)
 		router.POST("/modratings", controllers.CreateModRating)
-
-		// (WRITE ย้ายไปไว้ใต้ authList ด้านล่าง)
 	}
 
-	// 5) เส้นทางที่ต้อง Auth (แนบ Bearer หรือ X-User-ID)
-	authList := r.Group("/", AuthRequired())
+	// 5) Protected routes (ใช้ middlewares.AuthRequired ตัวเดียว)
+	authList := r.Group("/", middlewares.AuthRequired())
 	{
 		authList.GET("/me/permissions", controllers.GetMyPermissions)
 
-		// ฉีด user_id อัตโนมัติให้ GET /orders และ GET /payments
+		// ใส่ user_id อัตโนมัติให้ GET /orders และ GET /payments
 		withUserQuery := authList.Group("/", InjectUserIDQuery())
 		{
 			withUserQuery.GET("/orders", controllers.FindOrders)
@@ -171,7 +157,7 @@ func main() {
 		authList.POST("/payments/:id/approve", middlewares.RequireAdminPerm("admin:paymentreview"), controllers.ApprovePayment)
 		authList.POST("/payments/:id/reject", middlewares.RequireAdminPerm("admin:paymentreview"), controllers.RejectPayment)
 
-		// -------- Roles/Permissions (admin) --------
+		// Roles/Permissions (admin)
 		authList.POST("/roles", middlewares.RequireAdminPerm("admin:role"), controllers.CreateRole)
 		authList.PATCH("/roles/:id", middlewares.RequireAdminPerm("admin:role"), controllers.UpdateRole)
 		authList.DELETE("/roles/:id", middlewares.RequireAdminPerm("admin:role"), controllers.DeleteRole)
@@ -184,7 +170,7 @@ func main() {
 		authList.PATCH("/rolepermissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.UpdateRolePermission)
 		authList.DELETE("/rolepermissions/:id", middlewares.RequireAdminPerm("admin:role"), controllers.DeleteRolePermission)
 
-		// -------- Games (admin) --------
+		// Games (admin)
 		authList.POST("/new-game", middlewares.RequireAdminPerm("admin:game"), controllers.CreateGame)
 		authList.PUT("/update-game/:id", middlewares.RequireAdminPerm("admin:game"), controllers.UpdateGamebyID)
 		authList.POST("/upload/game", middlewares.RequireAdminPerm("admin:game"), controllers.UploadGame)
@@ -194,19 +180,19 @@ func main() {
 		authList.POST("/new-minimumspec", middlewares.RequireAdminPerm("admin:game"), controllers.CreateMinimumSpec)
 		authList.GET("/minimumspec", middlewares.RequireAdminPerm("admin:game"), controllers.FindMinimumSpec)
 
-		// -------- Promotions (admin) --------
+		// Promotions (admin)
 		authList.POST("/promotions", middlewares.RequireAdminPerm("admin:promotion"), controllers.CreatePromotion)
 		authList.PUT("/promotions/:id", middlewares.RequireAdminPerm("admin:promotion"), controllers.UpdatePromotion)
 		authList.DELETE("/promotions/:id", middlewares.RequireAdminPerm("admin:promotion"), controllers.DeletePromotion)
 		authList.POST("/promotions/:id/games", middlewares.RequireAdminPerm("admin:promotion"), controllers.SetPromotionGames)
 
-		// -------- Problem Reports (admin actions) --------
+		// Problem Reports (admin actions)
 		authList.POST("/admin/reports/:id/replies", middlewares.RequireAdminPerm("admin:page"), controllers.AdminCreateReply)
 		authList.PATCH("/admin/reports/:id/resolve", middlewares.RequireAdminPerm("admin:page"), controllers.AdminResolveReport)
 
-		// -------- Threads (WRITE only = ต้อง auth) --------
-		authList.POST("/threads", controllers.CreateThread)    // multipart: title, content, game_id, images[]
-		authList.PUT("/threads/:id", controllers.UpdateThread) // แก้ title/content
+		// Threads (write)
+		authList.POST("/threads", controllers.CreateThread)
+		authList.PUT("/threads/:id", controllers.UpdateThread)
 		authList.DELETE("/threads/:id", controllers.DeleteThread)
 		authList.POST("/threads/:id/comments", controllers.CreateComment)
 		authList.DELETE("/comments/:id", controllers.DeleteComment)
@@ -215,13 +201,11 @@ func main() {
 		authList.GET("/orders/:id/keys", controllers.FindOrderKeys)
 		authList.POST("/orders/:id/keys/:key_id/reveal", controllers.RevealOrderKey)
 
-		// -------- Mods (WRITE only = ต้อง auth) --------
-		// ✅ เพิ่มเฉพาะส่วนนี้ เพื่อบังคับให้ล็อกอินก่อนสร้าง/แก้ไข/ลบม็อด
+		// Mods (write)
 		authList.POST("/mods", controllers.CreateMod)
 		authList.PATCH("/mods/:id", controllers.UpdateMod)
 		authList.DELETE("/mods/:id", controllers.DeleteMod)
 		authList.GET("/mods/mine", controllers.GetMyMods)
-
 	}
 
 	// 6) Run server
@@ -245,84 +229,6 @@ func CORSMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-// AuthRequired: อ่าน user id จาก Bearer JWT (sub/user_id) หรือ X-User-ID
-func AuthRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		var userID uint
-
-		// 1) Bearer token
-		authz := c.GetHeader("Authorization")
-		if strings.HasPrefix(strings.ToLower(authz), "bearer ") {
-			raw := strings.TrimSpace(authz[7:])
-			if raw != "" {
-				secret := []byte(os.Getenv("JWT_SECRET"))
-				if len(secret) == 0 {
-					secret = []byte("secret")
-				}
-				if token, _ := jwt.Parse(raw, func(t *jwt.Token) (interface{}, error) {
-					return secret, nil
-				}); token != nil && token.Valid {
-					if claims, ok := token.Claims.(jwt.MapClaims); ok {
-						if sub, ok2 := claims["sub"].(string); ok2 {
-							if n, err := strconv.Atoi(sub); err == nil && n > 0 {
-								userID = uint(n)
-							}
-						}
-						if userID == 0 {
-							switch v := claims["user_id"].(type) {
-							case float64:
-								if v > 0 {
-									userID = uint(v)
-								}
-							case string:
-								if n, err := strconv.Atoi(v); err == nil && n > 0 {
-									userID = uint(n)
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-
-		// 2) สำรอง: X-User-ID
-		if userID == 0 {
-			if v := c.GetHeader("X-User-ID"); v != "" {
-				if n, err := strconv.Atoi(v); err == nil && n > 0 {
-					userID = uint(n)
-				}
-			}
-		}
-
-		if userID == 0 {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
-			return
-		}
-
-		// set context
-		c.Set("userID", userID)
-
-		// เติม roleID (รองรับทั้ง *uint และ uint)
-		var u entity.User
-		if err := configs.DB().Select("id, role_id").First(&u, userID).Error; err == nil {
-			switch v := any(getRoleField(u)).(type) {
-			case *uint:
-				if v != nil {
-					c.Set("roleID", *v)
-				}
-			case uint:
-				if v > 0 {
-					c.Set("roleID", v)
-				}
-			}
-		}
-		c.Next()
-	}
-}
-
-// รองรับ role_id ที่อาจประกาศเป็น pointer หรือไม่เป็น
-func getRoleField(u entity.User) interface{} { return any(u.RoleID) }
 
 // InjectUserIDQuery: ใส่ user_id ลง query ให้ /orders และ /payments (เฉพาะ GET)
 func InjectUserIDQuery() gin.HandlerFunc {

@@ -26,7 +26,8 @@ import {
   CheckOutlined,
 } from "@ant-design/icons";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import axios, { AxiosError } from "axios";
+import { useAuth } from "../../context/AuthContext";
 
 const { Title, Text } = Typography;
 const API_URL = "http://localhost:8088";
@@ -50,6 +51,12 @@ const RoleEdit: React.FC = () => {
   const navigate = useNavigate();
   const roleIdNum = useMemo(() => (id ? Number(id) : undefined), [id]);
 
+  const { token } = useAuth(); // ⬅️ เอา token จากบริบท
+  const authCfg = useMemo(
+    () => (token ? { headers: { Authorization: `Bearer ${token}` } } : undefined),
+    [token]
+  );
+
   const [messageApi, contextHolder] = message.useMessage();
 
   // Left: roles
@@ -69,14 +76,14 @@ const RoleEdit: React.FC = () => {
   const [permissionStates, setPermissionStates] = useState<Record<number, boolean>>({});
   const [rolePermissionMap, setRolePermissionMap] = useState<Record<number, number>>({});
   const [permissionSearch, setPermissionSearch] = useState("");
-  const [bulkLoading, setBulkLoading] = useState(false); // 🔹 สถานะโหลดเวลาทำ Select All / Clear All
+  const [bulkLoading, setBulkLoading] = useState(false);
 
   // Users
   const [allUsers, setAllUsers] = useState<User[]>([]);
 
   // Search states
-  const [memberSearch, setMemberSearch] = useState("");    // ในแท็บ “จัดการสมาชิก”
-  const [addSearchText, setAddSearchText] = useState("");  // ในโมดอล “เพิ่มสมาชิก”
+  const [memberSearch, setMemberSearch] = useState("");
+  const [addSearchText, setAddSearchText] = useState("");
 
   // Modal add members
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -159,30 +166,50 @@ const RoleEdit: React.FC = () => {
     });
   }, [rolePermissionMap, permissions]);
 
+  // -------- helpers --------
+  const requireToken = (): boolean => {
+    if (!token) {
+      messageApi.error("กรุณาเข้าสู่ระบบอีกครั้ง (missing token)");
+      return false;
+    }
+    return true;
+  };
+
+  const showAxiosError = (e: unknown, fallback: string) => {
+    const err = e as AxiosError<any>;
+    const msg =
+      (err.response?.data as any)?.error ||
+      err.response?.statusText ||
+      fallback;
+    messageApi.error(msg);
+  };
+
   // -------- actions --------
   const addRole = async () => {
+    if (!requireToken()) return;
     try {
-      const res = await axios.post<Role>(`${API_URL}/roles`, {
-        title: "New Role",
-        description: "",
-        color: "#a0a0a0",
-      });
+      const res = await axios.post<Role>(
+        `${API_URL}/roles`,
+        { title: "New Role", description: "", color: "#a0a0a0" },
+        authCfg
+      );
       messageApi.success("สร้างบทบาทใหม่เรียบร้อย");
       await fetchRoles();
       navigate(`/roles/${res.data.ID}`);
-    } catch {
-      messageApi.error("สร้างบทบาทไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "สร้างบทบาทไม่สำเร็จ");
     }
   };
 
   const deleteRole = async () => {
     if (!roleIdNum) return;
+    if (!requireToken()) return;
     try {
       setDeleting(true);
       const key = "deleteRole";
       messageApi.open({ key, type: "loading", content: "กำลังลบบทบาท...", duration: 0 });
 
-      await axios.delete(`${API_URL}/roles/${roleIdNum}`);
+      await axios.delete(`${API_URL}/roles/${roleIdNum}`, authCfg);
 
       const rolesRes = await axios.get<Role[]>(`${API_URL}/roles`);
       const fresh = rolesRes.data || [];
@@ -194,9 +221,7 @@ const RoleEdit: React.FC = () => {
         const oldIdx = roles.findIndex((r) => r.ID === roleIdNum);
         const nextIdx = Math.min(Math.max(oldIdx - 1, 0), fresh.length - 1);
         const nextId = fresh[nextIdx]?.ID;
-        if (nextId) {
-          navigate(`/roles/${nextId}`, { replace: true });
-        }
+        if (nextId) navigate(`/roles/${nextId}`, { replace: true });
       } else {
         setRoleName("");
         setRoleDescription("");
@@ -205,12 +230,8 @@ const RoleEdit: React.FC = () => {
         setPermissionStates({});
         setRolePermissionMap({});
       }
-    } catch (err: any) {
-      messageApi.open({
-        type: "error",
-        content: err?.response?.data?.error || "ลบบทบาทไม่สำเร็จ",
-        duration: 2.4,
-      });
+    } catch (e) {
+      showAxiosError(e, "ลบบทบาทไม่สำเร็จ");
     } finally {
       setDeleting(false);
     }
@@ -218,58 +239,61 @@ const RoleEdit: React.FC = () => {
 
   const updateRole = async () => {
     if (!roleIdNum) return;
+    if (!requireToken()) return;
     try {
-      await axios.patch(`${API_URL}/roles/${roleIdNum}`, {
-        title: roleName,
-        description: roleDescription,
-        color,
-      });
+      await axios.patch(
+        `${API_URL}/roles/${roleIdNum}`,
+        { title: roleName, description: roleDescription, color },
+        authCfg
+      );
       messageApi.success("บันทึกบทบาทเรียบร้อย");
       fetchRoles();
-    } catch {
-      messageApi.error("บันทึกบทบาทไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "บันทึกบทบาทไม่สำเร็จ");
     }
   };
 
   const togglePermission = async (pid: number, checked: boolean) => {
     if (!roleIdNum) return;
+    if (!requireToken()) return;
     try {
       if (checked) {
-        const res = await axios.post(`${API_URL}/rolepermissions`, {
-          role_id: roleIdNum,
-          permission_id: pid,
-        });
+        const res = await axios.post(
+          `${API_URL}/rolepermissions`,
+          { role_id: roleIdNum, permission_id: pid },
+          authCfg
+        );
         setRolePermissionMap({ ...rolePermissionMap, [pid]: (res.data as any).ID });
         setPermissionStates({ ...permissionStates, [pid]: true });
       } else {
         const rpID = rolePermissionMap[pid];
         if (!rpID) return;
-        await axios.delete(`${API_URL}/rolepermissions/${rpID}`);
+        await axios.delete(`${API_URL}/rolepermissions/${rpID}`, authCfg);
         const newMap = { ...rolePermissionMap };
         delete newMap[pid];
         setRolePermissionMap(newMap);
         setPermissionStates({ ...permissionStates, [pid]: false });
       }
-    } catch {
-      messageApi.error("อัปเดตสิทธิ์ไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "อัปเดตสิทธิ์ไม่สำเร็จ");
     }
   };
 
-  // 🔹 ช่วยเหลือสำหรับเลือก/ล้าง ทั้งชุด (ทำตามผลการค้นหา)
+  // bulk select/clear (ตามผลการค้นหา)
   const enablePermissions = async (pids: number[]) => {
     if (!roleIdNum) return;
-    // เฉพาะตัวที่ยังไม่เปิดอยู่
+    if (!requireToken()) return;
     const toCreate = pids.filter((pid) => !permissionStates[pid]);
     if (!toCreate.length) return;
     const results = await Promise.all(
       toCreate.map((pid) =>
-        axios.post(`${API_URL}/rolepermissions`, {
-          role_id: roleIdNum,
-          permission_id: pid,
-        })
+        axios.post(
+          `${API_URL}/rolepermissions`,
+          { role_id: roleIdNum, permission_id: pid },
+          authCfg
+        )
       )
     );
-    // อัปเดต map/state ทีเดียว
     const newMap = { ...rolePermissionMap };
     const newState = { ...permissionStates };
     results.forEach((res, idx) => {
@@ -284,14 +308,14 @@ const RoleEdit: React.FC = () => {
 
   const disablePermissions = async (pids: number[]) => {
     if (!roleIdNum) return;
-    // เฉพาะตัวที่เปิดอยู่
+    if (!requireToken()) return;
     const toDelete = pids.filter((pid) => !!permissionStates[pid]);
     if (!toDelete.length) return;
     await Promise.all(
       toDelete.map((pid) => {
         const rpID = rolePermissionMap[pid];
         if (!rpID) return Promise.resolve(null as any);
-        return axios.delete(`${API_URL}/rolepermissions/${rpID}`);
+        return axios.delete(`${API_URL}/rolepermissions/${rpID}`, authCfg);
       })
     );
     const newMap = { ...rolePermissionMap };
@@ -307,11 +331,11 @@ const RoleEdit: React.FC = () => {
   const handleSelectAll = async () => {
     try {
       setBulkLoading(true);
-      const ids = filteredPermissions.map((p) => p.ID); // ตามผลการค้นหา
+      const ids = filteredPermissions.map((p) => p.ID);
       await enablePermissions(ids);
       messageApi.success("เปิดสิทธิ์ทั้งหมดตามที่แสดงแล้ว");
-    } catch {
-      messageApi.error("เปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "เปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
     } finally {
       setBulkLoading(false);
     }
@@ -320,11 +344,11 @@ const RoleEdit: React.FC = () => {
   const handleClearAll = async () => {
     try {
       setBulkLoading(true);
-      const ids = filteredPermissions.map((p) => p.ID); // ตามผลการค้นหา
+      const ids = filteredPermissions.map((p) => p.ID);
       await disablePermissions(ids);
       messageApi.success("ปิดสิทธิ์ทั้งหมดตามที่แสดงแล้ว");
-    } catch {
-      messageApi.error("ปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "ปิดสิทธิ์ทั้งหมดไม่สำเร็จ");
     } finally {
       setBulkLoading(false);
     }
@@ -338,12 +362,13 @@ const RoleEdit: React.FC = () => {
       return;
     }
     try {
+      // endpoint นี้ของคุณอยู่ public ก็ได้ / จะส่ง token ไปด้วยก็ไม่เป็นไร
       await axios.patch(`${API_URL}/users/${uid}/role`, { role_id: defaultRoleId });
       const res = await axios.get<Role>(`${API_URL}/roles/${roleIdNum}`);
       setMembers(res.data.users || []);
       messageApi.success(`นำ ${username} ออกจากบทบาทเรียบร้อย`);
-    } catch {
-      messageApi.error("นำสมาชิกออกไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "นำสมาชิกออกไม่สำเร็จ");
     }
   };
 
@@ -377,8 +402,8 @@ const RoleEdit: React.FC = () => {
       setIsModalVisible(false);
       setSelectedMembers([]);
       messageApi.success("เพิ่มสมาชิกเข้าบทบาทเรียบร้อย");
-    } catch {
-      messageApi.error("เพิ่มสมาชิกไม่สำเร็จ");
+    } catch (e) {
+      showAxiosError(e, "เพิ่มสมาชิกไม่สำเร็จ");
     } finally {
       setAddingMembers(false);
     }
@@ -425,7 +450,6 @@ const RoleEdit: React.FC = () => {
     >
       {contextHolder}
 
-      {/* ไม่แตะ CSS ภายนอก — ใช้เฉพาะ inline style */}
       <div
         className="role-page"
         style={{ background: "#141414", height: "100vh", flex: 1, overflow: "hidden", display: "flex" }}
@@ -488,7 +512,7 @@ const RoleEdit: React.FC = () => {
             overflow: "hidden",
           }}
         >
-          {/* Header (fixed) */}
+          {/* Header */}
           <div style={{ display: "flex", marginBottom: 16, alignItems: "center", gap: 16 }}>
             <Title level={4} style={{ color: "white", margin: 0 }}>
               แก้ไขบทบาท – {roleName ? roleName.toUpperCase() : "LOADING"}
@@ -551,7 +575,6 @@ const RoleEdit: React.FC = () => {
                     label: <Text style={{ color: "white" }}>การอนุญาต</Text>,
                     children: (
                       <div style={{ maxWidth: 700 }}>
-                        {/* แถวควบคุมค้นหา + ปุ่มเลือก/ล้างทั้งหมด */}
                         <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
                           <Input.Search
                             placeholder="ค้นหาสิทธิ์"
@@ -560,23 +583,14 @@ const RoleEdit: React.FC = () => {
                             style={{ flex: "1 1 260px", minWidth: 220 }}
                             allowClear
                           />
-                          <Button
-                            onClick={handleSelectAll}
-                            loading={bulkLoading}
-                            disabled={bulkLoading || filteredPermissions.length === 0}
-                          >
+                          <Button onClick={handleSelectAll} loading={bulkLoading} disabled={bulkLoading || filteredPermissions.length === 0}>
                             เลือกทั้งหมด (ตามที่แสดง)
                           </Button>
-                          <Button
-                            onClick={handleClearAll}
-                            loading={bulkLoading}
-                            disabled={bulkLoading || filteredPermissions.length === 0}
-                          >
+                          <Button onClick={handleClearAll} loading={bulkLoading} disabled={bulkLoading || filteredPermissions.length === 0}>
                             ล้างทั้งหมด (ตามที่แสดง)
                           </Button>
                         </div>
 
-                        {/* 🔹 เลื่อนเฉพาะรายการสิทธิ์ */}
                         <div style={{ height: scrollAreaHeight, overflowY: "auto", paddingRight: 8 }}>
                           {filteredPermissions.map((perm) => (
                             <div
@@ -702,18 +716,11 @@ const RoleEdit: React.FC = () => {
                         border: selected ? "1px solid #91caff" : "1px solid transparent",
                         transition: "background-color 0.15s, border-color 0.15s",
                       }}
-                      actions={[
-                        selected ? (
-                          <CheckOutlined key="checked" style={{ color: "#1677ff" }} />
-                        ) : null,
-                      ]}
+                      actions={[ selected ? <CheckOutlined key="checked" style={{ color: "#1677ff" }} /> : null ]}
                     >
                       <Checkbox
                         checked={selected}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCheckboxToggle(user.ID);
-                        }}
+                        onClick={(e) => { e.stopPropagation(); handleCheckboxToggle(user.ID); }}
                         style={{ marginRight: 8 }}
                       />
                       <span style={{ color: "#000" }}>{user.username}</span>

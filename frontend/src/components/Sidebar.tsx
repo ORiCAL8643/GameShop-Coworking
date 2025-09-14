@@ -2,23 +2,33 @@
 import { Layout, Menu, Badge } from "antd";
 import type { MenuProps } from "antd";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { DollarOutlined, FlagOutlined, HomeOutlined, PlusOutlined, RetweetOutlined, SendOutlined, TeamOutlined, ToolOutlined } from "@ant-design/icons";
-import { useEffect, useMemo, useState } from "react";
+import {
+  DollarOutlined, FlagOutlined, HomeOutlined, PlusOutlined,
+  RetweetOutlined, SendOutlined, TeamOutlined, ToolOutlined
+} from "@ant-design/icons";
+import { useEffect, useMemo, useState, useCallback } from "react"; // ⬅️ useCallback
 import { useReportNewCount } from "../hooks/useReportNewCount";
 import type { ItemType } from "antd/es/menu/interface";
 import { useAuth } from "../context/AuthContext";
 
 const { Sider, Content } = Layout;
-type GroupItem = Required<MenuProps>["items"][number];
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ นับเคสใหม่ทุก 8s (หรือปรับตามต้องการ)
   const reportCount = useReportNewCount(8000);
-  const { perms } = useAuth();
-  const has = (p: string) => perms.includes("admin:all") || perms.includes(p);
+
+  // ⬇️ กัน perms undefined และเร่ง includes ด้วย Set
+  const { perms = [] } = useAuth() as { perms?: string[] };
+  const permSet = useMemo(() => new Set(perms ?? []), [perms]);
+  const has = useCallback(
+    (p: string) => permSet.has("admin:all") || permSet.has(p),
+    [permSet]
+  );
+
+  // (debug ชั่วคราว) ลองดูค่าที่ได้จาก useAuth
+  // useEffect(() => { console.log("[Sidebar perms]", perms); }, [perms]);
 
   const rootSubmenuKeys = useMemo(() => ["/information", "/category", "/Admin"], []);
   const selectedKey = location.pathname;
@@ -34,7 +44,6 @@ const Sidebar = () => {
     setOpenKeys(keys as string[]);
   };
 
-  // ✅ Label Page + Badge (โชว์แม้เป็น 0)
   const adminPageLabel = (
     <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
       <span>Page</span>
@@ -65,8 +74,13 @@ const Sidebar = () => {
     if (has("admin:page")) children.push({ key: "/Admin/Page", label: adminPageLabel, icon: <PlusOutlined /> });
     if (has("admin:paymentreview")) children.push({ key: "/Admin/PaymentReviewPage", label: "PaymentReview", icon: <PlusOutlined /> });
     if (has("admin:role")) children.push({ key: "/Admin/RolePage", label: "Role", icon: <PlusOutlined /> });
+
     if (children.length > 0) {
       items.push({ key: "/Admin", label: "Admin", children });
+    } else {
+      // ⬇️ (ออปชัน) แสดงหัวข้อ Admin ไว้ก่อน ถ้าคุณมีหน้า /Admin เป็น Dashboard
+      // ถ้าไม่มีหน้า /Admin ให้ลบบล็อกนี้ทิ้ง เพื่อคงพฤติกรรมเดิม
+      items.push({ key: "/Admin", label: "Admin" });
     }
   }
 
@@ -87,10 +101,9 @@ const Sidebar = () => {
         />
       </Sider>
 
-      {/* ✅ โซนเนื้อหาหลักต้องอยู่ใน Content */}
       <Layout style={{ background: "#0f0f0f" }}>
         <Content style={{ margin: 0, padding: 0, minHeight: "100vh" }}>
-            <Outlet />
+          <Outlet />
         </Content>
       </Layout>
     </Layout>
